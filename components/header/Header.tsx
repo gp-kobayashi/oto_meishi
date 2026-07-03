@@ -6,7 +6,7 @@ const Header = () => {
       <h1 className={styles.title}>oto_meishi</h1>
       <nav className={styles.nav} aria-label="main navigation">
         <a href="/login">ログイン</a>
-        <a href="/register">登録</a>
+        <a href="/signup">登録</a>
         <a href="/help">ヘルプ</a>
         <a href="/terms">利用規約</a>
       </nav>

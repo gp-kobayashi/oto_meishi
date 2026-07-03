@@ -70,7 +70,7 @@ export default function Home() {
 
         <div className={styles.arrow} aria-hidden="true" />
 
-        <a className={styles.registerButton} href="/register">
+        <a className={styles.registerButton} href="/signup">
           アカウント登録ページへ
         </a>
       </section>
