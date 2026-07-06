@@ -1,0 +1,121 @@
+/* ========================================
+   AudioPlayer – カスタムオーディオプレーヤー
+   白基調 + 薄い灰色ボーダー
+   ======================================== */
+
+.audioContainer {
+  width: 90%;
+  margin: 0 auto;
+  padding: 8px 20px;
+  background: #ffffff;
+  border: 3px solid #e2e5e9;
+  border-radius: 36px;
+  box-sizing: border-box;
+}
+
+/* ---------- 上段: 再生ボタン + プログレスバー ---------- */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 再生 / 一時停止ボタン */
+.playButton {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 3px solid #d0d5db;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.playButton:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+}
+
+.playButton:active {
+  background: #e2e8f0;
+}
+
+.icon {
+  width: 36px;
+  height: 36px;
+}
+
+/* ---------- プログレスバー ---------- */
+.progressBar {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  height: 6px;
+  background: #eef0f3;
+  border-radius: 3px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #64748b;
+  border-radius: 3px;
+  transition: width 0.15s linear;
+}
+
+.progressThumb {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 12px;
+  background: #475569;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.progressBar:hover .progressThumb {
+  opacity: 1;
+}
+
+.time {
+  flex-shrink: 0;
+  margin: 0;
+  color: #94a3b8;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.timeSeparator {
+  margin: 0 3px;
+  color: #cbd5e1;
+}
+
+/* ---------- テキストボックス ---------- */
+
+.title {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
