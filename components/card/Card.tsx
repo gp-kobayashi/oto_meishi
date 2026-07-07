@@ -1,15 +1,18 @@
 "use client";
 import styles from "./Card.module.css";
+import Background from "./background/Background";
 import AudioPlayer from "./audioPlayer/AudioPlayer";
 import SocialLink from "../card/socialLink/SocialLink";
 import QRCode from "./QRCode/QRCode";
 import type { ProfileData } from "../../lib/mock/profileData";
 
 const Card = ({ link }: { link: ProfileData }) => {
-  const { username, displayName, bio, audioUrl, audioTitle, sns } = link;
+  const { username, displayName, bio, audioUrl, audioTitle, sns, theme = "normal" } = link;
+  const themeClass = styles[theme] || styles.normal;
 
   return (
-    <div className={styles.card}>
+    <div className={`${styles.card} ${themeClass}`}>
+      <Background theme={theme} />
       <h2 id="profile-title" className={styles.title}>
         {displayName}
       </h2>

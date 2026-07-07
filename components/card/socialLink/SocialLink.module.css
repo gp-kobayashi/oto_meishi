@@ -1,31 +1,47 @@
 .snsLink {
   display: flex;
   margin: 0 auto;
-  width: 80%;
-  padding: 4px;
-  min-height: 25px;
+  width: 85%;
+  padding: 8px 12px;
+  min-height: 28px;
   text-decoration: none;
   font-size: 20px;
-  border: 2px solid;
-  border-color: #c0c0c0;
+  border: var(--sns-border);
   border-radius: 30px;
+  background: var(--sns-bg);
+  color: var(--sns-text);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.02);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .snsLink:hover {
-  background: rgba(22, 119, 194, 0.08);
+  background: var(--sns-hover-bg);
+  border-color: var(--sns-hover-border);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.06);
+}
+
+.snsLink:active {
+  transform: translateY(0);
 }
 
 .textContainer {
   display: flex;
   align-items: center;
   width: 100%;
-  padding: 4px 0;
 }
 
 .icon {
-  margin: 0 40px;
+  margin: 0 24px 0 16px;
+  flex-shrink: 0;
+  transition: transform 0.25s ease;
+}
+
+.snsLink:hover .icon {
+  transform: scale(1.15);
 }
 
 .labelText {
-  font-size: 16px;
-}
+  font-size: 15px;
+  font-weight: 600;
+}

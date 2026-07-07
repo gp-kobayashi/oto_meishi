@@ -1,0 +1,227 @@
+.backgroundContainer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  background: var(--bg-gradient);
+  transition: background 0.5s ease;
+}
+
+.blob {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  opacity: 0.65;
+  filter: blur(45px);
+  mix-blend-mode: multiply;
+  transition: background 0.5s ease;
+}
+
+/* Animations for premium floating blobs */
+.back {
+  background: var(--blob-back);
+  left: -40px;
+  top: -40px;
+  animation: floatBack 18s ease-in-out infinite alternate;
+}
+
+.middle {
+  background: var(--blob-middle);
+  right: -50px;
+  bottom: -30px;
+  animation: floatMiddle 22s ease-in-out infinite alternate;
+}
+
+.front {
+  background: var(--blob-front);
+  left: 25%;
+  top: 20%;
+  animation: floatFront 15s ease-in-out infinite alternate;
+}
+
+@keyframes floatBack {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(50px, 30px) scale(1.15);
+  }
+  100% {
+    transform: translate(-20px, 60px) scale(0.9);
+  }
+}
+
+@keyframes floatMiddle {
+  0% {
+    transform: translate(0, 0) scale(1.1);
+  }
+  50% {
+    transform: translate(-40px, -50px) scale(0.85);
+  }
+  100% {
+    transform: translate(30px, 20px) scale(1.2);
+  }
+}
+
+@keyframes floatFront {
+  0% {
+    transform: translate(0, 0) scale(0.9);
+  }
+  50% {
+    transform: translate(-30px, 40px) scale(1.15);
+  }
+  100% {
+    transform: translate(40px, -20px) scale(0.95);
+  }
+}
+
+/* Normal (Default soft light blue theme) */
+.normal {
+  --bg-gradient: linear-gradient(180deg, rgba(255, 255, 255, 0.95), #f1f5f9);
+  --blob-back: #c3e2ff;
+  --blob-middle: #a3d3ff;
+  --blob-front: #e0f2fe;
+}
+
+/* Dark Theme (Midnight Cyberpunk / Neon Purple & Cyan) */
+.dark {
+  --bg-gradient: linear-gradient(180deg, #0b0f19, #111827);
+}
+
+.darkBlob {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  border-radius: 50%;
+  opacity: 0.35;
+  filter: blur(55px);
+  mix-blend-mode: screen;
+  transition: background 0.5s ease;
+}
+
+.darkBack {
+  background: #4f46e5; /* Indigo */
+  left: -20px;
+  top: -20px;
+  animation: floatBack 25s ease-in-out infinite alternate;
+}
+
+.darkMiddle {
+  background: #7c3aed; /* Violet */
+  right: -30px;
+  bottom: -30px;
+  animation: floatMiddle 30s ease-in-out infinite alternate;
+}
+
+.darkFront {
+  background: #06b6d4; /* Cyan */
+  left: 30%;
+  top: 30%;
+  animation: floatFront 20s ease-in-out infinite alternate;
+}
+
+/* Light Theme (Golden Hour / Warm Peach & Gold) */
+.light {
+  --bg-gradient: linear-gradient(180deg, #fffcf9, #fbf4ec);
+}
+
+.lightBlob {
+  position: absolute;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  opacity: 0.55;
+  filter: blur(45px);
+  mix-blend-mode: multiply;
+  transition: background 0.5s ease;
+}
+
+.lightBack {
+  background: #fbcfe8; /* Pink 200 */
+  left: -40px;
+  top: -10px;
+  animation: floatBack 22s ease-in-out infinite alternate;
+}
+
+.lightMiddle {
+  background: #fed7aa; /* Orange 200 */
+  right: -40px;
+  bottom: -20px;
+  animation: floatMiddle 26s ease-in-out infinite alternate;
+}
+
+.lightFront {
+  background: #fef08a; /* Yellow 200 */
+  left: 20%;
+  top: 25%;
+  animation: floatFront 18s ease-in-out infinite alternate;
+}
+
+/* Colorful Theme (Holographic / Hyper-Vibrant Aurora) */
+.colorful {
+  --bg-gradient: linear-gradient(135deg, #1e1b4b, #311042);
+}
+
+.colorfulBlob {
+  position: absolute;
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  opacity: 0.65;
+  filter: blur(50px);
+  mix-blend-mode: screen;
+  transition: background 0.5s ease;
+}
+
+.color1 {
+  background: #ec4899; /* Pink 500 */
+  left: -30px;
+  top: -30px;
+  animation: floatBack 12s ease-in-out infinite alternate;
+}
+
+.color2 {
+  background: #06b6d4; /* Cyan 500 */
+  right: -40px;
+  bottom: -40px;
+  animation: floatMiddle 15s ease-in-out infinite alternate;
+}
+
+.color3 {
+  background: #10b981; /* Emerald 500 */
+  left: 35%;
+  top: 15%;
+  animation: floatFront 11s ease-in-out infinite alternate;
+}
+
+.color4 {
+  background: #eab308; /* Yellow 500 */
+  right: 25%;
+  top: 50%;
+  animation: floatExtra 14s ease-in-out infinite alternate;
+}
+
+.gridOverlay {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+@keyframes floatExtra {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(30px, -45px) scale(1.2);
+  }
+  100% {
+    transform: translate(-25px, 25px) scale(0.85);
+  }
+}
+

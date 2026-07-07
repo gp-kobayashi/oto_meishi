@@ -1,67 +1,68 @@
 /* ========================================
-   AudioPlayer – カスタムオーディオプレーヤー
-   白基調 + 薄い灰色ボーダー
+   AudioPlayer – Custom Audio Player
+   Interactive styling with parent theme variables
    ======================================== */
 
 .audioContainer {
-  width: 90%;
+  width: 95%;
   margin: 0 auto;
-  padding: 8px 20px;
-  background: #ffffff;
-  border: 3px solid #e2e5e9;
+  padding: 10px 20px;
+  background: var(--player-bg);
+  border: var(--player-border);
   border-radius: 36px;
   box-sizing: border-box;
+  transition: all 0.5s ease;
 }
 
-/* ---------- 上段: 再生ボタン + プログレスバー ---------- */
+/* ---------- Controls Panel ---------- */
 .controls {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-/* 再生 / 一時停止ボタン */
+/* Play/Pause Button */
 .playButton {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  border: 3px solid #d0d5db;
+  border: var(--player-button-border);
   border-radius: 50%;
-  background: #ffffff;
-  color: #334155;
+  background: var(--player-button-bg);
+  color: var(--player-button-color);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .playButton:hover {
-  background: #f1f5f9;
-  border-color: #94a3b8;
-  color: #1e293b;
+  transform: scale(1.06);
+  opacity: 0.95;
 }
 
 .playButton:active {
-  background: #e2e8f0;
+  transform: scale(0.94);
 }
 
 .icon {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
 }
 
-/* ---------- プログレスバー ---------- */
+/* ---------- Progress Bar ---------- */
 .progressBar {
   flex: 1;
   min-width: 0;
   position: relative;
   height: 6px;
-  background: #eef0f3;
+  background: var(--player-bar-bg);
   border-radius: 3px;
   cursor: pointer;
   user-select: none;
+  transition: background 0.5s ease;
 }
 
 .progressFill {
@@ -69,9 +70,9 @@
   top: 0;
   left: 0;
   height: 100%;
-  background: #64748b;
+  background: var(--player-bar-fill);
   border-radius: 3px;
-  transition: width 0.15s linear;
+  transition: width 0.15s linear, background 0.5s ease;
 }
 
 .progressThumb {
@@ -79,13 +80,13 @@
   top: 50%;
   width: 12px;
   height: 12px;
-  background: #475569;
-  border: 2px solid #ffffff;
+  background: var(--player-bar-fill);
+  border: 2px solid var(--player-button-bg);
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, background 0.5s ease;
 }
 
 .progressBar:hover .progressThumb {
@@ -95,27 +96,30 @@
 .time {
   flex-shrink: 0;
   margin: 0;
-  color: #94a3b8;
+  color: var(--card-text-secondary);
+  opacity: 0.85;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
   line-height: 1;
   white-space: nowrap;
+  transition: color 0.5s ease;
 }
 
 .timeSeparator {
   margin: 0 3px;
-  color: #cbd5e1;
+  opacity: 0.6;
 }
 
-/* ---------- テキストボックス ---------- */
-
+/* ---------- Text Info ---------- */
 .title {
-  color: #475569;
+  margin: 6px 0 0;
+  color: var(--card-text-secondary);
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
+  transition: color 0.5s ease;
+}

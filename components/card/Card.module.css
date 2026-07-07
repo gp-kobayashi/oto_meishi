@@ -1,29 +1,36 @@
 .card {
+  position: relative;
+  overflow: hidden;
   max-width: 460px;
   margin: 0 auto;
-  padding: 32px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(31, 41, 51, 0.12);
-  border-radius: 100px;
-  box-shadow: 0 12px 30px rgba(32, 47, 67, 0.1);
-  backdrop-filter: blur(8px);
+  text-align: center;
+  padding: 32px 40px;
+  border: var(--card-border);
+  border-radius: 40px;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(12px);
+  background: var(--card-bg);
+  color: var(--card-text-primary);
+  font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  transition: all 0.5s ease;
 }
 
 .title {
-  margin: 0 0 16px;
-  color: #18212b;
-  font-size: 28px;
-  font-weight: 600;
-  line-height: 1.2;
+  margin: 0 0 12px;
+  color: var(--card-text-primary);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.25;
+  transition: color 0.5s ease;
 }
 
 .bio {
-  margin: 0 0 24px;
-  color: #475569;
+  margin: 0 0 28px;
+  color: var(--card-text-secondary);
   font-size: 16px;
   line-height: 1.6;
+  transition: color 0.5s ease;
 }
-
 
 .snsList {
   list-style: none;
@@ -31,7 +38,7 @@
   justify-content: center;
 }
 .snsItem {
-  margin: 24px 0;
+  margin: 20px 0;
 }
 
 .qrCodeContainer {
@@ -39,11 +46,102 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  margin-top: 24px;
+  margin-top: 28px;
+  color: var(--qr-text);
+  font-size: 13px;
+  font-weight: 500;
+  transition: color 0.5s ease;
 }
 
 @media (max-width: 780px) {
   .card {
     padding: 24px;
+    border-radius: 32px;
   }
 }
+
+/* Theme Custom Variables */
+.normal {
+  --card-bg: rgba(255, 255, 255, 0.45);
+  --card-border: 1px solid rgba(255, 255, 255, 0.6);
+  --card-shadow: 0 20px 40px rgba(148, 163, 184, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+  --card-text-primary: #1e293b;
+  --card-text-secondary: #475569;
+  --player-bg: rgba(255, 255, 255, 0.7);
+  --player-border: 1.5px solid rgba(226, 229, 233, 0.8);
+  --player-button-bg: #ffffff;
+  --player-button-border: 2px solid #cbd5e1;
+  --player-button-color: #475569;
+  --player-bar-bg: #e2e8f0;
+  --player-bar-fill: #3b82f6;
+  --sns-bg: rgba(255, 255, 255, 0.6);
+  --sns-border: 1.5px solid rgba(208, 213, 221, 0.8);
+  --sns-text: #475569;
+  --sns-hover-bg: rgba(59, 130, 246, 0.08);
+  --sns-hover-border: 1.5px solid #3b82f6;
+  --qr-text: #64748b;
+}
+
+.dark {
+  --card-bg: rgba(15, 23, 42, 0.6);
+  --card-border: 1px solid rgba(139, 92, 246, 0.3);
+  --card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 15px rgba(139, 92, 246, 0.15);
+  --card-text-primary: #f8fafc;
+  --card-text-secondary: #cbd5e1;
+  --player-bg: rgba(30, 41, 59, 0.75);
+  --player-border: 1.5px solid rgba(71, 85, 105, 0.5);
+  --player-button-bg: #1e293b;
+  --player-button-border: 2px solid #8b5cf6;
+  --player-button-color: #a78bfa;
+  --player-bar-bg: #334155;
+  --player-bar-fill: #8b5cf6;
+  --sns-bg: rgba(30, 41, 59, 0.6);
+  --sns-border: 1.5px solid rgba(139, 92, 246, 0.35);
+  --sns-text: #e2e8f0;
+  --sns-hover-bg: rgba(139, 92, 246, 0.15);
+  --sns-hover-border: 1.5px solid #a78bfa;
+  --qr-text: #94a3b8;
+}
+
+.light {
+  --card-bg: rgba(254, 250, 246, 0.65);
+  --card-border: 1px solid rgba(217, 119, 6, 0.2);
+  --card-shadow: 0 20px 40px rgba(120, 53, 4, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  --card-text-primary: #451a03;
+  --card-text-secondary: #78350f;
+  --player-bg: rgba(255, 255, 255, 0.75);
+  --player-border: 1.5px solid rgba(251, 191, 36, 0.3);
+  --player-button-bg: #fffcf9;
+  --player-button-border: 2px solid #f59e0b;
+  --player-button-color: #b45309;
+  --player-bar-bg: #fef3c7;
+  --player-bar-fill: #d97706;
+  --sns-bg: rgba(255, 255, 255, 0.65);
+  --sns-border: 1.5px solid rgba(245, 158, 11, 0.3);
+  --sns-text: #78350f;
+  --sns-hover-bg: rgba(245, 158, 11, 0.08);
+  --sns-hover-border: 1.5px solid #d97706;
+  --qr-text: #b45309;
+}
+
+.colorful {
+  --card-bg: rgba(30, 27, 75, 0.55);
+  --card-border: 1px solid rgba(255, 255, 255, 0.2);
+  --card-shadow: 0 30px 60px rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  --card-text-primary: #ffffff;
+  --card-text-secondary: #e0e7ff;
+  --player-bg: rgba(15, 23, 42, 0.7);
+  --player-border: 1.5px solid rgba(255, 255, 255, 0.15);
+  --player-button-bg: #ec4899;
+  --player-button-border: 2px solid #ffffff;
+  --player-button-color: #ffffff;
+  --player-bar-bg: rgba(255, 255, 255, 0.15);
+  --player-bar-fill: #06b6d4;
+  --sns-bg: rgba(255, 255, 255, 0.1);
+  --sns-border: 1.5px solid rgba(255, 255, 255, 0.2);
+  --sns-text: #ffffff;
+  --sns-hover-bg: rgba(255, 255, 255, 0.2);
+  --sns-hover-border: 1.5px solid #ec4899;
+  --qr-text: #e2e8f0;
+}
+
