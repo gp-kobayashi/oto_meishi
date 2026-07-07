@@ -18,10 +18,12 @@ type SocialLink = {
   url: string;
   label: string;
 };
+type theme = "normal" | "dark" | "light" | "colorful";
+
 interface ProfileData {
   id: string;
   username: string;
-  card: string;
+  theme: theme;
   displayName: string;
   bio: string;
   audioUrl: string;

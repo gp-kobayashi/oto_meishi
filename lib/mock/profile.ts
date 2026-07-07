@@ -1,8 +1,8 @@
 const demoProfile = {
   id: "1",
   username: "demo_user",
-  card: "demo",
-  displayName: "demo_user",
+  theme: "normal",
+  displayName: "デモユーザー",
   bio: "音で伝える名刺サービスのデモアカウントです。",
   audioUrl: "/demo/sound.mp3",
   audioTitle: "音声のタイトルは文字数を多めに表示",
