@@ -16,6 +16,9 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProviderLoading, setIsProviderLoading] = useState<
+    "google" | "facebook" | null
+  >(null);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -63,6 +66,33 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
     }
   };
 
+  const handleSocialSignIn = async (provider: "google" | "facebook") => {
+    setError(null);
+    setMessage(null);
+    setIsProviderLoading(provider);
+
+    if (!supabase) {
+      setError(
+        "Supabase の環境変数が設定されていません。まずは .env.local に URL と anon key を設定してください。",
+      );
+      setIsProviderLoading(null);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/profile`,
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+    }
+
+    setIsProviderLoading(null);
+  };
+
   return (
     <div
       className={styles.panel}
@@ -70,13 +100,23 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
     >
       {/* Social Provider Buttons */}
       <div className={styles.providerStack}>
-        <button className={styles.providerButton} type="button">
+        <button
+          className={styles.providerButton}
+          type="button"
+          onClick={() => handleSocialSignIn("google")}
+          disabled={isSubmitting || isProviderLoading !== null}
+        >
           <span className={styles.googleMark} aria-hidden="true">
             G
           </span>
           {isSignup ? "Googleアカウントで登録" : "Googleアカウントでログイン"}
         </button>
-        <button className={styles.providerButton} type="button">
+        <button
+          className={styles.providerButton}
+          type="button"
+          onClick={() => handleSocialSignIn("facebook")}
+          disabled={isSubmitting || isProviderLoading !== null}
+        >
           <span className={styles.facebookMark} aria-hidden="true">
             f
           </span>
