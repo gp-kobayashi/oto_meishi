@@ -4,12 +4,12 @@ import demoProfile from "../../lib/mock/profile";
 import styles from "./page.module.css";
 import type { ProfileData } from "../../lib/mock/profileData";
 
-const UsernamePage = async ({
+const UserIdPage = async ({
   params,
 }: {
-  params: Promise<{ username: string }>;
+  params: Promise<{ userId: string }>;
 }) => {
-  const { username } = await params;
+  const { userId } = await params;
   const link = demoProfile as ProfileData;
 
   return (
@@ -21,4 +21,4 @@ const UsernamePage = async ({
     </main>
   );
 };
-export default UsernamePage;
+export default UserIdPage;
