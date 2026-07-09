@@ -7,7 +7,15 @@ import QRCode from "./QRCode/QRCode";
 import type { ProfileData } from "../../lib/mock/profileData";
 
 const Card = ({ link }: { link: ProfileData }) => {
-  const { username, displayName, bio, audioUrl, audioTitle, sns, theme = "normal" } = link;
+  const {
+    userId,
+    displayName,
+    bio,
+    audioUrl,
+    audioTitle,
+    sns,
+    theme = "normal",
+  } = link;
   const themeClass = styles[theme] || styles.normal;
 
   return (
@@ -27,7 +35,7 @@ const Card = ({ link }: { link: ProfileData }) => {
       </ul>
       <div className={styles.qrCodeContainer}>
         <p>QRコードで名刺を共有</p>
-        <QRCode username={username} />
+        <QRCode username={userId} />
       </div>
     </div>
   );
