@@ -1,6 +1,6 @@
 const demoProfile = {
   id: "1",
-  username: "demo_user",
+  userId: "demo_user",
   theme: "normal",
   displayName: "デモユーザー",
   bio: "音で伝える名刺サービスのデモアカウントです。",

@@ -22,7 +22,7 @@ type theme = "normal" | "dark" | "light" | "colorful";
 
 interface ProfileData {
   id: string;
-  username: string;
+  userId: string;
   theme: theme;
   displayName: string;
   bio: string;
