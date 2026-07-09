@@ -18,7 +18,7 @@ export default function SignupPage() {
           <p className={styles.description}>
             音声つきの名刺ページを作るための登録画面です。
             <br />
-            メールアドレス、Google、Xのいずれかで始められます。
+            メールアドレス、Google、Facebookのいずれかで始められます。
           </p>
         </div>
 

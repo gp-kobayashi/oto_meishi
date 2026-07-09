@@ -18,7 +18,7 @@ export default function LoginPage() {
           <p className={styles.description}>
             音声つきの名刺ページを作るためのログイン画面です。
             <br />
-            メールアドレス、Google、Xのいずれかでログインできます。
+            メールアドレス、Google、Facebookのいずれかでログインできます。
           </p>
         </div>
 

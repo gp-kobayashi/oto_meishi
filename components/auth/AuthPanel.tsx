@@ -77,10 +77,12 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
           {isSignup ? "Googleアカウントで登録" : "Googleアカウントでログイン"}
         </button>
         <button className={styles.providerButton} type="button">
-          <span className={styles.xMark} aria-hidden="true">
-            X
+          <span className={styles.facebookMark} aria-hidden="true">
+            f
           </span>
-          {isSignup ? "Xアカウントで登録" : "Xアカウントでログイン"}
+          {isSignup
+            ? "Facebookアカウントで登録"
+            : "Facebookアカウントでログイン"}
         </button>
       </div>
 

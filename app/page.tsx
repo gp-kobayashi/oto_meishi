@@ -65,7 +65,7 @@ export default function Home() {
 
         <p className={styles.startText}>まずは登録から</p>
         <p className={styles.note}>
-          （googleかXのアカウント。もしくは、メールアドレスで）
+          （googleかFacebookのアカウント。もしくは、メールアドレスで）
         </p>
 
         <div className={styles.arrow} aria-hidden="true" />

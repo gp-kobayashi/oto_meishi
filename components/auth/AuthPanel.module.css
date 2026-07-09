@@ -47,7 +47,7 @@
 }
 
 .googleMark,
-.xMark {
+.facebookMark {
   display: inline-flex;
   width: 24px;
   height: 24px;
@@ -63,8 +63,8 @@
   color: #1677c2;
 }
 
-.xMark {
-  background: #18212b;
+.facebookMark {
+  background: #1877f2;
   color: #ffffff;
 }
 
