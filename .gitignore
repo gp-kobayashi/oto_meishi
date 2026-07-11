@@ -43,3 +43,9 @@ next-env.d.ts
 /lib/generated/prisma
 .vscode/extensions.json
 .vscode/settings.json
+
+# audio conversion temp files
+/.tmp
+
+# ffmpeg binary (large file, not tracked by git - see README for setup)
+/bin/
