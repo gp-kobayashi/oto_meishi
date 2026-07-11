@@ -1,0 +1,112 @@
+.main {
+  min-height: 100vh;
+  padding: 40px 24px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.94), #f8fafc 100%);
+}
+
+.card {
+  width: min(560px, 100%);
+  padding: 36px;
+  border-radius: 32px;
+  background: #ffffff;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.description {
+  margin: 0 0 28px;
+  color: #475569;
+  line-height: 1.7;
+}
+
+.form {
+  display: grid;
+  gap: 18px;
+}
+
+.label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.inputGroup {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid rgba(148, 163, 184, 0.55);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.prefix {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 14px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  padding: 14px 16px;
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.hint {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.95rem;
+}
+
+.submitButton {
+  width: 100%;
+  padding: 14px 16px;
+  border: none;
+  border-radius: 16px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 180ms ease;
+}
+
+.submitButton:hover {
+  background: #1d4dd8;
+}
+
+@media (max-width: 520px) {
+  .card {
+    padding: 28px;
+  }
+
+  .title {
+    font-size: 1.9rem;
+  }
+}
