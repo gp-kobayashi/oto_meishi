@@ -1,12 +1,9 @@
-import Header from "../../components/header/Header";
-import Footer from "../../components/footer/Footer";
 import AuthPanel from "../../components/auth/AuthPanel";
 import styles from "./page.module.css";
 
 export default function SignupPage() {
   return (
-    <main className={styles.main}>
-      <Header />
+    <section className={styles.main}>
       <section className={styles.signup} aria-labelledby="signup-title">
         <div className={styles.intro}>
           <p className={styles.eyebrow}>Create your oto_meishi</p>
@@ -24,7 +21,6 @@ export default function SignupPage() {
 
         <AuthPanel mode="signup" />
       </section>
-      <Footer />
-    </main>
+    </section>
   );
 }

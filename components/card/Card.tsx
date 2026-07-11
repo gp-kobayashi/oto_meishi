@@ -25,7 +25,7 @@ const Card = ({ link }: { link: ProfileData }) => {
         {displayName}
       </h2>
       <p className={styles.bio}>{bio}</p>
-      <AudioPlayer audioUrl={audioUrl} audioTitle={audioTitle} />
+      {audioUrl && <AudioPlayer audioUrl={audioUrl} audioTitle={audioTitle} />}
       <ul className={styles.snsList}>
         {sns.map((link) => (
           <li key={link.service} className={styles.snsItem}>
