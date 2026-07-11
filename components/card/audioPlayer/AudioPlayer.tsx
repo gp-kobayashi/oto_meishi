@@ -74,6 +74,11 @@ const AudioPlayer = ({
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // audioUrlが空の場合はプレイヤーを表示しない
+  if (!audioUrl) {
+    return null;
+  }
+
   return (
     <div className={styles.audioContainer}>
       {/* 非表示の audio 要素 */}
