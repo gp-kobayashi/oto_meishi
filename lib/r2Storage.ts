@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs/promises";
 import path from "path";
 
@@ -92,4 +92,33 @@ export function generateAudioKey(userId: string, originalFilename: string): stri
   const ext = path.extname(originalFilename);
   const baseName = path.basename(originalFilename, ext);
   return `audio/${userId}/${baseName}-${timestamp}.m4a`;
+}
+
+/**
+ * R2からファイルを削除する
+ * @param key R2内のオブジェクトキー（ファイルパス）
+ */
+export async function deleteFromR2(key: string): Promise<void> {
+  const client = getR2Client();
+  const bucketName = process.env.R2_BUCKET!;
+
+  const command = new DeleteObjectCommand({
+    Bucket: bucketName,
+    Key: key,
+  });
+
+  await client.send(command);
+}
+
+/**
+ * URLからR2オブジェクトキーを抽出する
+ * @param url R2公開URL
+ * @returns R2オブジェクトキー
+ */
+export function extractKeyFromUrl(url: string): string {
+  const r2PublicUrl = process.env.R2_PUBLIC_URL!;
+  if (url.startsWith(r2PublicUrl)) {
+    return url.substring(r2PublicUrl.length + 1);
+  }
+  return url;
 }
