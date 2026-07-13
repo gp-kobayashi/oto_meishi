@@ -11,6 +11,12 @@
   border-bottom: 1px solid rgba(31, 41, 51, 0.1);
 }
 
+.logoContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .title {
   margin: 0;
   color: #18212b;

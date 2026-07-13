@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import Image from "next/image";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "./Header.module.css";
 
 const Header = () => {
@@ -35,7 +36,9 @@ const Header = () => {
 
   return (
     <header className={styles.header}>
-      <h1 className={styles.title}>oto_meishi</h1>
+      <a className={styles.logoContainer} href="/">
+        <Image src="/logo.svg" alt="Logo" width={40} height={32} />
+      </a>
       <nav className={styles.nav} aria-label="main navigation">
         {isLoggedIn ? (
           <a href="/profile">マイページ</a>
