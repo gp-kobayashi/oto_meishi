@@ -1,36 +1,131 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 音声付き名刺アプリ（oto_meishi）
 
-## Getting Started
+音声ファイルを添付できるデジタル名刺アプリです。プロフィール情報、SNSリンク、音声ファイルを管理・共有できます。
 
-First, run the development server:
+## 機能
+
+- **プロフィール管理**: 表示名、自己紹介、テーマの設定
+- **SNSリンク**: 複数のSNSサービスのリンク追加（最大4つ）
+- **音声ファイル**: 音声ファイルのアップロードと再生
+- **音声変換**: アップロードされた音声ファイルをAAC形式（.m4a）に自動変換
+- **古い音源削除**: 新しい音源をアップロード時、古い音源を自動削除
+- **文字数制限**: 表示名（20文字）、自己紹介（60文字）、音声タイトル（25文字）、SNSラベル（25文字）
+- **テーマ切り替え**: 標準、ダーク、ライト、カラフルの4つのテーマ
+
+## 環境設定
+
+プロジェクトルートに `.env.local` ファイルを作成し、以下の環境変数を設定してください。
+
+```env
+# Cloudflare R2 Storage Configuration
+R2_ACCOUNT_ID=your_account_id
+R2_ACCESS_KEY_ID=your_access_key_id
+R2_SECRET_ACCESS_KEY=your_secret_access_key
+R2_BUCKET=your_bucket_name
+R2_REGION=auto
+R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev  # 必須: R2の公開URL
+
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+### R2の設定手順
+
+1. Cloudflare R2でバケットを作成
+2. R2アクセス権を持つAPIトークンを生成
+3. `.env.local`ファイルに認証情報を追加
+4. `R2_PUBLIC_URL`をR2の公開URLに設定（例: `https://pub-xxxxxxxx.r2.dev`）
+
+### Supabaseの設定手順
+
+1. `supabase start` を実行してローカルSupabaseを起動
+2. 出力された `API URL` を `NEXT_PUBLIC_SUPABASE_URL` にコピー
+3. 出力された `anon key` を `NEXT_PUBLIC_SUPABASE_ANON_KEY` にコピー
+4. 出力された `service_role key` を `SUPABASE_SERVICE_ROLE_KEY` にコピー
+
+### Docker環境での開発
+
+Dockerを使用した開発環境を設定する場合：
+
+1. `.env.docker` ファイルを作成し、以下の変数を設定：
+```env
+# Cloudflare R2 Storage Configuration
+R2_ACCOUNT_ID=your_account_id
+R2_ACCESS_KEY_ID=your_access_key_id
+R2_SECRET_ACCESS_KEY=your_secret_access_key
+R2_BUCKET=your_bucket_name
+R2_REGION=auto
+R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
+
+# Supabase Configuration (for local testing)
+NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+2. Docker Composeで実行：
+```bash
+docker-compose up --build
+```
+
+3. アプリにアクセス: http://localhost:3000
+
+## 音声変換について
+
+アップロードされた音声ファイルは、FFmpegを使用してAAC形式（.m4a, 128kbps）に自動変換されます。これにより、すべてのブラウザでの互換性が確保され、MP3よりも良い圧縮率が提供されます。変換はサーバーサイドでffmpeg-staticを使用して処理されます。
+
+## 開始方法
+
+まず、開発サーバーを起動します：
 
 ```bash
 npm run dev
-# or
+# または
 yarn dev
-# or
+# または
 pnpm dev
-# or
+# または
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+ブラウザで [http://localhost:3000](http://localhost:3000) を開いてアプリを確認してください。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+`app/page.tsx` を編集することでページを変更できます。ファイルを編集するとページが自動的に更新されます。
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## プロジェクト構成
 
-## Learn More
+- `app/`: Next.jsのApp Routerを使用したページ構成
+- `components/`: Reactコンポーネント
+- `lib/`: ユーティリティ関数（R2ストレージ、Supabaseクライアント、音声変換など）
+- `prisma/`: データベーススキーマ
+- `supabase/`: Supabaseのマイグレーションファイル
 
-To learn more about Next.js, take a look at the following resources:
+## データベースのセットアップ
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Prismaスキーマをデータベースに適用：
+```bash
+npx prisma db push
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+2. Supabaseのマイグレーションを実行：
+```bash
+supabase db reset
+```
 
-## Deploy on Vercel
+## デプロイ
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Vercelを使用してデプロイするのが最も簡単です：
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+[Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) からデプロイできます。
+
+詳細は [Next.jsデプロイメントドキュメント](https://nextjs.org/docs/app/building-your-application/deploying) を参照してください。
+
+## 依存関係
+
+- Next.js: Reactフレームワーク
+- Supabase: 認証とデータベース
+- Prisma: ORM
+- Cloudflare R2: オブジェクトストレージ
+- FFmpeg: 音声変換
