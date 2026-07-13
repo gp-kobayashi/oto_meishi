@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { prisma } from "../../../lib/prisma";
-import { deleteFromR2, extractKeyFromUrl } from "../../../lib/r2Storage";
-import type { ProfileData, SocialLink, SocialService } from "../../../lib/mock/profileData";
+import { prisma } from "@/lib/prisma";
+import { deleteFromR2, extractKeyFromUrl } from "@/lib/r2Storage";
+import type { ProfileData, SocialLink, SocialService } from "@/lib/mock/profileData";
 
 const allowedThemes = ["normal", "dark", "light", "colorful"] as const;
 const allowedServices: SocialService[] = [

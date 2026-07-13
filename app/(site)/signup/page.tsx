@@ -1,4 +1,4 @@
-import AuthPanel from "../../components/auth/AuthPanel";
+import AuthPanel from "@/components/auth/AuthPanel";
 import styles from "./page.module.css";
 
 export default function SignupPage() {

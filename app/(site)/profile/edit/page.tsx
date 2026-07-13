@@ -5,8 +5,8 @@ import type {
   ProfileData,
   SocialLink,
   SocialService,
-} from "../../../lib/mock/profileData";
-import UserIdRedirect from "../../../components/auth/UserIdRedirect";
+} from "@/lib/mock/profileData";
+import UserIdRedirect from "@/components/auth/UserIdRedirect";
 import styles from "./page.module.css";
 
 const themeOptions = [
@@ -112,9 +112,10 @@ export default function ProfileEditPage() {
     if (field === "displayName") {
       setValidationErrors((prev) => ({
         ...prev,
-        displayName: value.length > MAX_DISPLAY_NAME_LENGTH
-          ? `文字数制限を超えています（${MAX_DISPLAY_NAME_LENGTH}文字まで）`
-          : undefined,
+        displayName:
+          value.length > MAX_DISPLAY_NAME_LENGTH
+            ? `文字数制限を超えています（${MAX_DISPLAY_NAME_LENGTH}文字まで）`
+            : undefined,
       }));
     }
 
@@ -122,9 +123,10 @@ export default function ProfileEditPage() {
     if (field === "bio") {
       setValidationErrors((prev) => ({
         ...prev,
-        bio: value.length > MAX_BIO_LENGTH
-          ? `文字数制限を超えています（${MAX_BIO_LENGTH}文字まで）`
-          : undefined,
+        bio:
+          value.length > MAX_BIO_LENGTH
+            ? `文字数制限を超えています（${MAX_BIO_LENGTH}文字まで）`
+            : undefined,
       }));
     }
 
@@ -132,9 +134,10 @@ export default function ProfileEditPage() {
     if (field === "audioTitle") {
       setValidationErrors((prev) => ({
         ...prev,
-        audioTitle: value.length > MAX_AUDIO_TITLE_LENGTH
-          ? `文字数制限を超えています（${MAX_AUDIO_TITLE_LENGTH}文字まで）`
-          : undefined,
+        audioTitle:
+          value.length > MAX_AUDIO_TITLE_LENGTH
+            ? `文字数制限を超えています（${MAX_AUDIO_TITLE_LENGTH}文字まで）`
+            : undefined,
       }));
     }
   };
@@ -157,9 +160,10 @@ export default function ProfileEditPage() {
             ...prev.sns,
             [index]: {
               ...prev.sns?.[index],
-              label: value.length > MAX_SOCIAL_LABEL_LENGTH
-                ? `文字数制限を超えています（${MAX_SOCIAL_LABEL_LENGTH}文字まで）`
-                : undefined,
+              label:
+                value.length > MAX_SOCIAL_LABEL_LENGTH
+                  ? `文字数制限を超えています（${MAX_SOCIAL_LABEL_LENGTH}文字まで）`
+                  : undefined,
             },
           },
         }));
@@ -178,7 +182,9 @@ export default function ProfileEditPage() {
       if (previousUrl) URL.revokeObjectURL(previousUrl);
       return URL.createObjectURL(file);
     });
-    setAudioUploadMessage(`変更を保存ボタンで${file.name}をアップできます<br/>（音源はサーバー側でAACファイルに変換されます）`);
+    setAudioUploadMessage(
+      `変更を保存ボタンで${file.name}をアップできます<br/>（音源はサーバー側でAACファイルに変換されます）`,
+    );
   };
 
   const handleAudioInput = (event: ChangeEvent<HTMLInputElement>) => {
@@ -439,7 +445,11 @@ export default function ProfileEditPage() {
                       <p
                         className={styles.uploadHint}
                         dangerouslySetInnerHTML={{
-                          __html: audioUploadMessage || audioFile?.name || profile.audioUrl || "未選択",
+                          __html:
+                            audioUploadMessage ||
+                            audioFile?.name ||
+                            profile.audioUrl ||
+                            "未選択",
                         }}
                       />
                     </label>

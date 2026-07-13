@@ -4,7 +4,7 @@ import Background from "./background/Background";
 import AudioPlayer from "./audioPlayer/AudioPlayer";
 import SocialLink from "../card/socialLink/SocialLink";
 import QRCode from "./QRCode/QRCode";
-import type { ProfileData } from "../../lib/mock/profileData";
+import type { ProfileData } from "@/lib/mock/profileData";
 
 const Card = ({ link }: { link: ProfileData }) => {
   const {

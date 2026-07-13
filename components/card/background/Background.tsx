@@ -1,5 +1,5 @@
 import styles from "./Background.module.css";
-import type { ProfileData } from "../../../lib/mock/profileData";
+import type { ProfileData } from "@/lib/mock/profileData";
 
 const Background = ({ theme = "normal" }: { theme?: ProfileData["theme"] }) => {
   const themeClass = styles[theme] || styles.normal;
@@ -50,4 +50,3 @@ const Background = ({ theme = "normal" }: { theme?: ProfileData["theme"] }) => {
 };
 
 export default Background;
-

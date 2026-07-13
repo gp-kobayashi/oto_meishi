@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import Card from "../../components/card/Card";
-import UserIdRedirect from "../../components/auth/UserIdRedirect";
+import Card from "@/components/card/Card";
+import UserIdRedirect from "@/components/auth/UserIdRedirect";
 import styles from "./page.module.css";
-import type { ProfileData } from "../../lib/mock/profileData";
+import type { ProfileData } from "@/lib/mock/profileData";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);

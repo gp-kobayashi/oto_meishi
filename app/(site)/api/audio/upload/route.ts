@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convertToAac, cleanupTempFile } from "../../../../lib/audioConverter";
-import { uploadToR2, generateAudioKey } from "../../../../lib/r2Storage";
+import { convertToAac, cleanupTempFile } from "@/lib/audioConverter";
+import { uploadToR2, generateAudioKey } from "@/lib/r2Storage";
 import path from "path";
 import fs from "fs/promises";
 

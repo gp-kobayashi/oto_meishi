@@ -1,7 +1,6 @@
-import type { SocialLink as SocialLinkType } from "../../../lib/mock/profileData";
+import type { SocialLink as SocialLinkType } from "@/lib/mock/profileData";
 import styles from "./SocialLink.module.css";
-import { socialIcons } from "../../../lib/socialIcons";
-
+import { socialIcons } from "@/lib/socialIcons";
 
 const SocialLink = ({ link }: { link: SocialLinkType }) => {
   const { service, url, label } = link;
