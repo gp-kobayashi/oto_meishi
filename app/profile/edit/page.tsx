@@ -32,6 +32,12 @@ const serviceOptions: Array<{ value: SocialService; label: string }> = [
   { value: "other", label: "その他" },
 ];
 
+// 文字数制限
+const MAX_DISPLAY_NAME_LENGTH = 20;
+const MAX_BIO_LENGTH = 60;
+const MAX_AUDIO_TITLE_LENGTH = 25;
+const MAX_SOCIAL_LABEL_LENGTH = 25;
+
 export default function ProfileEditPage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -49,6 +55,12 @@ export default function ProfileEditPage() {
   >("idle");
   const [saveMessage, setSaveMessage] = useState<string>("");
   const [audioUploadMessage, setAudioUploadMessage] = useState<string>("");
+  const [validationErrors, setValidationErrors] = useState<{
+    displayName?: string;
+    bio?: string;
+    audioTitle?: string;
+    sns?: Record<number, { label?: string }>;
+  }>({});
 
   useEffect(() => {
     const savedUserId = window.localStorage.getItem("oto_meishi_userId");
@@ -95,6 +107,36 @@ export default function ProfileEditPage() {
     setProfile((current) =>
       current ? { ...current, [field]: value } : current,
     );
+
+    // 表示名の文字数制限チェック
+    if (field === "displayName") {
+      setValidationErrors((prev) => ({
+        ...prev,
+        displayName: value.length > MAX_DISPLAY_NAME_LENGTH
+          ? `文字数制限を超えています（${MAX_DISPLAY_NAME_LENGTH}文字まで）`
+          : undefined,
+      }));
+    }
+
+    // 自己紹介の文字数制限チェック
+    if (field === "bio") {
+      setValidationErrors((prev) => ({
+        ...prev,
+        bio: value.length > MAX_BIO_LENGTH
+          ? `文字数制限を超えています（${MAX_BIO_LENGTH}文字まで）`
+          : undefined,
+      }));
+    }
+
+    // 音声タイトルの文字数制限チェック
+    if (field === "audioTitle") {
+      setValidationErrors((prev) => ({
+        ...prev,
+        audioTitle: value.length > MAX_AUDIO_TITLE_LENGTH
+          ? `文字数制限を超えています（${MAX_AUDIO_TITLE_LENGTH}文字まで）`
+          : undefined,
+      }));
+    }
   };
 
   const updateSocialLink = (
@@ -106,6 +148,23 @@ export default function ProfileEditPage() {
       if (!current) return current;
       const next = [...current.sns];
       next[index] = { ...next[index], [field]: value };
+
+      // SNSラベルの文字数制限チェック
+      if (field === "label") {
+        setValidationErrors((prev) => ({
+          ...prev,
+          sns: {
+            ...prev.sns,
+            [index]: {
+              ...prev.sns?.[index],
+              label: value.length > MAX_SOCIAL_LABEL_LENGTH
+                ? `文字数制限を超えています（${MAX_SOCIAL_LABEL_LENGTH}文字まで）`
+                : undefined,
+            },
+          },
+        }));
+      }
+
       return { ...current, sns: next };
     });
   };
@@ -288,34 +347,59 @@ export default function ProfileEditPage() {
             </div>
 
             <div className={styles.cardBody}>
-              <label className={styles.label} htmlFor="displayName">
-                表示名
-              </label>
-              <input
-                id="displayName"
-                className={styles.titleInput}
-                type="text"
-                value={profile.displayName}
-                onChange={(event) =>
-                  updateField("displayName", event.target.value)
-                }
-              />
+              <div className={styles.fieldRow}>
+                <div className={styles.labelWithValidation}>
+                  <label className={styles.label} htmlFor="displayName">
+                    表示名
+                  </label>
+                  {validationErrors.displayName && (
+                    <span className={styles.validationError}>
+                      {validationErrors.displayName}
+                    </span>
+                  )}
+                </div>
+                <input
+                  id="displayName"
+                  className={styles.titleInput}
+                  type="text"
+                  value={profile.displayName}
+                  onChange={(event) =>
+                    updateField("displayName", event.target.value)
+                  }
+                />
+              </div>
 
-              <label className={styles.label} htmlFor="bio">
-                自己紹介
-              </label>
-              <textarea
-                id="bio"
-                className={styles.bioInput}
-                value={profile.bio}
-                onChange={(event) => updateField("bio", event.target.value)}
-              />
+              <div className={styles.fieldRow}>
+                <div className={styles.labelWithValidation}>
+                  <label className={styles.label} htmlFor="bio">
+                    自己紹介
+                  </label>
+                  {validationErrors.bio && (
+                    <span className={styles.validationError}>
+                      {validationErrors.bio}
+                    </span>
+                  )}
+                </div>
+                <textarea
+                  id="bio"
+                  className={styles.bioInput}
+                  value={profile.bio}
+                  onChange={(event) => updateField("bio", event.target.value)}
+                />
+              </div>
 
               <div className={styles.audioGroup}>
                 <div className={styles.audioField}>
-                  <label className={styles.label} htmlFor="audioTitle">
-                    音声タイトル
-                  </label>
+                  <div className={styles.labelWithValidation}>
+                    <label className={styles.label} htmlFor="audioTitle">
+                      音声タイトル
+                    </label>
+                    {validationErrors.audioTitle && (
+                      <span className={styles.validationError}>
+                        {validationErrors.audioTitle}
+                      </span>
+                    )}
+                  </div>
                   <input
                     id="audioTitle"
                     className={styles.input}
@@ -425,12 +509,19 @@ export default function ProfileEditPage() {
                     </div>
 
                     <div className={styles.serviceRow}>
-                      <label
-                        className={styles.smallLabel}
-                        htmlFor={`label-${index}`}
-                      >
-                        ラベル
-                      </label>
+                      <div className={styles.labelWithValidation}>
+                        <label
+                          className={styles.smallLabel}
+                          htmlFor={`label-${index}`}
+                        >
+                          ラベル
+                        </label>
+                        {validationErrors.sns?.[index]?.label && (
+                          <span className={styles.validationError}>
+                            {validationErrors.sns[index].label}
+                          </span>
+                        )}
+                      </div>
                       <input
                         id={`label-${index}`}
                         className={`${styles.input} ${styles.smallInput}`}

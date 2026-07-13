@@ -69,6 +69,32 @@
   gap: 18px;
 }
 
+.fieldRow {
+  display: grid;
+  gap: 8px;
+}
+
+.labelWithValidation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.inputWithValidation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.validationError {
+  color: #dc2626;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .label {
   font-size: 0.95rem;
   font-weight: 700;
@@ -99,7 +125,7 @@
 }
 
 .bioInput {
-  min-height: 128px;
+  min-height: 70px;
   resize: vertical;
 }
 
@@ -268,7 +294,7 @@
 }
 
 .smallInput {
-  min-height: 44px;
+  min-height: 36px;
 }
 
 .addButton,
