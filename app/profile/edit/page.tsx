@@ -48,6 +48,7 @@ export default function ProfileEditPage() {
     "idle" | "saving" | "success" | "error"
   >("idle");
   const [saveMessage, setSaveMessage] = useState<string>("");
+  const [audioUploadMessage, setAudioUploadMessage] = useState<string>("");
 
   useEffect(() => {
     const savedUserId = window.localStorage.getItem("oto_meishi_userId");
@@ -70,6 +71,9 @@ export default function ProfileEditPage() {
       })
       .then((data) => {
         setProfile(data as ProfileData);
+        if (data.audioUrl) {
+          setAudioUploadMessage("音源を変更できます");
+        }
       })
       .catch((err) => {
         setError(
@@ -115,6 +119,7 @@ export default function ProfileEditPage() {
       if (previousUrl) URL.revokeObjectURL(previousUrl);
       return URL.createObjectURL(file);
     });
+    setAudioUploadMessage(`変更を保存ボタンで${file.name}をアップできます<br/>（音源はサーバー側でAACファイルに変換されます）`);
   };
 
   const handleAudioInput = (event: ChangeEvent<HTMLInputElement>) => {
@@ -174,11 +179,36 @@ export default function ProfileEditPage() {
     setSaveMessage("");
 
     try {
+      // 音声ファイルが選択されている場合は先にアップロード
+      let finalAudioUrl = profile.audioUrl;
+      if (audioFile) {
+        const formData = new FormData();
+        formData.append("file", audioFile);
+        formData.append("userId", savedUserId);
+
+        const uploadResponse = await fetch("/api/audio/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        const uploadPayload = await uploadResponse.json().catch(() => ({}));
+
+        if (!uploadResponse.ok) {
+          throw new Error(
+            uploadPayload.error || "音声のアップロードに失敗しました。",
+          );
+        }
+
+        finalAudioUrl = uploadPayload.audioUrl;
+        setAudioUploadMessage("音源をアップロードしました");
+      }
+
       const response = await fetch("/api/profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...profile,
+          audioUrl: finalAudioUrl,
           userId: savedUserId,
         }),
       });
@@ -190,6 +220,7 @@ export default function ProfileEditPage() {
       }
 
       setProfile(payload as ProfileData);
+      setAudioFile(null);
       setSaveState("success");
       setSaveMessage("プロフィールを保存しました。");
     } catch (err) {
@@ -321,18 +352,42 @@ export default function ProfileEditPage() {
                       <p className={styles.uploadLabel}>
                         ここに音声ファイルをドロップ、またはクリックして選択
                       </p>
-                      <p className={styles.uploadHint}>
-                        {audioFile?.name || profile.audioUrl || "未選択"}
-                      </p>
+                      <p
+                        className={styles.uploadHint}
+                        dangerouslySetInnerHTML={{
+                          __html: audioUploadMessage || audioFile?.name || profile.audioUrl || "未選択",
+                        }}
+                      />
                     </label>
                   </div>
                   {(audioPreviewUrl || profile.audioUrl) && (
-                    <audio
-                      controls
-                      className={styles.audioPlayer}
-                      src={audioPreviewUrl || profile.audioUrl}
-                    />
+                    <div>
+                      <audio
+                        controls
+                        className={styles.audioPlayer}
+                        src={audioPreviewUrl || profile.audioUrl}
+                      />
+                    </div>
                   )}
+                  <button
+                    type="button"
+                    className={styles.saveButton}
+                    onClick={handleSave}
+                    disabled={saveState === "saving"}
+                  >
+                    {saveState === "saving" ? "保存中..." : "変更を保存"}
+                  </button>
+                  {saveMessage ? (
+                    <p
+                      className={`${styles.saveMessage} ${
+                        saveState === "success"
+                          ? styles.saveMessageSuccess
+                          : styles.saveMessageError
+                      }`}
+                    >
+                      {saveMessage}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
