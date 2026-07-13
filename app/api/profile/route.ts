@@ -1,0 +1,170 @@
+import { NextResponse } from "next/server";
+import { prisma } from "../../../lib/prisma";
+import { deleteFromR2, extractKeyFromUrl } from "../../../lib/r2Storage";
+import type { ProfileData, SocialLink, SocialService } from "../../../lib/mock/profileData";
+
+const allowedThemes = ["normal", "dark", "light", "colorful"] as const;
+const allowedServices: SocialService[] = [
+  "x",
+  "instagram",
+  "youtube",
+  "tiktok",
+  "github",
+  "discord",
+  "facebook",
+  "linkedin",
+  "bluesky",
+  "threads",
+  "note",
+  "website",
+  "other",
+];
+
+export async function GET(request: Request) {
+  try {
+    const url = new URL(request.url);
+    const userId = url.searchParams.get("userId");
+
+    if (!userId) {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    const profile = await prisma.profile.findUnique({
+      where: { userId },
+      include: { sns: true },
+    });
+
+    if (!profile) {
+      return NextResponse.json({ error: "profile not found" }, { status: 404 });
+    }
+
+    console.log("Profile fetched:", { userId, audioUrl: profile.audioUrl });
+
+    return NextResponse.json(profile);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unknown server error" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = (await request.json().catch(() => ({}))) as Partial<ProfileData> & {
+      userId?: string;
+      sns?: SocialLink[];
+    };
+    const userId = typeof body.userId === "string" ? body.userId.trim() : "";
+    const displayName =
+      typeof body.displayName === "string" ? body.displayName.trim() : userId;
+    const theme =
+      typeof body.theme === "string" && allowedThemes.includes(body.theme as (typeof allowedThemes)[number])
+        ? body.theme
+        : "normal";
+    const bio = typeof body.bio === "string" ? body.bio : "";
+    const audioUrl = typeof body.audioUrl === "string" ? body.audioUrl : "";
+    const audioTitle = typeof body.audioTitle === "string" ? body.audioTitle : "";
+
+    if (!userId) {
+      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(userId)) {
+      return NextResponse.json(
+        { error: "userId must only contain letters, numbers, hyphen, and underscore." },
+        { status: 400 },
+      );
+    }
+
+    const snsPayload = (Array.isArray(body.sns) ? body.sns : [])
+      .filter(
+        (link): link is SocialLink =>
+          typeof link === "object" &&
+          link !== null &&
+          typeof link.url === "string" &&
+          typeof link.label === "string" &&
+          typeof link.service === "string",
+      )
+      .map((link, index) => ({
+        service: allowedServices.includes(link.service as SocialService)
+          ? (link.service as SocialService)
+          : "other",
+        url: link.url,
+        label: link.label,
+        sortOrder: index,
+      }));
+
+    let profile = await prisma.profile.findUnique({
+      where: { userId },
+      include: { sns: true },
+    });
+
+    if (!profile) {
+      profile = await prisma.profile.create({
+        data: {
+          userId,
+          displayName: displayName || userId,
+          bio,
+          audioUrl,
+          audioTitle,
+          theme,
+          sns: {
+            create: [],
+          },
+        },
+        include: { sns: true },
+      });
+    } else {
+      // audioUrlが変更された場合、古い音源をR2から削除
+      if (profile.audioUrl && profile.audioUrl !== audioUrl) {
+        try {
+          const oldKey = extractKeyFromUrl(profile.audioUrl);
+          await deleteFromR2(oldKey);
+          console.log("Deleted old audio file from R2:", oldKey);
+        } catch (error) {
+          console.error("Failed to delete old audio file:", error);
+          // 削除に失敗してもプロフィール更新は続行
+        }
+      }
+
+      profile = await prisma.profile.update({
+        where: { userId },
+        data: {
+          displayName: displayName || userId,
+          bio,
+          audioUrl,
+          audioTitle,
+          theme,
+        },
+        include: { sns: true },
+      });
+    }
+
+    await prisma.socialLink.deleteMany({ where: { profileId: profile.id } });
+
+    if (snsPayload.length > 0) {
+      await prisma.socialLink.createMany({
+        data: snsPayload.map((link) => ({
+          profileId: profile.id,
+          service: link.service,
+          url: link.url,
+          label: link.label,
+          sortOrder: link.sortOrder,
+        })),
+      });
+    }
+
+    const savedProfile = await prisma.profile.findUnique({
+      where: { userId },
+      include: { sns: true },
+    });
+
+    return NextResponse.json(savedProfile);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Unknown server error" },
+      { status: 500 },
+    );
+  }
+}
