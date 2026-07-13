@@ -1,12 +1,9 @@
 import styles from "./page.module.css";
 import Image from "next/image";
-import Header from "../components/header/Header";
-import Footer from "../components/footer/Footer";
 
 export default function Home() {
   return (
-    <main className={styles.main}>
-      <Header />
+    <section className={styles.main}>
       <section className={styles.hero} aria-label="oto_meishi introduction">
         <div className={styles.backgroundAura}>
           <div className={`${styles.blob} ${styles.back}`} />
@@ -74,7 +71,6 @@ export default function Home() {
           アカウント登録ページへ
         </a>
       </section>
-      <Footer />
-    </main>
+    </section>
   );
 }
