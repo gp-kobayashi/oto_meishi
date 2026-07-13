@@ -20,6 +20,12 @@ const allowedServices: SocialService[] = [
   "other",
 ];
 
+// 文字数制限
+const MAX_DISPLAY_NAME_LENGTH = 20;
+const MAX_BIO_LENGTH = 60;
+const MAX_AUDIO_TITLE_LENGTH = 25;
+const MAX_SOCIAL_LABEL_LENGTH = 25;
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -77,6 +83,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // 文字数制限チェック
+    if (displayName.length > MAX_DISPLAY_NAME_LENGTH) {
+      return NextResponse.json(
+        { error: `表示名は${MAX_DISPLAY_NAME_LENGTH}文字までです。` },
+        { status: 400 },
+      );
+    }
+
+    if (bio.length > MAX_BIO_LENGTH) {
+      return NextResponse.json(
+        { error: `自己紹介は${MAX_BIO_LENGTH}文字までです。` },
+        { status: 400 },
+      );
+    }
+
+    if (audioTitle.length > MAX_AUDIO_TITLE_LENGTH) {
+      return NextResponse.json(
+        { error: `音声タイトルは${MAX_AUDIO_TITLE_LENGTH}文字までです。` },
+        { status: 400 },
+      );
+    }
+
     const snsPayload = (Array.isArray(body.sns) ? body.sns : [])
       .filter(
         (link): link is SocialLink =>
@@ -94,6 +122,16 @@ export async function POST(request: Request) {
         label: link.label,
         sortOrder: index,
       }));
+
+    // SNSラベルの文字数制限チェック
+    for (const link of snsPayload) {
+      if (link.label.length > MAX_SOCIAL_LABEL_LENGTH) {
+        return NextResponse.json(
+          { error: `SNSラベルは${MAX_SOCIAL_LABEL_LENGTH}文字までです。` },
+          { status: 400 },
+        );
+      }
+    }
 
     let profile = await prisma.profile.findUnique({
       where: { userId },
