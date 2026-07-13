@@ -16,6 +16,32 @@
   text-align: center;
 }
 
+.cardWrapper {
+  width: 100%;
+}
+
+.editButton {
+  display: inline-flex;
+  align-items: left;
+  padding: 10px 80px;
+  margin: 10px auto;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.26);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+}
+
+.editButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px rgba(37, 99, 235, 0.3);
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+}
+
 .backgroundAura {
   position: absolute;
   z-index: -1;
