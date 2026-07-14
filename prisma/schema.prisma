@@ -36,6 +36,7 @@ enum SocialService {
 model Profile {
   id          String       @id @default(uuid())
   userId      String       @unique
+  authId      String?      @unique
   theme       Theme        @default(normal)
   displayName String
   bio         String
