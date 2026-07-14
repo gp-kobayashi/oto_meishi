@@ -116,9 +116,12 @@ export async function deleteFromR2(key: string): Promise<void> {
  * @returns R2オブジェクトキー
  */
 export function extractKeyFromUrl(url: string): string {
-  const r2PublicUrl = process.env.R2_PUBLIC_URL!;
-  if (url.startsWith(r2PublicUrl)) {
+  const r2PublicUrl = process.env.R2_PUBLIC_URL!.replace(/\/$/, "");
+  if (url.startsWith(`${r2PublicUrl}/`)) {
     return url.substring(r2PublicUrl.length + 1);
+  }
+  if (url === r2PublicUrl) {
+    return "";
   }
   return url;
 }
