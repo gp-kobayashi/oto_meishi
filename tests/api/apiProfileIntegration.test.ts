@@ -21,7 +21,6 @@ describe("API Profile 認証統合テスト", () => {
   let token1: string;
   let user1Id: string;
   let token2: string;
-  let user2Id: string;
   const testUserId1 = `user1-${Date.now()}`;
   const testUserId2 = `user2-${Date.now()}`;
 
@@ -44,7 +43,6 @@ describe("API Profile 認証統合テスト", () => {
     const signUpRes2 = await supabase.auth.signUp({ email: email2, password });
     if (signUpRes2.error) throw signUpRes2.error;
     token2 = signUpRes2.data.session?.access_token || "";
-    user2Id = signUpRes2.data.user?.id || "";
   });
 
   afterAll(async () => {

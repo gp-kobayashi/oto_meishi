@@ -35,7 +35,10 @@ describe("AuthPanel", () => {
 
   it("メールアドレスとパスワードによるログインが成功すること", async () => {
     const mockSignIn = vi.mocked(supabase!.auth.signInWithPassword);
-    mockSignIn.mockResolvedValueOnce({ data: { user: {} } as any, error: null });
+    mockSignIn.mockResolvedValueOnce({
+      data: { user: {} },
+      error: null,
+    } as Awaited<ReturnType<typeof mockSignIn>>);
 
     render(<AuthPanel mode="login" />);
 
@@ -54,7 +57,10 @@ describe("AuthPanel", () => {
 
   it("ログイン失敗時にエラーメッセージが表示されること", async () => {
     const mockSignIn = vi.mocked(supabase!.auth.signInWithPassword);
-    mockSignIn.mockResolvedValueOnce({ data: { user: null, session: null }, error: new Error("Invalid credentials") as any });
+    mockSignIn.mockResolvedValueOnce({
+      data: { user: null, session: null },
+      error: new Error("Invalid credentials"),
+    } as Awaited<ReturnType<typeof mockSignIn>>);
 
     render(<AuthPanel mode="login" />);
 
@@ -69,7 +75,10 @@ describe("AuthPanel", () => {
 
   it("新規登録モードで正しく動作すること", async () => {
     const mockSignUp = vi.mocked(supabase!.auth.signUp);
-    mockSignUp.mockResolvedValueOnce({ data: { user: {} } as any, error: null });
+    mockSignUp.mockResolvedValueOnce({
+      data: { user: {} },
+      error: null,
+    } as Awaited<ReturnType<typeof mockSignUp>>);
 
     render(<AuthPanel mode="signup" />);
 
