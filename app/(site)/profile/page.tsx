@@ -6,6 +6,7 @@ import Card from "@/components/card/Card";
 import UserIdRedirect from "@/components/auth/UserIdRedirect";
 import styles from "./page.module.css";
 import type { ProfileData } from "@/lib/mock/profileData";
+import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -14,11 +15,11 @@ export default function ProfilePage() {
     if (typeof window === "undefined") {
       return true;
     }
-    return Boolean(window.localStorage.getItem("oto_meishi_userId"));
+    return Boolean(window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY));
   });
 
   useEffect(() => {
-    const savedUserId = window.localStorage.getItem("oto_meishi_userId");
+    const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
     if (!savedUserId) {
       return;
     }
@@ -26,15 +27,15 @@ export default function ProfilePage() {
     fetch(`/api/profile?userId=${encodeURIComponent(savedUserId)}`)
       .then(async (res) => {
         if (!res.ok) {
-          const payload = await res.json();
+          const errorResponse = await res.json();
           throw new Error(
-            payload.error || "プロフィールの取得に失敗しました。",
+            errorResponse.error || "プロフィールの取得に失敗しました。",
           );
         }
         return res.json();
       })
-      .then((data) => {
-        setProfile(data as ProfileData);
+      .then((profileResponse) => {
+        setProfile(profileResponse as ProfileData);
       })
       .catch((err) => {
         setError(

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 
 export default function UserIdRedirect() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function UserIdRedirect() {
         return;
       }
 
-      const savedUserId = window.localStorage.getItem("oto_meishi_userId");
+      const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
       if (!savedUserId) {
         router.replace("/userid");
       }

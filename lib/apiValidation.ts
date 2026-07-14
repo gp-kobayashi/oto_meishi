@@ -128,14 +128,14 @@ export function normalizeTheme(theme: string): string {
  */
 export function validateUrlFormat(url: string): ApiValidationError | null {
   if (!url) {
-    return { field: 'sns', message: 'URLは必須です。' };
+    return { field: "sns", message: "URLは必須です。" };
   }
 
   try {
     new URL(url);
     return null;
   } catch {
-    return { field: 'sns', message: '無効なURL形式です。' };
+    return { field: "sns", message: "無効なURL形式です。" };
   }
 }
 
@@ -151,13 +151,13 @@ export function normalizeSocialService(service: string): SocialService {
 /**
  * SNSリンクのフィルタリングと正規化
  */
-export function sanitizeSocialLinks(sns: unknown[]): Array<{
+export function sanitizeSocialLinks(socialLinks: unknown[]): Array<{
   service: SocialService;
   url: string;
   label: string;
   sortOrder: number;
 }> {
-  return sns
+  return socialLinks
     .filter(
       (link): link is SocialLink => {
         if (typeof link !== "object" || link === null) return false;
@@ -227,10 +227,10 @@ export function sanitizeProfileData(
   }
 
   // SNSリンクのサニタイズ
-  const snsPayload = sanitizeSocialLinks(Array.isArray(body.sns) ? body.sns : []);
+  const socialLinks = sanitizeSocialLinks(Array.isArray(body.sns) ? body.sns : []);
 
   // SNSリンクの個数制限チェック
-  if (snsPayload.length > MAX_SNS_COUNT) {
+  if (socialLinks.length > MAX_SNS_COUNT) {
     return {
       data: null,
       error: {
@@ -241,7 +241,7 @@ export function sanitizeProfileData(
   }
 
   // SNSラベルの文字数制限チェック
-  for (const link of snsPayload) {
+  for (const link of socialLinks) {
     const labelError = validateSocialLabelLength(link.label);
     if (labelError) {
       return { data: null, error: labelError };
@@ -262,7 +262,7 @@ export function sanitizeProfileData(
       bio,
       audioUrl,
       audioTitle,
-      sns: snsPayload,
+      sns: socialLinks,
     },
     error: null,
   };

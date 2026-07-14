@@ -2,6 +2,7 @@ import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import ProfileEditPage from "@/app/(site)/profile/edit/page";
+import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {
@@ -60,7 +61,7 @@ describe("ProfileEditPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
-    window.localStorage.setItem("oto_meishi_userId", "testuser");
+    window.localStorage.setItem(OTO_MEISHI_USER_ID_KEY, "testuser");
     mocks.getSession.mockResolvedValue({
       data: { session: { access_token: "session-token" } },
     });

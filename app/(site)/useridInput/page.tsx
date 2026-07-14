@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 import styles from "./page.module.css";
 
 export default function UserIdInputPage() {
@@ -11,7 +12,7 @@ export default function UserIdInputPage() {
     if (typeof window === "undefined") {
       return "";
     }
-    return window.localStorage.getItem("oto_meishi_userId") ?? "";
+    return window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY) ?? "";
   });
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -73,7 +74,7 @@ export default function UserIdInputPage() {
         return;
       }
 
-      window.localStorage.setItem("oto_meishi_userId", trimmed);
+      window.localStorage.setItem(OTO_MEISHI_USER_ID_KEY, trimmed);
       router.push("/profile");
     } catch (err) {
       setError(

@@ -14,6 +14,7 @@ import {
   validateSocialLabel,
 } from "@/lib/validation";
 import { supabase } from "@/lib/supabaseClient";
+import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 import styles from "./page.module.css";
 
 const themeOptions = [
@@ -39,6 +40,71 @@ const serviceOptions: Array<{ value: SocialService; label: string }> = [
   { value: "other", label: "その他" },
 ];
 
+type SaveState = "idle" | "saving" | "success" | "error";
+
+type ProfileSaveControlsProps = {
+  state: SaveState;
+  message: string;
+  onSave: () => void;
+  className?: string | null;
+};
+
+function ProfileSaveControls({
+  state,
+  message,
+  onSave,
+  className = styles.saveButtonRow,
+}: ProfileSaveControlsProps) {
+  const content = (
+    <>
+      <button
+        type="button"
+        className={styles.saveButton}
+        onClick={onSave}
+        disabled={state === "saving"}
+      >
+        {state === "saving" ? "保存中..." : "変更を保存"}
+      </button>
+      {message ? (
+        <p
+          className={`${styles.saveMessage} ${
+            state === "success"
+              ? styles.saveMessageSuccess
+              : styles.saveMessageError
+          }`}
+        >
+          {message}
+        </p>
+      ) : null}
+    </>
+  );
+
+  return className ? <div className={className}>{content}</div> : content;
+}
+
+type ValidatedFieldLabelProps = {
+  htmlFor: string;
+  label: string;
+  error?: string;
+  className?: string;
+};
+
+function ValidatedFieldLabel({
+  htmlFor,
+  label,
+  error,
+  className = styles.label,
+}: ValidatedFieldLabelProps) {
+  return (
+    <div className={styles.labelWithValidation}>
+      <label className={className} htmlFor={htmlFor}>
+        {label}
+      </label>
+      {error ? <span className={styles.validationError}>{error}</span> : null}
+    </div>
+  );
+}
+
 export default function ProfileEditPage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
@@ -48,23 +114,21 @@ export default function ProfileEditPage() {
     if (typeof window === "undefined") {
       return true;
     }
-    return Boolean(window.localStorage.getItem("oto_meishi_userId"));
+    return Boolean(window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY));
   });
   const [error, setError] = useState<string | null>(null);
-  const [saveState, setSaveState] = useState<
-    "idle" | "saving" | "success" | "error"
-  >("idle");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string>("");
-  const [audioUploadMessage, setAudioUploadMessage] = useState<string>("");
+  const [audioUploadMessages, setAudioUploadMessages] = useState<string[]>([]);
   const [validationErrors, setValidationErrors] = useState<{
     displayName?: string;
     bio?: string;
     audioTitle?: string;
-    sns?: Record<number, { label?: string }>;
+    socialLinks?: Record<number, { label?: string }>;
   }>({});
 
   useEffect(() => {
-    const savedUserId = window.localStorage.getItem("oto_meishi_userId");
+    const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
     if (!savedUserId) {
       return;
     }
@@ -72,17 +136,17 @@ export default function ProfileEditPage() {
     fetch(`/api/profile?userId=${encodeURIComponent(savedUserId)}`)
       .then(async (res) => {
         if (!res.ok) {
-          const payload = await res.json();
+          const errorResponse = await res.json();
           throw new Error(
-            payload.error || "プロフィールの取得に失敗しました。",
+            errorResponse.error || "プロフィールの取得に失敗しました。",
           );
         }
         return res.json();
       })
-      .then((data) => {
-        setProfile(data as ProfileData);
-        if (data.audioUrl) {
-          setAudioUploadMessage("音源を変更できます");
+      .then((profileResponse) => {
+        setProfile(profileResponse as ProfileData);
+        if (profileResponse.audioUrl) {
+          setAudioUploadMessages(["音源を変更できます"]);
         }
       })
       .catch((err) => {
@@ -145,10 +209,10 @@ export default function ProfileEditPage() {
       if (field === "label") {
         setValidationErrors((prev) => ({
           ...prev,
-          sns: {
-            ...prev.sns,
+          socialLinks: {
+            ...prev.socialLinks,
             [index]: {
-              ...prev.sns?.[index],
+              ...prev.socialLinks?.[index],
               label: validateSocialLabel(value),
             },
           },
@@ -168,9 +232,10 @@ export default function ProfileEditPage() {
       if (previousUrl) URL.revokeObjectURL(previousUrl);
       return URL.createObjectURL(file);
     });
-    setAudioUploadMessage(
-      `変更を保存ボタンで${file.name}をアップできます<br/>（音源はサーバー側でAACファイルに変換されます）`,
-    );
+    setAudioUploadMessages([
+      `変更を保存ボタンで${file.name}をアップできます`,
+      "（音源はサーバー側でAACファイルに変換されます）",
+    ]);
   };
 
   const handleAudioInput = (event: ChangeEvent<HTMLInputElement>) => {
@@ -219,7 +284,7 @@ export default function ProfileEditPage() {
   const handleSave = async () => {
     if (!profile) return;
 
-    const savedUserId = window.localStorage.getItem("oto_meishi_userId");
+    const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
     if (!savedUserId) {
       setSaveState("error");
       setSaveMessage("ユーザーIDが設定されていません。");
@@ -262,16 +327,16 @@ export default function ProfileEditPage() {
           body: formData,
         });
 
-        const uploadPayload = await uploadResponse.json().catch(() => ({}));
+        const uploadResult = await uploadResponse.json().catch(() => ({}));
 
         if (!uploadResponse.ok) {
           throw new Error(
-            uploadPayload.error || "音声のアップロードに失敗しました。",
+            uploadResult.error || "音声のアップロードに失敗しました。",
           );
         }
 
-        finalAudioUrl = uploadPayload.audioUrl;
-        setAudioUploadMessage("音源をアップロードしました");
+        finalAudioUrl = uploadResult.audioUrl;
+        setAudioUploadMessages(["音源をアップロードしました"]);
       }
 
       const response = await fetch("/api/profile", {
@@ -287,13 +352,13 @@ export default function ProfileEditPage() {
         }),
       });
 
-      const payload = await response.json().catch(() => ({}));
+      const savedProfileResponse = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.error || "保存に失敗しました。");
+        throw new Error(savedProfileResponse.error || "保存に失敗しました。");
       }
 
-      setProfile(payload as ProfileData);
+      setProfile(savedProfileResponse as ProfileData);
       setAudioFile(null);
       setSaveState("success");
       setSaveMessage("プロフィールを保存しました。");
@@ -304,6 +369,8 @@ export default function ProfileEditPage() {
       );
     }
   };
+
+  const socialLinks = profile?.sns ?? [];
 
   return (
     <section className={styles.main}>
@@ -318,27 +385,11 @@ export default function ProfileEditPage() {
           <p className={styles.error}>ユーザーIDが設定されていません。</p>
         ) : (
           <article className={`${styles.cardEditor} ${styles[profile.theme]}`}>
-            <div className={styles.saveButtonRow}>
-              <button
-                type="button"
-                className={styles.saveButton}
-                onClick={handleSave}
-                disabled={saveState === "saving"}
-              >
-                {saveState === "saving" ? "保存中..." : "変更を保存"}
-              </button>
-              {saveMessage ? (
-                <p
-                  className={`${styles.saveMessage} ${
-                    saveState === "success"
-                      ? styles.saveMessageSuccess
-                      : styles.saveMessageError
-                  }`}
-                >
-                  {saveMessage}
-                </p>
-              ) : null}
-            </div>
+            <ProfileSaveControls
+              state={saveState}
+              message={saveMessage}
+              onSave={handleSave}
+            />
             <div className={styles.cardTopBar}>
               <div>
                 <p className={styles.cardBadge}>編集モード</p>
@@ -363,16 +414,11 @@ export default function ProfileEditPage() {
 
             <div className={styles.cardBody}>
               <div className={styles.fieldRow}>
-                <div className={styles.labelWithValidation}>
-                  <label className={styles.label} htmlFor="displayName">
-                    表示名
-                  </label>
-                  {validationErrors.displayName && (
-                    <span className={styles.validationError}>
-                      {validationErrors.displayName}
-                    </span>
-                  )}
-                </div>
+                <ValidatedFieldLabel
+                  htmlFor="displayName"
+                  label="表示名"
+                  error={validationErrors.displayName}
+                />
                 <input
                   id="displayName"
                   className={styles.titleInput}
@@ -385,16 +431,11 @@ export default function ProfileEditPage() {
               </div>
 
               <div className={styles.fieldRow}>
-                <div className={styles.labelWithValidation}>
-                  <label className={styles.label} htmlFor="bio">
-                    自己紹介
-                  </label>
-                  {validationErrors.bio && (
-                    <span className={styles.validationError}>
-                      {validationErrors.bio}
-                    </span>
-                  )}
-                </div>
+                <ValidatedFieldLabel
+                  htmlFor="bio"
+                  label="自己紹介"
+                  error={validationErrors.bio}
+                />
                 <textarea
                   id="bio"
                   className={styles.bioInput}
@@ -405,16 +446,11 @@ export default function ProfileEditPage() {
 
               <div className={styles.audioGroup}>
                 <div className={styles.audioField}>
-                  <div className={styles.labelWithValidation}>
-                    <label className={styles.label} htmlFor="audioTitle">
-                      音声タイトル
-                    </label>
-                    {validationErrors.audioTitle && (
-                      <span className={styles.validationError}>
-                        {validationErrors.audioTitle}
-                      </span>
-                    )}
-                  </div>
+                  <ValidatedFieldLabel
+                    htmlFor="audioTitle"
+                    label="音声タイトル"
+                    error={validationErrors.audioTitle}
+                  />
                   <input
                     id="audioTitle"
                     className={styles.input}
@@ -451,16 +487,17 @@ export default function ProfileEditPage() {
                       <p className={styles.uploadLabel}>
                         ここに音声ファイルをドロップ、またはクリックして選択
                       </p>
-                      <p
-                        className={styles.uploadHint}
-                        dangerouslySetInnerHTML={{
-                          __html:
-                            audioUploadMessage ||
-                            audioFile?.name ||
-                            profile.audioUrl ||
-                            "未選択",
-                        }}
-                      />
+                      <p className={styles.uploadHint}>
+                        {(audioUploadMessages.length > 0
+                          ? audioUploadMessages
+                          : [audioFile?.name || profile.audioUrl || "未選択"]
+                        ).map((line, index, lines) => (
+                          <span key={`${line}-${index}`}>
+                            {line}
+                            {index < lines.length - 1 ? <br /> : null}
+                          </span>
+                        ))}
+                      </p>
                     </label>
                   </div>
                   {(audioPreviewUrl || profile.audioUrl) && (
@@ -472,25 +509,12 @@ export default function ProfileEditPage() {
                       />
                     </div>
                   )}
-                  <button
-                    type="button"
-                    className={styles.saveButton}
-                    onClick={handleSave}
-                    disabled={saveState === "saving"}
-                  >
-                    {saveState === "saving" ? "保存中..." : "変更を保存"}
-                  </button>
-                  {saveMessage ? (
-                    <p
-                      className={`${styles.saveMessage} ${
-                        saveState === "success"
-                          ? styles.saveMessageSuccess
-                          : styles.saveMessageError
-                      }`}
-                    >
-                      {saveMessage}
-                    </p>
-                  ) : null}
+                  <ProfileSaveControls
+                    state={saveState}
+                    message={saveMessage}
+                    onSave={handleSave}
+                    className={null}
+                  />
                 </div>
               </div>
 
@@ -499,7 +523,7 @@ export default function ProfileEditPage() {
               </div>
 
               <div className={styles.socialList}>
-                {profile.sns.map((link, index) => (
+                {socialLinks.map((link, index) => (
                   <div
                     key={`${link.service}-${index}`}
                     className={styles.socialRow}
@@ -528,19 +552,12 @@ export default function ProfileEditPage() {
                     </div>
 
                     <div className={styles.serviceRow}>
-                      <div className={styles.labelWithValidation}>
-                        <label
-                          className={styles.smallLabel}
-                          htmlFor={`label-${index}`}
-                        >
-                          ラベル
-                        </label>
-                        {validationErrors.sns?.[index]?.label && (
-                          <span className={styles.validationError}>
-                            {validationErrors.sns[index].label}
-                          </span>
-                        )}
-                      </div>
+                      <ValidatedFieldLabel
+                        htmlFor={`label-${index}`}
+                        label="ラベル"
+                        error={validationErrors.socialLinks?.[index]?.label}
+                        className={styles.smallLabel}
+                      />
                       <input
                         id={`label-${index}`}
                         className={`${styles.input} ${styles.smallInput}`}
@@ -585,32 +602,16 @@ export default function ProfileEditPage() {
                 type="button"
                 className={styles.addButton}
                 onClick={addSocialLink}
-                disabled={profile.sns.length >= 4}
+                disabled={socialLinks.length >= 4}
               >
                 + リンクを追加
               </button>
             </div>
-            <div className={styles.saveButtonRow}>
-              <button
-                type="button"
-                className={styles.saveButton}
-                onClick={handleSave}
-                disabled={saveState === "saving"}
-              >
-                {saveState === "saving" ? "保存中..." : "変更を保存"}
-              </button>
-              {saveMessage ? (
-                <p
-                  className={`${styles.saveMessage} ${
-                    saveState === "success"
-                      ? styles.saveMessageSuccess
-                      : styles.saveMessageError
-                  }`}
-                >
-                  {saveMessage}
-                </p>
-              ) : null}
-            </div>
+            <ProfileSaveControls
+              state={saveState}
+              message={saveMessage}
+              onSave={handleSave}
+            />
           </article>
         )}
       </section>
