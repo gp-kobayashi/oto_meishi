@@ -7,6 +7,13 @@ import type {
   SocialService,
 } from "@/lib/mock/profileData";
 import UserIdRedirect from "@/components/auth/UserIdRedirect";
+import {
+  validateDisplayName,
+  validateBio,
+  validateAudioTitle,
+  validateSocialLabel,
+} from "@/lib/validation";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "./page.module.css";
 
 const themeOptions = [
@@ -31,12 +38,6 @@ const serviceOptions: Array<{ value: SocialService; label: string }> = [
   { value: "website", label: "Webサイト" },
   { value: "other", label: "その他" },
 ];
-
-// 文字数制限
-const MAX_DISPLAY_NAME_LENGTH = 20;
-const MAX_BIO_LENGTH = 60;
-const MAX_AUDIO_TITLE_LENGTH = 25;
-const MAX_SOCIAL_LABEL_LENGTH = 25;
 
 export default function ProfileEditPage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
@@ -112,10 +113,7 @@ export default function ProfileEditPage() {
     if (field === "displayName") {
       setValidationErrors((prev) => ({
         ...prev,
-        displayName:
-          value.length > MAX_DISPLAY_NAME_LENGTH
-            ? `文字数制限を超えています（${MAX_DISPLAY_NAME_LENGTH}文字まで）`
-            : undefined,
+        displayName: validateDisplayName(value),
       }));
     }
 
@@ -123,10 +121,7 @@ export default function ProfileEditPage() {
     if (field === "bio") {
       setValidationErrors((prev) => ({
         ...prev,
-        bio:
-          value.length > MAX_BIO_LENGTH
-            ? `文字数制限を超えています（${MAX_BIO_LENGTH}文字まで）`
-            : undefined,
+        bio: validateBio(value),
       }));
     }
 
@@ -134,10 +129,7 @@ export default function ProfileEditPage() {
     if (field === "audioTitle") {
       setValidationErrors((prev) => ({
         ...prev,
-        audioTitle:
-          value.length > MAX_AUDIO_TITLE_LENGTH
-            ? `文字数制限を超えています（${MAX_AUDIO_TITLE_LENGTH}文字まで）`
-            : undefined,
+        audioTitle: validateAudioTitle(value),
       }));
     }
   };
@@ -160,10 +152,7 @@ export default function ProfileEditPage() {
             ...prev.sns,
             [index]: {
               ...prev.sns?.[index],
-              label:
-                value.length > MAX_SOCIAL_LABEL_LENGTH
-                  ? `文字数制限を超えています（${MAX_SOCIAL_LABEL_LENGTH}文字まで）`
-                  : undefined,
+              label: validateSocialLabel(value),
             },
           },
         }));
@@ -240,6 +229,23 @@ export default function ProfileEditPage() {
       return;
     }
 
+    if (!supabase) {
+      setSaveState("error");
+      setSaveMessage("認証クライアントが初期化されていません。");
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      setSaveState("error");
+      setSaveMessage("セッションがありません。ログインしてください。");
+      return;
+    }
+    const token = session.access_token;
+
     setSaveState("saving");
     setSaveMessage("");
 
@@ -253,6 +259,9 @@ export default function ProfileEditPage() {
 
         const uploadResponse = await fetch("/api/audio/upload", {
           method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           body: formData,
         });
 
@@ -270,7 +279,10 @@ export default function ProfileEditPage() {
 
       const response = await fetch("/api/profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           ...profile,
           audioUrl: finalAudioUrl,
