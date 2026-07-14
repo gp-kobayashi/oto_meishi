@@ -1,0 +1,90 @@
+import { vi, describe, it, expect, beforeEach } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import AuthPanel from "@/components/auth/AuthPanel";
+import React from "react";
+
+// supabaseClientのモック
+vi.mock("@/lib/supabaseClient", () => {
+  return {
+    supabase: {
+      auth: {
+        signUp: vi.fn(),
+        signInWithPassword: vi.fn(),
+        signInWithOAuth: vi.fn(),
+      },
+    },
+  };
+});
+
+import { supabase } from "@/lib/supabaseClient";
+
+describe("AuthPanel", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("ログインモードで正しくレンダリングされること", () => {
+    render(<AuthPanel mode="login" />);
+    
+    expect(screen.getByRole("button", { name: /Googleアカウントでログイン/i })).toBeDefined();
+    expect(screen.getByRole("button", { name: /Facebookアカウントでログイン/i })).toBeDefined();
+    expect(screen.getByLabelText("メールアドレス")).toBeDefined();
+    expect(screen.getByLabelText("パスワード")).toBeDefined();
+    expect(screen.getByRole("button", { name: "メールアドレスでログイン" })).toBeDefined();
+  });
+
+  it("メールアドレスとパスワードによるログインが成功すること", async () => {
+    const mockSignIn = vi.mocked(supabase!.auth.signInWithPassword);
+    mockSignIn.mockResolvedValueOnce({ data: { user: {} } as any, error: null });
+
+    render(<AuthPanel mode="login" />);
+
+    fireEvent.change(screen.getByLabelText("メールアドレス"), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText("パスワード"), { target: { value: "password123" } });
+    fireEvent.click(screen.getByRole("button", { name: "メールアドレスでログイン" }));
+
+    await waitFor(() => {
+      expect(mockSignIn).toHaveBeenCalledWith({
+        email: "test@example.com",
+        password: "password123",
+      });
+      expect(screen.getByText("ログインしました。")).toBeDefined();
+    });
+  });
+
+  it("ログイン失敗時にエラーメッセージが表示されること", async () => {
+    const mockSignIn = vi.mocked(supabase!.auth.signInWithPassword);
+    mockSignIn.mockResolvedValueOnce({ data: { user: null, session: null }, error: new Error("Invalid credentials") as any });
+
+    render(<AuthPanel mode="login" />);
+
+    fireEvent.change(screen.getByLabelText("メールアドレス"), { target: { value: "test@example.com" } });
+    fireEvent.change(screen.getByLabelText("パスワード"), { target: { value: "wrongpass" } });
+    fireEvent.click(screen.getByRole("button", { name: "メールアドレスでログイン" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Invalid credentials")).toBeDefined();
+    });
+  });
+
+  it("新規登録モードで正しく動作すること", async () => {
+    const mockSignUp = vi.mocked(supabase!.auth.signUp);
+    mockSignUp.mockResolvedValueOnce({ data: { user: {} } as any, error: null });
+
+    render(<AuthPanel mode="signup" />);
+
+    expect(screen.getByRole("button", { name: "メールアドレスで登録" })).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("メールアドレス"), { target: { value: "new@example.com" } });
+    fireEvent.change(screen.getByLabelText("パスワード"), { target: { value: "securepass" } });
+    fireEvent.click(screen.getByRole("button", { name: "メールアドレスで登録" }));
+
+    await waitFor(() => {
+      expect(mockSignUp).toHaveBeenCalledWith({
+        email: "new@example.com",
+        password: "securepass",
+      });
+      expect(screen.getByText(/確認メールを送信しました/)).toBeDefined();
+    });
+  });
+});
