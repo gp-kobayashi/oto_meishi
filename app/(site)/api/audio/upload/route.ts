@@ -3,6 +3,7 @@ import { convertToAac, cleanupTempFile } from "@/lib/audioConverter";
 import { uploadToR2, generateAudioKey } from "@/lib/r2Storage";
 import path from "path";
 import fs from "fs/promises";
+import { createServerSupabaseClient } from "@/lib/supabaseClient";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -10,6 +11,32 @@ const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
 
 export async function POST(request: NextRequest) {
   try {
+    // Authorizationヘッダーの検証
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Unauthorized: Missing or invalid token" },
+        { status: 401 },
+      );
+    }
+    const token = authHeader.split(" ")[1];
+
+    try {
+      const supabaseServer = createServerSupabaseClient();
+      const { data: { user }, error } = await supabaseServer.auth.getUser(token);
+      if (error || !user) {
+        return NextResponse.json(
+          { error: "Unauthorized: Invalid token" },
+          { status: 401 },
+        );
+      }
+    } catch {
+      return NextResponse.json(
+        { error: "Unauthorized: Token verification failed" },
+        { status: 401 },
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get("file") as File;
     const userId = formData.get("userId") as string;

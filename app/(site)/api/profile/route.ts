@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deleteFromR2, extractKeyFromUrl } from "@/lib/r2Storage";
 import type { ProfileData, SocialLink, SocialService } from "@/lib/mock/profileData";
+import { createServerSupabaseClient } from "@/lib/supabaseClient";
 
 const allowedThemes = ["normal", "dark", "light", "colorful"] as const;
 const allowedServices: SocialService[] = [
@@ -57,6 +58,34 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    // Authorizationヘッダーの検証
+    const authHeader = request.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Unauthorized: Missing or invalid token" },
+        { status: 401 },
+      );
+    }
+    const token = authHeader.split(" ")[1];
+
+    let supabaseUser: { id: string } | null = null;
+    try {
+      const supabaseServer = createServerSupabaseClient();
+      const { data: { user }, error } = await supabaseServer.auth.getUser(token);
+      if (error || !user) {
+        return NextResponse.json(
+          { error: "Unauthorized: Invalid token" },
+          { status: 401 },
+        );
+      }
+      supabaseUser = user;
+    } catch {
+      return NextResponse.json(
+        { error: "Unauthorized: Token verification failed" },
+        { status: 401 },
+      );
+    }
+
     const body = (await request.json().catch(() => ({}))) as Partial<ProfileData> & {
       userId?: string;
       sns?: SocialLink[];
@@ -139,9 +168,21 @@ export async function POST(request: Request) {
     });
 
     if (!profile) {
+      // 新規作成時：このアカウントがすでに別のuserIdでプロフィールを作成していないか確認
+      const existingProfileByAuth = await prisma.profile.findUnique({
+        where: { authId: supabaseUser.id },
+      });
+      if (existingProfileByAuth) {
+        return NextResponse.json(
+          { error: "このアカウントはすでに別のユーザーIDで登録されています。" },
+          { status: 400 },
+        );
+      }
+
       profile = await prisma.profile.create({
         data: {
           userId,
+          authId: supabaseUser.id,
           displayName: displayName || userId,
           bio,
           audioUrl,
@@ -154,6 +195,14 @@ export async function POST(request: Request) {
         include: { sns: true },
       });
     } else {
+      // 既存プロフィールの更新時：authIdの一致確認、または既存で設定されていない場合はここで紐付け
+      if (profile.authId && profile.authId !== supabaseUser.id) {
+        return NextResponse.json(
+          { error: "別のユーザーのプロフィールを変更する権限がありません。" },
+          { status: 403 },
+        );
+      }
+
       // audioUrlが変更された場合、古い音源をR2から削除
       if (profile.audioUrl && profile.audioUrl !== audioUrl) {
         try {
@@ -169,6 +218,7 @@ export async function POST(request: Request) {
       profile = await prisma.profile.update({
         where: { userId },
         data: {
+          authId: profile.authId ? undefined : supabaseUser.id,
           displayName: displayName || userId,
           bio,
           audioUrl,
