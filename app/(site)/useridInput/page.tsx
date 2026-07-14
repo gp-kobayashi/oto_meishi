@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 import styles from "./page.module.css";
 
 export default function UserIdInputPage() {
@@ -34,10 +35,28 @@ export default function UserIdInputPage() {
     setIsSaving(true);
 
     try {
+      if (!supabase) {
+        setError("認証クライアントが初期化されていません。");
+        setIsSaving(false);
+        return;
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setError("セッションがありません。ログインしてください。");
+        setIsSaving(false);
+        return;
+      }
+      const token = session.access_token;
+
       const response = await fetch("/api/profile", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ userId: trimmed, displayName: trimmed }),
       });
