@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { generateAudioKey, extractKeyFromUrl } from '../lib/r2Storage';
+import { generateAudioKey, extractKeyFromUrl } from '@/lib/r2Storage';
 
 describe('R2ストレージ機能', () => {
   describe('generateAudioKey', () => {
@@ -78,14 +78,12 @@ describe('R2ストレージ機能', () => {
       expect(key).toBe('audio/testuser/test-1234567890.m4a');
     });
 
-    it('URLの末尾にスラッシュがある場合、現在の実装に合わせて調整する', () => {
+    it('R2_PUBLIC_URLの末尾にスラッシュがある場合も正しいキーを抽出する', () => {
       process.env.R2_PUBLIC_URL = 'https://pub-xxxxxxxx.r2.dev/';
       const url = 'https://pub-xxxxxxxx.r2.dev/audio/testuser/test-1234567890.m4a';
       const key = extractKeyFromUrl(url);
 
-      // 現在の実装ではスラッシュが含まれる場合、+1でスキップされるため先頭文字が欠ける
-      // これは実装のバグだが、テストは現在の挙動に合わせる
-      expect(key).toBe('udio/testuser/test-1234567890.m4a');
+      expect(key).toBe('audio/testuser/test-1234567890.m4a');
     });
 
     it('URLがR2_PUBLIC_URLで始まらない場合、URLをそのまま返す', () => {
