@@ -10,12 +10,16 @@ import type { ProfileData } from "@/lib/mock/profileData";
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined") {
+      return true;
+    }
+    return Boolean(window.localStorage.getItem("oto_meishi_userId"));
+  });
 
   useEffect(() => {
     const savedUserId = window.localStorage.getItem("oto_meishi_userId");
     if (!savedUserId) {
-      setLoading(false);
       return;
     }
 

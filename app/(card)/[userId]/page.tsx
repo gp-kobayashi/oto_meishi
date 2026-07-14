@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import Card from "@/components/card/Card";
 import styles from "./page.module.css";
@@ -22,9 +23,9 @@ const UserIdPage = async ({
 
   return (
     <main className={styles.main}>
-      <a href="/" className={styles.logo}>
+      <Link href="/" className={styles.logo}>
         <Image src="/logo-title.svg" alt="Logo" width={140} height={24} />
-      </a>
+      </Link>
       <Card link={profile as ProfileData} />
     </main>
   );

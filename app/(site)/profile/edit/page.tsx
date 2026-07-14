@@ -66,11 +66,8 @@ export default function ProfileEditPage() {
   useEffect(() => {
     const savedUserId = window.localStorage.getItem("oto_meishi_userId");
     if (!savedUserId) {
-      setLoading(false);
       return;
     }
-
-    setLoading(true);
 
     fetch(`/api/profile?userId=${encodeURIComponent(savedUserId)}`)
       .then(async (res) => {

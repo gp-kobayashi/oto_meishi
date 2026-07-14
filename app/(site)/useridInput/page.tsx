@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./page.module.css";
 
 export default function UserIdInputPage() {
   const router = useRouter();
-  const [userId, setUserId] = useState("");
+  const [userId, setUserId] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    return window.localStorage.getItem("oto_meishi_userId") ?? "";
+  });
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem("oto_meishi_userId");
-    if (saved) {
-      setUserId(saved);
-    }
-  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -113,8 +111,12 @@ export default function UserIdInputPage() {
             英数字、ハイフン、アンダースコアが使えます。
           </p>
           {error && <p className={styles.error}>{error}</p>}
-          <button className={styles.submitButton} type="submit">
-            保存してマイページへ
+          <button
+            className={styles.submitButton}
+            type="submit"
+            disabled={isSaving}
+          >
+            {isSaving ? "保存中..." : "保存してマイページへ"}
           </button>
         </form>
       </div>

@@ -1,4 +1,4 @@
-import type { ProfileData, SocialLink, SocialService } from "./mock/profileData";
+import type { SocialLink, SocialService } from "./mock/profileData";
 
 const allowedThemes = ["normal", "dark", "light", "colorful"] as const;
 const allowedServices: SocialService[] = [

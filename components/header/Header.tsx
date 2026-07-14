@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./Header.module.css";
 
@@ -36,20 +37,20 @@ const Header = () => {
 
   return (
     <header className={styles.header}>
-      <a className={styles.logoContainer} href="/">
+      <Link className={styles.logoContainer} href="/">
         <Image src="/logo.svg" alt="Logo" width={40} height={32} />
-      </a>
+      </Link>
       <nav className={styles.nav} aria-label="main navigation">
         {isLoggedIn ? (
-          <a href="/profile">マイページ</a>
+          <Link href="/profile">マイページ</Link>
         ) : (
           <>
-            <a href="/login">ログイン</a>
-            <a href="/signup">登録</a>
+            <Link href="/login">ログイン</Link>
+            <Link href="/signup">登録</Link>
           </>
         )}
-        <a href="/help">ヘルプ</a>
-        <a href="/terms">利用規約</a>
+        <Link href="/help">ヘルプ</Link>
+        <Link href="/terms">利用規約</Link>
       </nav>
     </header>
   );

@@ -1,5 +1,6 @@
 import styles from "./page.module.css";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -67,9 +68,9 @@ export default function Home() {
 
         <div className={styles.arrow} aria-hidden="true" />
 
-        <a className={styles.registerButton} href="/signup">
+        <Link className={styles.registerButton} href="/signup">
           アカウント登録ページへ
-        </a>
+        </Link>
       </section>
     </section>
   );
