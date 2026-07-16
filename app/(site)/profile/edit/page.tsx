@@ -148,6 +148,7 @@ export default function ProfileEditPage() {
   const [saveMessage, setSaveMessage] = useState<string>("");
   const [audioUploadMessages, setAudioUploadMessages] = useState<string[]>([]);
   const [audioFileError, setAudioFileError] = useState<string>("");
+  const [deletingAudio, setDeletingAudio] = useState(false);
   const [validationErrors, setValidationErrors] = useState<{
     displayName?: string;
     bio?: string;
@@ -300,6 +301,56 @@ export default function ProfileEditPage() {
     setDragActive(false);
     const file = event.dataTransfer.files?.[0];
     if (file) handleAudioFile(file);
+  };
+
+  const handleDeleteAudio = async () => {
+    if (!profile || deletingAudio) return;
+    if (!window.confirm("登録中の音源を削除しますか？この操作は取り消せません。")) {
+      return;
+    }
+
+    if (!supabase) {
+      setAudioFileError("認証クライアントが初期化されていません。");
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) {
+      setAudioFileError("セッションがありません。ログインしてください。");
+      return;
+    }
+
+    setDeletingAudio(true);
+    setAudioFileError("");
+    try {
+      const response = await fetch("/api/audio", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "音源の削除に失敗しました。");
+      }
+
+      setAudioFile(null);
+      setAudioPreviewUrl((previousUrl) => {
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
+        return "";
+      });
+      setProfile((current) =>
+        current ? { ...current, audioUrl: "", audioTitle: "" } : current,
+      );
+      setValidationErrors((current) => ({ ...current, audioTitle: undefined }));
+      setAudioUploadMessages([]);
+    } catch (error) {
+      setAudioFileError(
+        error instanceof Error ? error.message : "音源の削除に失敗しました。",
+      );
+    } finally {
+      setDeletingAudio(false);
+    }
   };
 
   const addSocialLink = () => {
@@ -563,6 +614,16 @@ export default function ProfileEditPage() {
                         className={styles.audioPlayer}
                         src={audioPreviewUrl || profile.audioUrl}
                       />
+                      {profile.audioUrl ? (
+                        <button
+                          type="button"
+                          className={styles.deleteAudioButton}
+                          onClick={handleDeleteAudio}
+                          disabled={deletingAudio}
+                        >
+                          {deletingAudio ? "削除中..." : "音源を削除"}
+                        </button>
+                      ) : null}
                     </div>
                   )}
                   <ProfileSaveControls

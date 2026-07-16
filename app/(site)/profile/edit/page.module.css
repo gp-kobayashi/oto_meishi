@@ -191,6 +191,27 @@
   font-weight: 600;
 }
 
+.deleteAudioButton {
+  justify-self: start;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 10px 16px;
+  background: #fff;
+  color: #b91c1c;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.deleteAudioButton:hover {
+  background: #fef2f2;
+}
+
+.deleteAudioButton:disabled {
+  color: #94a3b8;
+  border-color: #e2e8f0;
+  cursor: wait;
+}
+
 .sectionHeader {
   display: flex;
   justify-content: space-between;
