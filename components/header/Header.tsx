@@ -42,7 +42,10 @@ const Header = () => {
       </Link>
       <nav className={styles.nav} aria-label="main navigation">
         {isLoggedIn ? (
-          <Link href="/profile">マイページ</Link>
+          <>
+            <Link href="/profile">マイページ</Link>
+            <Link href="/logout">ログアウト</Link>
+          </>
         ) : (
           <>
             <Link href="/login">ログイン</Link>
