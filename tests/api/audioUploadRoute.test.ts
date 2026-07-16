@@ -68,6 +68,12 @@ function formDataWithFile() {
   return formData;
 }
 
+function fileWithReportedSize(size: number) {
+  const file = new File(["audio bytes"], "voice.mp3", { type: "audio/mpeg" });
+  Object.defineProperty(file, "size", { value: size });
+  return file;
+}
+
 describe("/api/audio/upload route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -118,6 +124,60 @@ describe("/api/audio/upload route", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "userId is required" });
     expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("fileが文字列の場合は400を返す", async () => {
+    const formData = new FormData();
+    formData.append("file", "not-a-file");
+    formData.append("userId", "testuser");
+
+    const response = await POST(uploadRequest(formData));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "File is required" });
+    expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("空ファイルの場合は400を返す", async () => {
+    const formData = new FormData();
+    formData.append("file", new File([], "empty.wav", { type: "audio/wav" }));
+    formData.append("userId", "testuser");
+
+    const response = await POST(uploadRequest(formData));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "空の音声ファイルはアップロードできません。",
+    });
+    expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("64MiBを超えるファイルの場合は413を返す", async () => {
+    const formData = new FormData();
+    formData.append("file", fileWithReportedSize(64 * 1024 * 1024 + 1));
+    formData.append("userId", "testuser");
+
+    const response = await POST(uploadRequest(formData));
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "音声ファイルは64MB以下にしてください。",
+    });
+    expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("64MiBちょうどのファイルはサイズ検証を通過する", async () => {
+    const formData = new FormData();
+    formData.append("file", fileWithReportedSize(64 * 1024 * 1024));
+    formData.append("userId", "testuser");
+
+    const response = await POST(uploadRequest(formData));
+
+    expect(response.status).toBe(200);
+    expect(mocks.writeFile).toHaveBeenCalled();
   });
 
   it("プロフィールが存在しない場合は404を返す", async () => {
@@ -171,21 +231,21 @@ describe("/api/audio/upload route", () => {
       audioKey: "audio/testuser/voice-123.m4a",
     });
     expect(mocks.writeFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.mp3",
+      "C:\\project\\.tmp\\upload-123\\input.bin",
       expect.any(Buffer),
     );
     expect(mocks.convertToAac).toHaveBeenCalledWith({
-      inputPath: "C:\\project\\.tmp\\upload-123\\input.mp3",
+      inputPath: "C:\\project\\.tmp\\upload-123\\input.bin",
       bitrate: "128k",
     });
-    expect(mocks.generateAudioKey).toHaveBeenCalledWith("testuser", "声.mp3");
+    expect(mocks.generateAudioKey).toHaveBeenCalledWith("testuser");
     expect(mocks.uploadToR2).toHaveBeenCalledWith(
       "C:\\project\\.tmp\\upload-123\\out.m4a",
       "audio/testuser/voice-123.m4a",
       "audio/mp4",
     );
     expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.mp3",
+      "C:\\project\\.tmp\\upload-123\\input.bin",
     );
     expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
       "C:\\project\\.tmp\\upload-123\\out.m4a",
@@ -204,7 +264,7 @@ describe("/api/audio/upload route", () => {
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toEqual({ error: "convert failed" });
     expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.mp3",
+      "C:\\project\\.tmp\\upload-123\\input.bin",
     );
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,
@@ -224,7 +284,7 @@ describe("/api/audio/upload route", () => {
       "C:\\project\\.tmp\\upload-123\\out.m4a",
     );
     expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.mp3",
+      "C:\\project\\.tmp\\upload-123\\input.bin",
     );
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,

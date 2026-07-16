@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
 const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
+const MAX_AUDIO_FILE_SIZE_BYTES = 64 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,14 +42,28 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    const file = formData.get("file") as File;
-    const userId = formData.get("userId") as string;
+    const file = formData.get("file");
+    const userId = formData.get("userId");
 
-    if (!file) {
+    if (!(file instanceof File)) {
       return NextResponse.json({ error: "File is required" }, { status: 400 });
     }
 
-    if (!userId) {
+    if (file.size === 0) {
+      return NextResponse.json(
+        { error: "空の音声ファイルはアップロードできません。" },
+        { status: 400 },
+      );
+    }
+
+    if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: "音声ファイルは64MB以下にしてください。" },
+        { status: 413 },
+      );
+    }
+
+    if (typeof userId !== "string" || !userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
@@ -71,9 +86,8 @@ export async function POST(request: NextRequest) {
     // 一時ディレクトリを作成（ASCIIパスのみのプロジェクト内ディレクトリを使用）
     await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
     const tempDir = await fs.mkdtemp(path.join(PROJECT_TMP_DIR, "upload-"));
-    // ファイル名に日本語等が含まれる場合もFFmpegが失敗するため、拡張子のみ保持したASCII安全なファイル名を使用する
-    const safeFileName = `input${path.extname(file.name)}`;
-    const inputPath = path.join(tempDir, safeFileName);
+    // クライアント提供のファイル名をパスに使用せず、固定名で保存する
+    const inputPath = path.join(tempDir, "input.bin");
 
     // アップロードされたファイルを一時ファイルとして保存
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -88,7 +102,7 @@ export async function POST(request: NextRequest) {
 
       try {
         // R2ストレージにアップロード
-        const audioKey = generateAudioKey(userId, file.name);
+        const audioKey = generateAudioKey(userId);
         const audioUrl = await uploadToR2(convertedPath, audioKey, "audio/mp4");
 
         console.log("Audio uploaded successfully:", { audioKey, audioUrl });
