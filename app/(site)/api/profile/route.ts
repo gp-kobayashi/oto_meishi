@@ -93,12 +93,13 @@ export async function POST(request: Request) {
       sns: socialLinks,
     } = profileInput;
 
-    let profile = await prisma.profile.findUnique({
+    const existingProfile = await prisma.profile.findUnique({
       where: { userId },
       include: { sns: true },
     });
+    let profileId: string;
 
-    if (!profile) {
+    if (!existingProfile) {
       // 新規作成時：このアカウントがすでに別のuserIdでプロフィールを作成していないか確認
       const existingProfileByAuth = await prisma.profile.findUnique({
         where: { authId: supabaseUser.id },
@@ -110,7 +111,7 @@ export async function POST(request: Request) {
         );
       }
 
-      profile = await prisma.profile.create({
+      const createdProfile = await prisma.profile.create({
         data: {
           userId,
           authId: supabaseUser.id,
@@ -125,9 +126,13 @@ export async function POST(request: Request) {
         },
         include: { sns: true },
       });
+      profileId = createdProfile.id;
     } else {
       // 既存プロフィールの更新時：authIdの一致確認、または既存で設定されていない場合はここで紐付け
-      if (profile.authId && profile.authId !== supabaseUser.id) {
+      if (
+        existingProfile.authId &&
+        existingProfile.authId !== supabaseUser.id
+      ) {
         return NextResponse.json(
           { error: "別のユーザーのプロフィールを変更する権限がありません。" },
           { status: 403 },
@@ -135,9 +140,12 @@ export async function POST(request: Request) {
       }
 
       // audioUrlが変更された場合、古い音源をR2から削除
-      if (profile.audioUrl && profile.audioUrl !== audioUrl) {
+      if (
+        existingProfile.audioUrl &&
+        existingProfile.audioUrl !== audioUrl
+      ) {
         try {
-          const oldKey = extractKeyFromUrl(profile.audioUrl);
+          const oldKey = extractKeyFromUrl(existingProfile.audioUrl);
           await deleteFromR2(oldKey);
           console.log("Deleted old audio file from R2:", oldKey);
         } catch (error) {
@@ -146,10 +154,10 @@ export async function POST(request: Request) {
         }
       }
 
-      profile = await prisma.profile.update({
+      await prisma.profile.update({
         where: { userId },
         data: {
-          authId: profile.authId ? undefined : supabaseUser.id,
+          authId: existingProfile.authId ? undefined : supabaseUser.id,
           displayName: displayName || userId,
           bio,
           audioUrl,
@@ -158,14 +166,15 @@ export async function POST(request: Request) {
         },
         include: { sns: true },
       });
+      profileId = existingProfile.id;
     }
 
-    await prisma.socialLink.deleteMany({ where: { profileId: profile.id } });
+    await prisma.socialLink.deleteMany({ where: { profileId } });
 
     if (socialLinks.length > 0) {
       await prisma.socialLink.createMany({
         data: socialLinks.map((link) => ({
-          profileId: profile.id,
+          profileId,
           service: link.service,
           url: link.url,
           label: link.label,

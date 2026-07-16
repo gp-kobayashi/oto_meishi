@@ -1,6 +1,7 @@
 import type { SocialLink, SocialService } from "./mock/profileData";
 
 const allowedThemes = ["normal", "dark", "light", "colorful"] as const;
+type ProfileTheme = (typeof allowedThemes)[number];
 const allowedServices: SocialService[] = [
   "x",
   "instagram",
@@ -32,7 +33,7 @@ export interface ApiValidationError {
 export interface SanitizedProfileData {
   userId: string;
   displayName: string;
-  theme: string;
+  theme: ProfileTheme;
   bio: string;
   audioUrl: string;
   audioTitle: string;
@@ -117,9 +118,9 @@ export function validateSocialLabelLength(label: string): ApiValidationError | n
 /**
  * テーマのバリデーションと正規化
  */
-export function normalizeTheme(theme: string): string {
-  return allowedThemes.includes(theme as (typeof allowedThemes)[number])
-    ? theme
+export function normalizeTheme(theme: string): ProfileTheme {
+  return allowedThemes.includes(theme as ProfileTheme)
+    ? (theme as ProfileTheme)
     : "normal";
 }
 
