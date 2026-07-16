@@ -70,6 +70,30 @@ describe("ProfileEditPage", () => {
       createObjectURL: vi.fn(() => "blob:audio-preview"),
       revokeObjectURL: vi.fn(),
     });
+    vi.stubGlobal("confirm", vi.fn(() => true));
+  });
+
+  it("確認後に登録済み音源を削除して未選択表示にする", async () => {
+    const fetchMock = await renderLoadedPage({
+      ...baseProfile,
+      audioUrl: "https://r2.example/audio/testuser/old.m4a",
+    });
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ success: true, audioUrl: "", audioTitle: "" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "音源を削除" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "音源を削除" })).toBeNull();
+    });
+    expect(window.confirm).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/audio", {
+      method: "DELETE",
+      headers: { Authorization: "Bearer session-token" },
+    });
+    expect(screen.getByText("未選択")).toBeDefined();
+    expect(screen.getByLabelText<HTMLInputElement>("音声タイトル").value).toBe("");
   });
 
   it("セッションが無い場合は保存APIを呼ばずにエラーを表示する", async () => {
