@@ -16,6 +16,45 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const userId = url.searchParams.get("userId");
+    const mine = url.searchParams.get("mine") === "true";
+
+    if (mine) {
+      const authHeader = request.headers.get("Authorization");
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return NextResponse.json(
+          { error: "Unauthorized: Missing or invalid token" },
+          { status: 401 },
+        );
+      }
+
+      const token = authHeader.slice("Bearer ".length);
+      const supabaseServer = createServerSupabaseClient();
+      const {
+        data: { user },
+        error,
+      } = await supabaseServer.auth.getUser(token);
+
+      if (error || !user) {
+        return NextResponse.json(
+          { error: "Unauthorized: Invalid token" },
+          { status: 401 },
+        );
+      }
+
+      const profile = await prisma.profile.findUnique({
+        where: { authId: user.id },
+        include: { sns: true },
+      });
+
+      if (!profile) {
+        return NextResponse.json(
+          { error: "profile not found" },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json(profile);
+    }
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });

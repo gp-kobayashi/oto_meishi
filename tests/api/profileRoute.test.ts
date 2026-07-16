@@ -40,7 +40,7 @@ vi.mock("@/lib/r2Storage", () => ({
   extractKeyFromUrl: mocks.extractKeyFromUrl,
 }));
 
-import { POST } from "@/app/(site)/api/profile/route";
+import { GET, POST } from "@/app/(site)/api/profile/route";
 
 const authHeader = { Authorization: "Bearer valid-token" };
 
@@ -66,6 +66,45 @@ describe("/api/profile route", () => {
     mocks.socialLinkCreateMany.mockResolvedValue({ count: 0 });
     mocks.extractKeyFromUrl.mockReturnValue("audio/test/old.m4a");
     mocks.deleteFromR2.mockResolvedValue(undefined);
+  });
+
+  it("認証ユーザーに紐づく既存プロフィールを返す", async () => {
+    const profile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      sns: [],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(profile);
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?mine=true", {
+        headers: authHeader,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(profile);
+    expect(mocks.getUser).toHaveBeenCalledWith("valid-token");
+    expect(mocks.profileFindUnique).toHaveBeenCalledWith({
+      where: { authId: "auth-user-1" },
+      include: { sns: true },
+    });
+  });
+
+  it("認証ユーザーにプロフィールがなければ404を返す", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce(null);
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?mine=true", {
+        headers: authHeader,
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "profile not found",
+    });
   });
 
   it("ルート実体で文字数制限エラーを返し、DBを書き換えない", async () => {

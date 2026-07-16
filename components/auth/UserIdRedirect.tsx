@@ -21,8 +21,27 @@ export default function UserIdRedirect() {
       }
 
       const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
-      if (!savedUserId) {
-        router.replace("/userid");
+      if (savedUserId) {
+        return;
+      }
+
+      const response = await fetch("/api/profile?mine=true", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        const profile = (await response.json()) as { userId?: string };
+        if (profile.userId) {
+          window.localStorage.setItem(OTO_MEISHI_USER_ID_KEY, profile.userId);
+          window.location.reload();
+        }
+        return;
+      }
+
+      if (response.status === 404) {
+        router.replace("/useridInput");
       }
     };
 
