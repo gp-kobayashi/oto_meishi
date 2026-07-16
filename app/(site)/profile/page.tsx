@@ -11,12 +11,7 @@ import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(() => {
-    if (typeof window === "undefined") {
-      return true;
-    }
-    return Boolean(window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY));
-  });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
