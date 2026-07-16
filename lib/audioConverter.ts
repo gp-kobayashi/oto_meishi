@@ -2,6 +2,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs/promises";
+import { getFfmpegBinaryPath } from "@/lib/ffmpegBinary";
 
 const execFileAsync = promisify(execFile);
 
@@ -15,13 +16,6 @@ const MAX_OUTPUT_DURATION_SECONDS = 180;
 export const MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const CONVERSION_TIMEOUT_MS = 60_000;
 const PROCESS_OUTPUT_MAX_BUFFER_BYTES = 1024 * 1024;
-
-// Next.jsのバンドラーがffmpeg-staticのパスを書き換えてしまうため、
-// importを使わずprocess.cwd()から直接バイナリパスを構築する
-function getFfmpegBinaryPath(): string {
-  const ffmpegExe = process.platform === "win32" ? "ffmpeg.exe" : "ffmpeg";
-  return path.join(process.cwd(), "node_modules", "ffmpeg-static", ffmpegExe);
-}
 
 export interface ConversionOptions {
   inputPath: string;
