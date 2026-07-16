@@ -3,6 +3,13 @@ import { promisify } from "util";
 import path from "path";
 import fs from "fs/promises";
 import { getFfmpegBinaryPath } from "@/lib/ffmpegBinary";
+import {
+  LOUDNESS_TARGET_INTEGRATED_LUFS,
+  LOUDNESS_TARGET_RANGE_LU,
+  LOUDNESS_TARGET_TRUE_PEAK_DBTP,
+  type LoudnessMeasurement,
+  measureAudioLoudness,
+} from "@/lib/audioLoudness";
 
 const execFileAsync = promisify(execFile);
 
@@ -33,6 +40,27 @@ interface FfmpegArgumentsOptions {
   audioStreamIndex: number;
   outputSampleRate: number;
   outputChannels: 1 | 2;
+  loudnessMeasurement: LoudnessMeasurement;
+}
+
+export function buildLoudnessNormalizationFilter(
+  measurement: LoudnessMeasurement,
+  outputSampleRate: number,
+): string {
+  const loudnorm = [
+    `I=${LOUDNESS_TARGET_INTEGRATED_LUFS}`,
+    `TP=${LOUDNESS_TARGET_TRUE_PEAK_DBTP}`,
+    `LRA=${LOUDNESS_TARGET_RANGE_LU}`,
+    `measured_I=${measurement.inputIntegratedLufs}`,
+    `measured_TP=${measurement.inputTruePeakDbtp}`,
+    `measured_LRA=${measurement.inputLoudnessRangeLu}`,
+    `measured_thresh=${measurement.inputThresholdLufs}`,
+    `offset=${measurement.targetOffsetLu}`,
+    "linear=true",
+    "print_format=summary",
+  ].join(":");
+
+  return `loudnorm=${loudnorm},aresample=${outputSampleRate}`;
 }
 
 export function buildFfmpegArguments(
@@ -45,6 +73,7 @@ export function buildFfmpegArguments(
     audioStreamIndex,
     outputSampleRate,
     outputChannels,
+    loudnessMeasurement,
   } = options;
 
   return [
@@ -52,6 +81,10 @@ export function buildFfmpegArguments(
     "-nostdin",
     "-i", inputPath,
     "-map", `0:${audioStreamIndex}`,
+    "-af", buildLoudnessNormalizationFilter(
+      loudnessMeasurement,
+      outputSampleRate,
+    ),
     "-c:a", "aac",
     "-profile:a", "aac_low",
     "-b:a", bitrate,
@@ -97,19 +130,27 @@ export async function convertToAac(options: ConversionOptions): Promise<string> 
 
   const ffmpegBinary = getFfmpegBinaryPath();
 
-  // バイナリの存在確認
-  await fs.access(ffmpegBinary);
-
-  const args = buildFfmpegArguments({
-    inputPath,
-    outputPath: finalOutputPath,
-    bitrate,
-    audioStreamIndex,
-    outputSampleRate,
-    outputChannels,
-  });
-
   try {
+    // バイナリの存在確認
+    await fs.access(ffmpegBinary);
+
+    // 1パス目で入力音声のラウドネスを測定する
+    const loudnessMeasurement = await measureAudioLoudness(
+      inputPath,
+      audioStreamIndex,
+    );
+
+    // 2パス目で測定値を使ってラウドネスを正規化し、AACへ変換する
+    const args = buildFfmpegArguments({
+      inputPath,
+      outputPath: finalOutputPath,
+      bitrate,
+      audioStreamIndex,
+      outputSampleRate,
+      outputChannels,
+      loudnessMeasurement,
+    });
+
     await execFileAsync(ffmpegBinary, args, {
       timeout: CONVERSION_TIMEOUT_MS,
       maxBuffer: PROCESS_OUTPUT_MAX_BUFFER_BYTES,

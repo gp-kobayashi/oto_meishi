@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
-import { buildFfmpegArguments } from '@/lib/audioConverter';
+import {
+  buildFfmpegArguments,
+  buildLoudnessNormalizationFilter,
+} from '@/lib/audioConverter';
+
+const loudnessMeasurement = {
+  inputIntegratedLufs: -22.1,
+  inputTruePeakDbtp: -3.2,
+  inputLoudnessRangeLu: 7.1,
+  inputThresholdLufs: -32.5,
+  targetOffsetLu: -0.2,
+};
 
 describe('音声変換機能', () => {
   describe('ファイルパス生成ロジック', () => {
@@ -31,6 +42,7 @@ describe('音声変換機能', () => {
         audioStreamIndex: 2,
         outputSampleRate: 44100,
         outputChannels: 1,
+        loudnessMeasurement,
       });
 
       expect(args).toEqual([
@@ -38,6 +50,7 @@ describe('音声変換機能', () => {
         '-nostdin',
         '-i', '/tmp/input.bin',
         '-map', '0:2',
+        '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=-22.1:measured_TP=-3.2:measured_LRA=7.1:measured_thresh=-32.5:offset=-0.2:linear=true:print_format=summary,aresample=44100',
         '-c:a', 'aac',
         '-profile:a', 'aac_low',
         '-b:a', '128k',
@@ -53,6 +66,14 @@ describe('音声変換機能', () => {
         '-y',
         '/tmp/output.m4a',
       ]);
+    });
+
+    it('測定値から2パス目のラウドネス正規化フィルターを生成する', () => {
+      expect(
+        buildLoudnessNormalizationFilter(loudnessMeasurement, 48000),
+      ).toBe(
+        'loudnorm=I=-16:TP=-1.5:LRA=11:measured_I=-22.1:measured_TP=-3.2:measured_LRA=7.1:measured_thresh=-32.5:offset=-0.2:linear=true:print_format=summary,aresample=48000',
+      );
     });
   });
 });
