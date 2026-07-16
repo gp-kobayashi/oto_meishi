@@ -29,6 +29,9 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+RUN find node_modules/@ffprobe-installer -type f -name ffprobe -exec chmod +x {} + \
+    && chmod +x node_modules/ffmpeg-static/ffmpeg
+
 USER nextjs
 
 EXPOSE 3000
