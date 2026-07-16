@@ -5,6 +5,8 @@ import path from "path";
 import fs from "fs/promises";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { prisma } from "@/lib/prisma";
+import { inspectAudioFile } from "@/lib/audioInspector";
+import { validateAudioMetadata } from "@/lib/audioUploadPolicy";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -94,6 +96,19 @@ export async function POST(request: NextRequest) {
     await fs.writeFile(inputPath, buffer);
 
     try {
+      const metadata = await inspectAudioFile(inputPath);
+      const policyResult = validateAudioMetadata(metadata);
+
+      if (!policyResult.valid) {
+        await cleanupTempFile(inputPath);
+        await fs.rm(tempDir, { recursive: true, force: true });
+
+        return NextResponse.json(
+          { error: policyResult.message, code: policyResult.code },
+          { status: 422 },
+        );
+      }
+
       // FFmpegでAAC形式（.m4a）に変換（128kbps・全ブラウザ対応）
       const convertedPath = await convertToAac({
         inputPath,

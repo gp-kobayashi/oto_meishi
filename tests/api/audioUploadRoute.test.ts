@@ -12,6 +12,7 @@ const { mocks } = vi.hoisted(() => ({
     uploadToR2: vi.fn(),
     generateAudioKey: vi.fn(),
     findUniqueProfile: vi.fn(),
+    inspectAudioFile: vi.fn(),
   },
 }));
 
@@ -29,6 +30,10 @@ vi.mock("@/lib/prisma", () => ({
       findUnique: mocks.findUniqueProfile,
     },
   },
+}));
+
+vi.mock("@/lib/audioInspector", () => ({
+  inspectAudioFile: mocks.inspectAudioFile,
 }));
 
 vi.mock("fs/promises", () => ({
@@ -82,6 +87,21 @@ describe("/api/audio/upload route", () => {
       error: null,
     });
     mocks.findUniqueProfile.mockResolvedValue({ authId: "auth-user-1" });
+    mocks.inspectAudioFile.mockResolvedValue({
+      formatName: "mp3",
+      durationSeconds: 120,
+      streams: [
+        {
+          index: 0,
+          codecType: "audio",
+          codecName: "mp3",
+          durationSeconds: 120,
+          sampleRate: 44100,
+          channels: 2,
+          attachedPicture: false,
+        },
+      ],
+    });
     mocks.mkdir.mockResolvedValue(undefined);
     mocks.mkdtemp.mockResolvedValue("C:\\project\\.tmp\\upload-123");
     mocks.writeFile.mockResolvedValue(undefined);
@@ -221,6 +241,90 @@ describe("/api/audio/upload route", () => {
     expect(mocks.uploadToR2).not.toHaveBeenCalled();
   });
 
+  it("3分を超える音声は422を返し、変換前に一時ファイルを削除する", async () => {
+    mocks.inspectAudioFile.mockResolvedValueOnce({
+      formatName: "mp3",
+      durationSeconds: 180.001,
+      streams: [
+        {
+          index: 0,
+          codecType: "audio",
+          codecName: "mp3",
+          durationSeconds: 180.001,
+          sampleRate: 44100,
+          channels: 2,
+          attachedPicture: false,
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: "音声は3分以内にしてください。",
+      code: "duration_too_long",
+    });
+    expect(mocks.inspectAudioFile).toHaveBeenCalledWith(
+      "C:\\project\\.tmp\\upload-123\\input.bin",
+    );
+    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
+      "C:\\project\\.tmp\\upload-123\\input.bin",
+    );
+    expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
+      recursive: true,
+      force: true,
+    });
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+  });
+
+  it("音声ストリームがないファイルは422を返し、変換しない", async () => {
+    mocks.inspectAudioFile.mockResolvedValueOnce({
+      formatName: "mov,mp4,m4a,3gp,3g2,mj2",
+      durationSeconds: 10,
+      streams: [
+        {
+          index: 0,
+          codecType: "video",
+          codecName: "h264",
+          durationSeconds: 10,
+          sampleRate: null,
+          channels: null,
+          attachedPicture: false,
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toEqual({
+      error: "音声ストリームが見つかりません。",
+      code: "no_audio_stream",
+    });
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+  });
+
+  it("メタデータ解析失敗時は500を返し、一時ファイルを削除する", async () => {
+    mocks.inspectAudioFile.mockRejectedValueOnce(new Error("inspect failed"));
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "inspect failed" });
+    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
+      "C:\\project\\.tmp\\upload-123\\input.bin",
+    );
+    expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
+      recursive: true,
+      force: true,
+    });
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+  });
+
   it("変換とR2アップロードに成功したらURLとキーを返し、一時ファイルを削除する", async () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
@@ -233,6 +337,9 @@ describe("/api/audio/upload route", () => {
     expect(mocks.writeFile).toHaveBeenCalledWith(
       "C:\\project\\.tmp\\upload-123\\input.bin",
       expect.any(Buffer),
+    );
+    expect(mocks.inspectAudioFile).toHaveBeenCalledWith(
+      "C:\\project\\.tmp\\upload-123\\input.bin",
     );
     expect(mocks.convertToAac).toHaveBeenCalledWith({
       inputPath: "C:\\project\\.tmp\\upload-123\\input.bin",
