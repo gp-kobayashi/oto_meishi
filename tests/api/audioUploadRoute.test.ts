@@ -11,6 +11,7 @@ const { mocks } = vi.hoisted(() => ({
     cleanupTempFile: vi.fn(),
     uploadToR2: vi.fn(),
     generateAudioKey: vi.fn(),
+    findUniqueProfile: vi.fn(),
   },
 }));
 
@@ -20,6 +21,14 @@ vi.mock("@/lib/supabaseClient", () => ({
       getUser: mocks.getUser,
     },
   }),
+}));
+
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    profile: {
+      findUnique: mocks.findUniqueProfile,
+    },
+  },
 }));
 
 vi.mock("fs/promises", () => ({
@@ -66,6 +75,7 @@ describe("/api/audio/upload route", () => {
       data: { user: { id: "auth-user-1" } },
       error: null,
     });
+    mocks.findUniqueProfile.mockResolvedValue({ authId: "auth-user-1" });
     mocks.mkdir.mockResolvedValue(undefined);
     mocks.mkdtemp.mockResolvedValue("C:\\project\\.tmp\\upload-123");
     mocks.writeFile.mockResolvedValue(undefined);
@@ -108,6 +118,47 @@ describe("/api/audio/upload route", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "userId is required" });
     expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
+
+  it("プロフィールが存在しない場合は404を返す", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce(null);
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "profile not found" });
+    expect(mocks.findUniqueProfile).toHaveBeenCalledWith({
+      where: { userId: "testuser" },
+      select: { authId: true },
+    });
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+  });
+
+  it("別ユーザーのプロフィールへのアップロードは403を返す", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({ authId: "other-auth-user" });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "このプロフィールに音声をアップロードする権限がありません。",
+    });
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+  });
+
+  it("authId未設定のプロフィールへのアップロードは403を返す", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({ authId: null });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(403);
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
   });
 
   it("変換とR2アップロードに成功したらURLとキーを返し、一時ファイルを削除する", async () => {

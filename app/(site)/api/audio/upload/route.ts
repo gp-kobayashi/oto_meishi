@@ -4,6 +4,7 @@ import { uploadToR2, generateAudioKey } from "@/lib/r2Storage";
 import path from "path";
 import fs from "fs/promises";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
+import { prisma } from "@/lib/prisma";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -21,6 +22,7 @@ export async function POST(request: NextRequest) {
     }
     const token = authHeader.split(" ")[1];
 
+    let authenticatedUserId: string;
     try {
       const supabaseServer = createServerSupabaseClient();
       const { data: { user }, error } = await supabaseServer.auth.getUser(token);
@@ -30,6 +32,7 @@ export async function POST(request: NextRequest) {
           { status: 401 },
         );
       }
+      authenticatedUserId = user.id;
     } catch {
       return NextResponse.json(
         { error: "Unauthorized: Token verification failed" },
@@ -47,6 +50,22 @@ export async function POST(request: NextRequest) {
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    const profile = await prisma.profile.findUnique({
+      where: { userId },
+      select: { authId: true },
+    });
+
+    if (!profile) {
+      return NextResponse.json({ error: "profile not found" }, { status: 404 });
+    }
+
+    if (profile.authId !== authenticatedUserId) {
+      return NextResponse.json(
+        { error: "このプロフィールに音声をアップロードする権限がありません。" },
+        { status: 403 },
+      );
     }
 
     // 一時ディレクトリを作成（ASCIIパスのみのプロジェクト内ディレクトリを使用）
