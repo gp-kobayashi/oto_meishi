@@ -3,7 +3,10 @@ import type {
   AudioFileMetadata,
   AudioStreamMetadata,
 } from "@/lib/audioInspector";
-import { validateAudioMetadata } from "@/lib/audioUploadPolicy";
+import {
+  validateAudioMetadata,
+  validateConvertedAudioMetadata,
+} from "@/lib/audioUploadPolicy";
 
 function audioStream(
   overrides: Partial<AudioStreamMetadata> = {},
@@ -192,5 +195,48 @@ describe("音声アップロード受付ポリシー", () => {
     expectRejected(metadata({
       streams: [audioStream({ channels })],
     }), code);
+  });
+});
+
+describe("AAC変換後の受付ポリシー", () => {
+  it("規格内のAAC／M4Aを許可する", () => {
+    expect(validateConvertedAudioMetadata(metadata())).toEqual({ valid: true });
+  });
+
+  it("M4A以外のコンテナを拒否する", () => {
+    expect(validateConvertedAudioMetadata(metadata({ formatName: "mp3" })))
+      .toEqual({ valid: false, code: "invalid_output_format" });
+  });
+
+  it("複数ストリームを拒否する", () => {
+    expect(validateConvertedAudioMetadata(metadata({
+      streams: [audioStream(), audioStream({ index: 1 })],
+    }))).toEqual({ valid: false, code: "invalid_output_streams" });
+  });
+
+  it("AAC以外のコーデックを拒否する", () => {
+    expect(validateConvertedAudioMetadata(metadata({
+      streams: [audioStream({ codecName: "mp3" })],
+    }))).toEqual({ valid: false, code: "invalid_output_codec" });
+  });
+
+  it.each([
+    [
+      metadata({ durationSeconds: 180.001 }),
+      "output_duration_too_long",
+    ],
+    [
+      metadata({ streams: [audioStream({ sampleRate: 48001 })] }),
+      "output_sample_rate_too_high",
+    ],
+    [
+      metadata({ streams: [audioStream({ channels: 3 })] }),
+      "output_channels_too_many",
+    ],
+  ])("変換後の規格外メタデータを拒否する", (value, code) => {
+    expect(validateConvertedAudioMetadata(value)).toEqual({
+      valid: false,
+      code,
+    });
   });
 });

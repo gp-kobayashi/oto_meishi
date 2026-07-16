@@ -76,6 +76,22 @@ export type AudioPolicyResult =
       message: string;
     };
 
+export type ConvertedAudioPolicyResult =
+  | { valid: true }
+  | {
+      valid: false;
+      code:
+        | "invalid_output_format"
+        | "invalid_output_streams"
+        | "invalid_output_codec"
+        | "invalid_output_duration"
+        | "output_duration_too_long"
+        | "invalid_output_sample_rate"
+        | "output_sample_rate_too_high"
+        | "invalid_output_channels"
+        | "output_channels_too_many";
+    };
+
 function reject(
   code: AudioPolicyErrorCode,
   message: string,
@@ -231,4 +247,67 @@ export function validateAudioMetadata(
     outputSampleRate: Math.min(audioStreams[0].sampleRate!, 48_000),
     outputChannels: audioStreams[0].channels === 1 ? 1 : 2,
   };
+}
+
+export function validateConvertedAudioMetadata(
+  metadata: AudioFileMetadata,
+): ConvertedAudioPolicyResult {
+  const formats = metadata.formatName
+    ?.split(",")
+    .map((format) => format.trim().toLowerCase()) ?? [];
+
+  if (!formats.some((format) => ["mov", "mp4", "m4a"].includes(format))) {
+    return { valid: false, code: "invalid_output_format" };
+  }
+
+  if (
+    metadata.streams.length !== 1 ||
+    metadata.streams[0].codecType !== "audio"
+  ) {
+    return { valid: false, code: "invalid_output_streams" };
+  }
+
+  const stream = metadata.streams[0];
+  if (stream.codecName !== "aac") {
+    return { valid: false, code: "invalid_output_codec" };
+  }
+
+  const durationSeconds = metadata.durationSeconds ?? stream.durationSeconds;
+  if (
+    durationSeconds === null ||
+    !Number.isFinite(durationSeconds) ||
+    durationSeconds <= 0
+  ) {
+    return { valid: false, code: "invalid_output_duration" };
+  }
+
+  if (durationSeconds > MAX_AUDIO_DURATION_SECONDS) {
+    return { valid: false, code: "output_duration_too_long" };
+  }
+
+  if (
+    stream.sampleRate === null ||
+    !Number.isInteger(stream.sampleRate) ||
+    stream.sampleRate <= 0
+  ) {
+    return { valid: false, code: "invalid_output_sample_rate" };
+  }
+
+  if (stream.sampleRate > 48_000) {
+    return { valid: false, code: "output_sample_rate_too_high" };
+  }
+
+  if (
+    stream.channels === null ||
+    !Number.isInteger(stream.channels) ||
+    stream.channels <= 0
+  ) {
+    return { valid: false, code: "invalid_output_channels" };
+  }
+
+  if (stream.channels > 2) {
+    return { valid: false, code: "output_channels_too_many" };
+  }
+
+  return { valid: true };
 }

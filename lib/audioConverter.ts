@@ -12,7 +12,7 @@ const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
 // 変換フォーマット設定
 const OUTPUT_EXT = ".m4a";
 const MAX_OUTPUT_DURATION_SECONDS = 180;
-const MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024;
+export const MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const CONVERSION_TIMEOUT_MS = 60_000;
 const PROCESS_OUTPUT_MAX_BUFFER_BYTES = 1024 * 1024;
 
@@ -67,7 +67,7 @@ export function buildFfmpegArguments(
     "-sn",
     "-dn",
     "-t", String(MAX_OUTPUT_DURATION_SECONDS),
-    "-fs", String(MAX_OUTPUT_SIZE_BYTES),
+    "-fs", String(MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES),
     "-threads", "1",
     "-movflags", "+faststart",
     "-y",

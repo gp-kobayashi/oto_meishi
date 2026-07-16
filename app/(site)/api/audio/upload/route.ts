@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convertToAac } from "@/lib/audioConverter";
+import {
+  convertToAac,
+  MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES,
+} from "@/lib/audioConverter";
 import { uploadToR2, generateAudioKey } from "@/lib/r2Storage";
 import path from "path";
 import fs from "fs/promises";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { prisma } from "@/lib/prisma";
 import { inspectAudioFile } from "@/lib/audioInspector";
-import { validateAudioMetadata } from "@/lib/audioUploadPolicy";
+import {
+  validateAudioMetadata,
+  validateConvertedAudioMetadata,
+} from "@/lib/audioUploadPolicy";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -138,6 +144,24 @@ export async function POST(request: NextRequest) {
         outputSampleRate: policyResult.outputSampleRate,
         outputChannels: policyResult.outputChannels,
       });
+
+      const convertedFile = await fs.stat(convertedPath);
+      if (
+        convertedFile.size <= 0 ||
+        convertedFile.size > MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES
+      ) {
+        throw new Error("Converted audio file size is invalid.");
+      }
+
+      const convertedMetadata = await inspectAudioFile(convertedPath);
+      const convertedPolicyResult = validateConvertedAudioMetadata(
+        convertedMetadata,
+      );
+      if (!convertedPolicyResult.valid) {
+        throw new Error(
+          `Converted audio validation failed: ${convertedPolicyResult.code}`,
+        );
+      }
 
       // R2ストレージにアップロード
       const audioKey = generateAudioKey(userId);

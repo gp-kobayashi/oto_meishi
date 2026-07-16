@@ -7,6 +7,7 @@ const { mocks } = vi.hoisted(() => ({
     mkdtemp: vi.fn(),
     writeFile: vi.fn(),
     rm: vi.fn(),
+    stat: vi.fn(),
     convertToAac: vi.fn(),
     uploadToR2: vi.fn(),
     generateAudioKey: vi.fn(),
@@ -41,11 +42,13 @@ vi.mock("fs/promises", () => ({
     mkdtemp: mocks.mkdtemp,
     writeFile: mocks.writeFile,
     rm: mocks.rm,
+    stat: mocks.stat,
   },
 }));
 
 vi.mock("@/lib/audioConverter", () => ({
   convertToAac: mocks.convertToAac,
+  MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES: 5 * 1024 * 1024,
 }));
 
 vi.mock("@/lib/r2Storage", () => ({
@@ -77,6 +80,42 @@ function fileWithReportedSize(size: number) {
   return file;
 }
 
+function validInputMetadata() {
+  return {
+    formatName: "mp3",
+    durationSeconds: 120,
+    streams: [
+      {
+        index: 0,
+        codecType: "audio",
+        codecName: "mp3",
+        durationSeconds: 120,
+        sampleRate: 44100,
+        channels: 2,
+        attachedPicture: false,
+      },
+    ],
+  };
+}
+
+function validOutputMetadata() {
+  return {
+    formatName: "mov,mp4,m4a,3gp,3g2,mj2",
+    durationSeconds: 120,
+    streams: [
+      {
+        index: 0,
+        codecType: "audio",
+        codecName: "aac",
+        durationSeconds: 120,
+        sampleRate: 44100,
+        channels: 2,
+        attachedPicture: false,
+      },
+    ],
+  };
+}
+
 describe("/api/audio/upload route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -85,25 +124,16 @@ describe("/api/audio/upload route", () => {
       error: null,
     });
     mocks.findUniqueProfile.mockResolvedValue({ authId: "auth-user-1" });
-    mocks.inspectAudioFile.mockResolvedValue({
-      formatName: "mp3",
-      durationSeconds: 120,
-      streams: [
-        {
-          index: 0,
-          codecType: "audio",
-          codecName: "mp3",
-          durationSeconds: 120,
-          sampleRate: 44100,
-          channels: 2,
-          attachedPicture: false,
-        },
-      ],
-    });
+    mocks.inspectAudioFile.mockImplementation(async (filePath: string) =>
+      filePath.endsWith("output.m4a")
+        ? validOutputMetadata()
+        : validInputMetadata()
+    );
     mocks.mkdir.mockResolvedValue(undefined);
     mocks.mkdtemp.mockResolvedValue("C:\\project\\.tmp\\upload-123");
     mocks.writeFile.mockResolvedValue(undefined);
     mocks.rm.mockResolvedValue(undefined);
+    mocks.stat.mockResolvedValue({ size: 2 * 1024 * 1024 });
     mocks.convertToAac.mockResolvedValue("C:\\project\\.tmp\\upload-123\\output.m4a");
     mocks.generateAudioKey.mockReturnValue("audio/testuser/voice-123.m4a");
     mocks.uploadToR2.mockResolvedValue("https://r2.example/audio/testuser/voice-123.m4a");
@@ -378,6 +408,12 @@ describe("/api/audio/upload route", () => {
     expect(mocks.inspectAudioFile).toHaveBeenCalledWith(
       "C:\\project\\.tmp\\upload-123\\input.bin",
     );
+    expect(mocks.stat).toHaveBeenCalledWith(
+      "C:\\project\\.tmp\\upload-123\\output.m4a",
+    );
+    expect(mocks.inspectAudioFile).toHaveBeenCalledWith(
+      "C:\\project\\.tmp\\upload-123\\output.m4a",
+    );
     expect(mocks.convertToAac).toHaveBeenCalledWith({
       inputPath: "C:\\project\\.tmp\\upload-123\\input.bin",
       outputPath: "C:\\project\\.tmp\\upload-123\\output.m4a",
@@ -427,6 +463,38 @@ describe("/api/audio/upload route", () => {
       recursive: true,
       force: true,
     });
+  });
+
+  it("変換後ファイルが5MiBを超える場合はR2へ保存しない", async () => {
+    mocks.stat.mockResolvedValueOnce({ size: 5 * 1024 * 1024 + 1 });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "音声アップロードの処理中にエラーが発生しました。",
+    });
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+    expect(mocks.rm).toHaveBeenCalled();
+  });
+
+  it("変換後ファイルがAACでない場合はR2へ保存しない", async () => {
+    mocks.inspectAudioFile.mockResolvedValueOnce(validInputMetadata());
+    mocks.inspectAudioFile.mockResolvedValueOnce({
+      ...validOutputMetadata(),
+      streams: [
+        {
+          ...validOutputMetadata().streams[0],
+          codecName: "mp3",
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(500);
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+    expect(mocks.rm).toHaveBeenCalled();
   });
 
   it("一時ディレクトリの削除失敗で成功レスポンスを失わない", async () => {
