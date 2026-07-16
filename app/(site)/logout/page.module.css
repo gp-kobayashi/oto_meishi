@@ -94,6 +94,13 @@
   transform: translateY(-1px);
 }
 
+.logoutButton:disabled {
+  border-color: #94a3b8;
+  background: #94a3b8;
+  cursor: wait;
+  transform: none;
+}
+
 .cancelLink {
   display: grid;
   place-items: center;
@@ -111,6 +118,13 @@
 .cancelLink:focus-visible {
   outline: 3px solid rgba(22, 119, 194, 0.28);
   outline-offset: 3px;
+}
+
+.error {
+  margin: 20px 0 0;
+  color: #b42318;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 @media (max-width: 540px) {
