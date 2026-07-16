@@ -12,6 +12,18 @@ import { validateAudioMetadata } from "@/lib/audioUploadPolicy";
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
 const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
 const MAX_AUDIO_FILE_SIZE_BYTES = 64 * 1024 * 1024;
+const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
+const MAX_REQUEST_BODY_SIZE_BYTES =
+  MAX_AUDIO_FILE_SIZE_BYTES + MAX_MULTIPART_OVERHEAD_BYTES;
+
+function exceedsRequestSizeLimit(contentLength: string | null): boolean {
+  if (!contentLength) {
+    return false;
+  }
+
+  const size = Number(contentLength);
+  return Number.isSafeInteger(size) && size > MAX_REQUEST_BODY_SIZE_BYTES;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +35,14 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       );
     }
+
+    if (exceedsRequestSizeLimit(request.headers.get("Content-Length"))) {
+      return NextResponse.json(
+        { error: "音声ファイルは64MB以下にしてください。" },
+        { status: 413 },
+      );
+    }
+
     const token = authHeader.split(" ")[1];
 
     let authenticatedUserId: string;
