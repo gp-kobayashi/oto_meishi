@@ -61,6 +61,8 @@ describe("音声アップロード受付ポリシー", () => {
       valid: true,
       durationSeconds: 120,
       audioStreamIndex: 0,
+      outputSampleRate: 48000,
+      outputChannels: 2,
     });
   });
 
@@ -71,6 +73,30 @@ describe("音声アップロード受付ポリシー", () => {
 
   it("180秒を超える音声を拒否する", () => {
     expectRejected(metadata({ durationSeconds: 180.001 }), "duration_too_long");
+  });
+
+  it("モノラルと48kHz以下のサンプルレートを維持する", () => {
+    const result = validateAudioMetadata(metadata({
+      streams: [audioStream({ sampleRate: 44100, channels: 1 })],
+    }));
+
+    expect(result).toEqual(expect.objectContaining({
+      valid: true,
+      outputSampleRate: 44100,
+      outputChannels: 1,
+    }));
+  });
+
+  it("高サンプルレートと多チャンネルを48kHz・ステレオへ縮小する", () => {
+    const result = validateAudioMetadata(metadata({
+      streams: [audioStream({ sampleRate: 96000, channels: 6 })],
+    }));
+
+    expect(result).toEqual(expect.objectContaining({
+      valid: true,
+      outputSampleRate: 48000,
+      outputChannels: 2,
+    }));
   });
 
   it("コンテナの再生時間がない場合は音声ストリームの最大値を使う", () => {
@@ -86,6 +112,8 @@ describe("音声アップロード受付ポリシー", () => {
       valid: true,
       durationSeconds: 100,
       audioStreamIndex: 1,
+      outputSampleRate: 48000,
+      outputChannels: 2,
     });
   });
 

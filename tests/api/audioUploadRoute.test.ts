@@ -344,6 +344,9 @@ describe("/api/audio/upload route", () => {
     expect(mocks.convertToAac).toHaveBeenCalledWith({
       inputPath: "C:\\project\\.tmp\\upload-123\\input.bin",
       bitrate: "128k",
+      audioStreamIndex: 0,
+      outputSampleRate: 44100,
+      outputChannels: 2,
     });
     expect(mocks.generateAudioKey).toHaveBeenCalledWith("testuser");
     expect(mocks.uploadToR2).toHaveBeenCalledWith(

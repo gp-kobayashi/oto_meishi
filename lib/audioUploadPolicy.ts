@@ -67,6 +67,8 @@ export type AudioPolicyResult =
       valid: true;
       durationSeconds: number;
       audioStreamIndex: number;
+      outputSampleRate: number;
+      outputChannels: 1 | 2;
     }
   | {
       valid: false;
@@ -226,5 +228,7 @@ export function validateAudioMetadata(
     valid: true,
     durationSeconds,
     audioStreamIndex: audioStreams[0].index,
+    outputSampleRate: Math.min(audioStreams[0].sampleRate!, 48_000),
+    outputChannels: audioStreams[0].channels === 1 ? 1 : 2,
   };
 }

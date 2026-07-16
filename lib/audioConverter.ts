@@ -11,6 +11,10 @@ const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
 
 // 変換フォーマット設定
 const OUTPUT_EXT = ".m4a";
+const MAX_OUTPUT_DURATION_SECONDS = 180;
+const MAX_OUTPUT_SIZE_BYTES = 5 * 1024 * 1024;
+const CONVERSION_TIMEOUT_MS = 60_000;
+const PROCESS_OUTPUT_MAX_BUFFER_BYTES = 1024 * 1024;
 
 // Next.jsのバンドラーがffmpeg-staticのパスを書き換えてしまうため、
 // importを使わずprocess.cwd()から直接バイナリパスを構築する
@@ -23,6 +27,52 @@ export interface ConversionOptions {
   inputPath: string;
   outputPath?: string;
   bitrate?: string;
+  audioStreamIndex: number;
+  outputSampleRate: number;
+  outputChannels: 1 | 2;
+}
+
+interface FfmpegArgumentsOptions {
+  inputPath: string;
+  outputPath: string;
+  bitrate: string;
+  audioStreamIndex: number;
+  outputSampleRate: number;
+  outputChannels: 1 | 2;
+}
+
+export function buildFfmpegArguments(
+  options: FfmpegArgumentsOptions,
+): string[] {
+  const {
+    inputPath,
+    outputPath,
+    bitrate,
+    audioStreamIndex,
+    outputSampleRate,
+    outputChannels,
+  } = options;
+
+  return [
+    "-hide_banner",
+    "-nostdin",
+    "-i", inputPath,
+    "-map", `0:${audioStreamIndex}`,
+    "-c:a", "aac",
+    "-profile:a", "aac_low",
+    "-b:a", bitrate,
+    "-ar", String(outputSampleRate),
+    "-ac", String(outputChannels),
+    "-vn",
+    "-sn",
+    "-dn",
+    "-t", String(MAX_OUTPUT_DURATION_SECONDS),
+    "-fs", String(MAX_OUTPUT_SIZE_BYTES),
+    "-threads", "1",
+    "-movflags", "+faststart",
+    "-y",
+    outputPath,
+  ];
 }
 
 /**
@@ -32,7 +82,14 @@ export interface ConversionOptions {
  * @returns 変換後のファイルパス
  */
 export async function convertToAac(options: ConversionOptions): Promise<string> {
-  const { inputPath, outputPath, bitrate = "128k" } = options;
+  const {
+    inputPath,
+    outputPath,
+    bitrate = "128k",
+    audioStreamIndex,
+    outputSampleRate,
+    outputChannels,
+  } = options;
 
   // プロジェクト内の.tmpディレクトリを使用（ASCIIパスのみ）
   await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
@@ -44,18 +101,21 @@ export async function convertToAac(options: ConversionOptions): Promise<string> 
   // バイナリの存在確認
   await fs.access(ffmpegBinary);
 
-  const args = [
-    "-i", inputPath,
-    "-c:a", "aac",       // FFmpeg内蔵AACエンコーダー（全ブラウザ対応）
-    "-b:a", bitrate,
-    "-vn",               // ビデオストリームを無視
-    "-movflags", "+faststart", // ストリーミング最適化（先頭にメタデータを配置）
-    "-y",                // 出力ファイルが存在する場合上書き
-    finalOutputPath,
-  ];
+  const args = buildFfmpegArguments({
+    inputPath,
+    outputPath: finalOutputPath,
+    bitrate,
+    audioStreamIndex,
+    outputSampleRate,
+    outputChannels,
+  });
 
   try {
-    await execFileAsync(ffmpegBinary, args);
+    await execFileAsync(ffmpegBinary, args, {
+      timeout: CONVERSION_TIMEOUT_MS,
+      maxBuffer: PROCESS_OUTPUT_MAX_BUFFER_BYTES,
+      windowsHide: true,
+    });
     return finalOutputPath;
   } catch (error) {
     // エラー時は一時ディレクトリをクリーンアップ

@@ -113,6 +113,9 @@ export async function POST(request: NextRequest) {
       const convertedPath = await convertToAac({
         inputPath,
         bitrate: "128k",
+        audioStreamIndex: policyResult.audioStreamIndex,
+        outputSampleRate: policyResult.outputSampleRate,
+        outputChannels: policyResult.outputChannels,
       });
 
       try {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
+import { buildFfmpegArguments } from '@/lib/audioConverter';
 
 describe('音声変換機能', () => {
   describe('ファイルパス生成ロジック', () => {
@@ -21,21 +22,37 @@ describe('音声変換機能', () => {
     });
   });
 
-  describe('変換オプションのバリデーション', () => {
-    it('デフォルトのビットレートが128kである', () => {
-      const defaultBitrate = '128k';
-      expect(defaultBitrate).toBe('128k');
-    });
+  describe('FFmpeg引数', () => {
+    it('選択した音声ストリームだけを制限付きでAAC変換する', () => {
+      const args = buildFfmpegArguments({
+        inputPath: '/tmp/input.bin',
+        outputPath: '/tmp/output.m4a',
+        bitrate: '128k',
+        audioStreamIndex: 2,
+        outputSampleRate: 44100,
+        outputChannels: 1,
+      });
 
-    it('カスタムビットレートが設定できる', () => {
-      const customBitrate = '192k';
-      expect(customBitrate).toBe('192k');
-    });
-
-    it('無効なビットレート形式はエラーになるべき', () => {
-      const invalidBitrate = 'invalid';
-      const isValid = /^\d+k$/.test(invalidBitrate);
-      expect(isValid).toBe(false);
+      expect(args).toEqual([
+        '-hide_banner',
+        '-nostdin',
+        '-i', '/tmp/input.bin',
+        '-map', '0:2',
+        '-c:a', 'aac',
+        '-profile:a', 'aac_low',
+        '-b:a', '128k',
+        '-ar', '44100',
+        '-ac', '1',
+        '-vn',
+        '-sn',
+        '-dn',
+        '-t', '180',
+        '-fs', String(5 * 1024 * 1024),
+        '-threads', '1',
+        '-movflags', '+faststart',
+        '-y',
+        '/tmp/output.m4a',
+      ]);
     });
   });
 });
