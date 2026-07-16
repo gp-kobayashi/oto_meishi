@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { convertToAac, cleanupTempFile } from "@/lib/audioConverter";
+import { convertToAac } from "@/lib/audioConverter";
 import { uploadToR2, generateAudioKey } from "@/lib/r2Storage";
 import path from "path";
 import fs from "fs/promises";
@@ -85,24 +85,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 一時ディレクトリを作成（ASCIIパスのみのプロジェクト内ディレクトリを使用）
-    await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
-    const tempDir = await fs.mkdtemp(path.join(PROJECT_TMP_DIR, "upload-"));
-    // クライアント提供のファイル名をパスに使用せず、固定名で保存する
-    const inputPath = path.join(tempDir, "input.bin");
-
-    // アップロードされたファイルを一時ファイルとして保存
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await fs.writeFile(inputPath, buffer);
-
+    let tempDir: string | null = null;
     try {
+      // 一時ディレクトリを作成（ASCIIパスのみのプロジェクト内ディレクトリを使用）
+      await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
+      tempDir = await fs.mkdtemp(path.join(PROJECT_TMP_DIR, "upload-"));
+
+      // クライアント提供のファイル名をパスに使用せず、固定名で保存する
+      const inputPath = path.join(tempDir, "input.bin");
+      const outputPath = path.join(tempDir, "output.m4a");
+
+      // アップロードされたファイルを一時ファイルとして保存
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await fs.writeFile(inputPath, buffer);
+
       const metadata = await inspectAudioFile(inputPath);
       const policyResult = validateAudioMetadata(metadata);
 
       if (!policyResult.valid) {
-        await cleanupTempFile(inputPath);
-        await fs.rm(tempDir, { recursive: true, force: true });
-
         return NextResponse.json(
           { error: policyResult.message, code: policyResult.code },
           { status: 422 },
@@ -112,45 +112,37 @@ export async function POST(request: NextRequest) {
       // FFmpegでAAC形式（.m4a）に変換（128kbps・全ブラウザ対応）
       const convertedPath = await convertToAac({
         inputPath,
+        outputPath,
         bitrate: "128k",
         audioStreamIndex: policyResult.audioStreamIndex,
         outputSampleRate: policyResult.outputSampleRate,
         outputChannels: policyResult.outputChannels,
       });
 
-      try {
-        // R2ストレージにアップロード
-        const audioKey = generateAudioKey(userId);
-        const audioUrl = await uploadToR2(convertedPath, audioKey, "audio/mp4");
+      // R2ストレージにアップロード
+      const audioKey = generateAudioKey(userId);
+      const audioUrl = await uploadToR2(convertedPath, audioKey, "audio/mp4");
 
-        console.log("Audio uploaded successfully:", { audioKey, audioUrl });
+      console.log("Audio uploaded successfully:", { audioKey, audioUrl });
 
-        // 一時ファイルをクリーンアップ
-        await cleanupTempFile(inputPath);
-        await cleanupTempFile(convertedPath);
-        await fs.rm(tempDir, { recursive: true, force: true });
-
-        return NextResponse.json({
-          success: true,
-          audioUrl,
-          audioKey,
-        });
-      } catch (uploadError) {
-        // アップロード失敗時は変換ファイルをクリーンアップ
-        await cleanupTempFile(convertedPath);
-        throw uploadError;
+      return NextResponse.json({
+        success: true,
+        audioUrl,
+        audioKey,
+      });
+    } finally {
+      if (tempDir) {
+        try {
+          await fs.rm(tempDir, { recursive: true, force: true });
+        } catch (cleanupError) {
+          console.error("Failed to cleanup audio upload directory:", cleanupError);
+        }
       }
-    } catch (conversionError) {
-      // 変換失敗時は入力ファイルをクリーンアップ
-      await cleanupTempFile(inputPath);
-      await fs.rm(tempDir, { recursive: true, force: true });
-      throw conversionError;
     }
   } catch (error) {
+    console.error("Audio upload failed:", error);
     return NextResponse.json(
-      {
-        error: error instanceof Error ? error.message : "Unknown server error",
-      },
+      { error: "音声アップロードの処理中にエラーが発生しました。" },
       { status: 500 },
     );
   }

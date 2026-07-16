@@ -91,10 +91,15 @@ export async function convertToAac(options: ConversionOptions): Promise<string> 
     outputChannels,
   } = options;
 
-  // プロジェクト内の.tmpディレクトリを使用（ASCIIパスのみ）
-  await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
-  const tempDir = await fs.mkdtemp(path.join(PROJECT_TMP_DIR, "audio-"));
-  const finalOutputPath = outputPath || path.join(tempDir, `${Date.now()}${OUTPUT_EXT}`);
+  let ownedTempDir: string | null = null;
+  let finalOutputPath = outputPath;
+
+  if (!finalOutputPath) {
+    // 呼び出し側から出力先が指定されない場合のみ一時ディレクトリを作成する
+    await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
+    ownedTempDir = await fs.mkdtemp(path.join(PROJECT_TMP_DIR, "audio-"));
+    finalOutputPath = path.join(ownedTempDir, `${Date.now()}${OUTPUT_EXT}`);
+  }
 
   const ffmpegBinary = getFfmpegBinaryPath();
 
@@ -118,8 +123,10 @@ export async function convertToAac(options: ConversionOptions): Promise<string> 
     });
     return finalOutputPath;
   } catch (error) {
-    // エラー時は一時ディレクトリをクリーンアップ
-    await fs.rm(tempDir, { recursive: true, force: true });
+    // この関数内で作成した一時ディレクトリだけをクリーンアップする
+    if (ownedTempDir) {
+      await fs.rm(ownedTempDir, { recursive: true, force: true });
+    }
 
     // child_processのエラーにはstderrが含まれるため詳細を付与する
     const errMsg = error instanceof Error

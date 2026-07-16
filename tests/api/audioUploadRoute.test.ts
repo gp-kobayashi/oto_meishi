@@ -8,7 +8,6 @@ const { mocks } = vi.hoisted(() => ({
     writeFile: vi.fn(),
     rm: vi.fn(),
     convertToAac: vi.fn(),
-    cleanupTempFile: vi.fn(),
     uploadToR2: vi.fn(),
     generateAudioKey: vi.fn(),
     findUniqueProfile: vi.fn(),
@@ -47,7 +46,6 @@ vi.mock("fs/promises", () => ({
 
 vi.mock("@/lib/audioConverter", () => ({
   convertToAac: mocks.convertToAac,
-  cleanupTempFile: mocks.cleanupTempFile,
 }));
 
 vi.mock("@/lib/r2Storage", () => ({
@@ -106,8 +104,7 @@ describe("/api/audio/upload route", () => {
     mocks.mkdtemp.mockResolvedValue("C:\\project\\.tmp\\upload-123");
     mocks.writeFile.mockResolvedValue(undefined);
     mocks.rm.mockResolvedValue(undefined);
-    mocks.convertToAac.mockResolvedValue("C:\\project\\.tmp\\upload-123\\out.m4a");
-    mocks.cleanupTempFile.mockResolvedValue(undefined);
+    mocks.convertToAac.mockResolvedValue("C:\\project\\.tmp\\upload-123\\output.m4a");
     mocks.generateAudioKey.mockReturnValue("audio/testuser/voice-123.m4a");
     mocks.uploadToR2.mockResolvedValue("https://r2.example/audio/testuser/voice-123.m4a");
   });
@@ -268,9 +265,6 @@ describe("/api/audio/upload route", () => {
     expect(mocks.inspectAudioFile).toHaveBeenCalledWith(
       "C:\\project\\.tmp\\upload-123\\input.bin",
     );
-    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.bin",
-    );
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,
       force: true,
@@ -313,14 +307,31 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "inspect failed" });
-    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.bin",
-    );
+    await expect(response.json()).resolves.toEqual({
+      error: "音声アップロードの処理中にエラーが発生しました。",
+    });
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,
       force: true,
     });
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+  });
+
+  it("一時ファイルの書き込み失敗時も一時ディレクトリを削除する", async () => {
+    mocks.writeFile.mockRejectedValueOnce(new Error("write failed"));
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "音声アップロードの処理中にエラーが発生しました。",
+    });
+    expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
+      recursive: true,
+      force: true,
+    });
+    expect(mocks.inspectAudioFile).not.toHaveBeenCalled();
     expect(mocks.convertToAac).not.toHaveBeenCalled();
     expect(mocks.uploadToR2).not.toHaveBeenCalled();
   });
@@ -343,6 +354,7 @@ describe("/api/audio/upload route", () => {
     );
     expect(mocks.convertToAac).toHaveBeenCalledWith({
       inputPath: "C:\\project\\.tmp\\upload-123\\input.bin",
+      outputPath: "C:\\project\\.tmp\\upload-123\\output.m4a",
       bitrate: "128k",
       audioStreamIndex: 0,
       outputSampleRate: 44100,
@@ -350,15 +362,9 @@ describe("/api/audio/upload route", () => {
     });
     expect(mocks.generateAudioKey).toHaveBeenCalledWith("testuser");
     expect(mocks.uploadToR2).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\out.m4a",
+      "C:\\project\\.tmp\\upload-123\\output.m4a",
       "audio/testuser/voice-123.m4a",
       "audio/mp4",
-    );
-    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.bin",
-    );
-    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\out.m4a",
     );
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,
@@ -372,10 +378,9 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "convert failed" });
-    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.bin",
-    );
+    await expect(response.json()).resolves.toEqual({
+      error: "音声アップロードの処理中にエラーが発生しました。",
+    });
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,
       force: true,
@@ -383,22 +388,32 @@ describe("/api/audio/upload route", () => {
     expect(mocks.uploadToR2).not.toHaveBeenCalled();
   });
 
-  it("R2アップロード失敗時は変換済みファイル、入力ファイル、一時ディレクトリを削除する", async () => {
+  it("R2アップロード失敗時は一時ディレクトリ全体を削除する", async () => {
     mocks.uploadToR2.mockRejectedValueOnce(new Error("upload failed"));
 
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(500);
-    await expect(response.json()).resolves.toEqual({ error: "upload failed" });
-    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\out.m4a",
-    );
-    expect(mocks.cleanupTempFile).toHaveBeenCalledWith(
-      "C:\\project\\.tmp\\upload-123\\input.bin",
-    );
+    await expect(response.json()).resolves.toEqual({
+      error: "音声アップロードの処理中にエラーが発生しました。",
+    });
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,
       force: true,
     });
+  });
+
+  it("一時ディレクトリの削除失敗で成功レスポンスを失わない", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.rm.mockRejectedValueOnce(new Error("cleanup failed"));
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(200);
+    expect(consoleError).toHaveBeenCalledWith(
+      "Failed to cleanup audio upload directory:",
+      expect.any(Error),
+    );
+    consoleError.mockRestore();
   });
 });
