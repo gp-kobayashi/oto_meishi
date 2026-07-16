@@ -73,6 +73,31 @@ describe("AuthPanel", () => {
     });
   });
 
+  it("Googleログイン時にアカウント選択画面を要求すること", async () => {
+    const mockSignInWithOAuth = vi.mocked(
+      supabase!.auth.signInWithOAuth,
+    );
+    mockSignInWithOAuth.mockResolvedValueOnce({
+      data: { provider: "google", url: null },
+      error: null,
+    } as unknown as Awaited<ReturnType<typeof mockSignInWithOAuth>>);
+
+    render(<AuthPanel mode="login" />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Googleアカウントでログイン" }),
+    );
+
+    await waitFor(() => {
+      expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/profile`,
+          queryParams: { prompt: "select_account" },
+        },
+      });
+    });
+  });
+
   it("新規登録モードで正しく動作すること", async () => {
     const mockSignUp = vi.mocked(supabase!.auth.signUp);
     mockSignUp.mockResolvedValueOnce({

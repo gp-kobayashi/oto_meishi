@@ -83,6 +83,8 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
       provider,
       options: {
         redirectTo: `${window.location.origin}/profile`,
+        queryParams:
+          provider === "google" ? { prompt: "select_account" } : undefined,
       },
     });
 
