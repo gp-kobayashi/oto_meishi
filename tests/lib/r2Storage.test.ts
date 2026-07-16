@@ -1,63 +1,27 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { generateAudioKey, extractKeyFromUrl } from '@/lib/r2Storage';
 
 describe('R2ストレージ機能', () => {
   describe('generateAudioKey', () => {
-    beforeEach(() => {
-      // テストのタイミングによる影響を避けるためにDate.nowをモック
-      vi.spyOn(Date, 'now').mockReturnValue(1234567890);
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
     it('正しい形式のキーを生成する', () => {
       const userId = 'testuser';
-      const filename = 'test.mp3';
-      const key = generateAudioKey(userId, filename);
+      const key = generateAudioKey(userId);
 
-      expect(key).toBe('audio/testuser/test-1234567890.m4a');
+      expect(key).toMatch(
+        /^audio\/testuser\/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.m4a$/,
+      );
     });
 
-    it('日本語ファイル名を含む場合も正しく処理する', () => {
+    it('呼び出しごとに異なるキーを生成する', () => {
       const userId = 'testuser';
-      const filename = 'テスト音声.mp3';
-      const key = generateAudioKey(userId, filename);
-
-      expect(key).toBe('audio/testuser/テスト音声-1234567890.m4a');
-    });
-
-    it('拡張子が異なる場合も.m4aに変換される', () => {
-      const userId = 'testuser';
-      const filename = 'test.wav';
-      const key = generateAudioKey(userId, filename);
-
-      expect(key).toBe('audio/testuser/test-1234567890.m4a');
-    });
-
-    it('複数の拡張子を持つファイル名を正しく処理する', () => {
-      const userId = 'testuser';
-      const filename = 'test.audio.mp3';
-      const key = generateAudioKey(userId, filename);
-
-      expect(key).toBe('audio/testuser/test.audio-1234567890.m4a');
+      expect(generateAudioKey(userId)).not.toBe(generateAudioKey(userId));
     });
 
     it('ユーザーIDに特殊文字が含まれても正しく処理する', () => {
       const userId = 'test_user-123';
-      const filename = 'test.mp3';
-      const key = generateAudioKey(userId, filename);
+      const key = generateAudioKey(userId);
 
-      expect(key).toBe('audio/test_user-123/test-1234567890.m4a');
-    });
-
-    it('空のファイル名の場合も処理する', () => {
-      const userId = 'testuser';
-      const filename = '.mp3';
-      const key = generateAudioKey(userId, filename);
-
-      expect(key).toBe('audio/testuser/.mp3-1234567890.m4a');
+      expect(key).toMatch(/^audio\/test_user-123\/.+\.m4a$/);
     });
   });
 
@@ -144,17 +108,15 @@ describe('R2ストレージ機能', () => {
   describe('ファイルパスの安全性', () => {
     it('キーにパストラバーサル攻撃を防ぐ', () => {
       const userId = '../etc';
-      const filename = 'test.mp3';
-      const key = generateAudioKey(userId, filename);
+      const key = generateAudioKey(userId);
 
-      // キーに..が含まれていても、正しい形式で生成される
-      expect(key).toContain('audio/../etc');
+      expect(key).toMatch(/^audio\/\.\.%2Fetc\/.+\.m4a$/);
+      expect(key).not.toContain('/../');
     });
 
     it('キーに絶対パスが含まれない', () => {
       const userId = 'testuser';
-      const filename = 'test.mp3';
-      const key = generateAudioKey(userId, filename);
+      const key = generateAudioKey(userId);
 
       expect(key.startsWith('/')).toBe(false);
     });

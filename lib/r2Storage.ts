@@ -1,6 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs/promises";
-import path from "path";
+import { randomUUID } from "crypto";
 
 // R2設定の型定義
 export interface R2Config {
@@ -84,14 +84,10 @@ export async function uploadToR2(
 /**
  * ユーザーIDに基づいた一意のファイルキーを生成する
  * @param userId ユーザーID
- * @param originalFilename 元のファイル名
  * @returns R2オブジェクトキー
  */
-export function generateAudioKey(userId: string, originalFilename: string): string {
-  const timestamp = Date.now();
-  const ext = path.extname(originalFilename);
-  const baseName = path.basename(originalFilename, ext);
-  return `audio/${userId}/${baseName}-${timestamp}.m4a`;
+export function generateAudioKey(userId: string): string {
+  return `audio/${encodeURIComponent(userId)}/${randomUUID()}.m4a`;
 }
 
 /**
