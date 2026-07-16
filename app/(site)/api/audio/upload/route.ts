@@ -13,11 +13,11 @@ import {
   validateAudioMetadata,
   validateConvertedAudioMetadata,
 } from "@/lib/audioUploadPolicy";
+import { MAX_AUDIO_FILE_SIZE_BYTES } from "@/lib/audioUploadConstraints";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
 const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
-const MAX_AUDIO_FILE_SIZE_BYTES = 64 * 1024 * 1024;
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 const MAX_REQUEST_BODY_SIZE_BYTES =
   MAX_AUDIO_FILE_SIZE_BYTES + MAX_MULTIPART_OVERHEAD_BYTES;

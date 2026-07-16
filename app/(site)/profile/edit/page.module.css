@@ -177,6 +177,20 @@
   font-size: 0.9rem;
 }
 
+.uploadRequirements {
+  margin: 0;
+  color: #475569;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.audioFileError {
+  margin: 0;
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
 .sectionHeader {
   display: flex;
   justify-content: space-between;

@@ -15,6 +15,11 @@ import {
 } from "@/lib/validation";
 import { supabase } from "@/lib/supabaseClient";
 import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
+import {
+  AUDIO_FILE_ACCEPT,
+  AUDIO_UPLOAD_REQUIREMENTS,
+  MAX_AUDIO_FILE_SIZE_BYTES,
+} from "@/lib/audioUploadConstraints";
 import styles from "./page.module.css";
 
 const themeOptions = [
@@ -41,6 +46,28 @@ const serviceOptions: Array<{ value: SocialService; label: string }> = [
 ];
 
 type SaveState = "idle" | "saving" | "success" | "error";
+
+function getAudioUploadErrorMessage(
+  status: number,
+  response: { error?: unknown },
+): string {
+  if (status === 401) {
+    return "セッションの有効期限が切れました。再度ログインしてください。";
+  }
+  if (status === 403) {
+    return "このプロフィールの音声を変更する権限がありません。";
+  }
+  if (status === 404) {
+    return "プロフィールが見つかりません。";
+  }
+  if (status === 413) {
+    return "音声ファイルは64MB以下にしてください。";
+  }
+  if (status === 422 && typeof response.error === "string") {
+    return response.error;
+  }
+  return "音声のアップロードに失敗しました。時間をおいて再度お試しください。";
+}
 
 type ProfileSaveControlsProps = {
   state: SaveState;
@@ -120,6 +147,7 @@ export default function ProfileEditPage() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string>("");
   const [audioUploadMessages, setAudioUploadMessages] = useState<string[]>([]);
+  const [audioFileError, setAudioFileError] = useState<string>("");
   const [validationErrors, setValidationErrors] = useState<{
     displayName?: string;
     bio?: string;
@@ -223,7 +251,18 @@ export default function ProfileEditPage() {
     });
   };
 
-  const handleAudioFile = (file: File) => {
+  const handleAudioFile = (file: File): boolean => {
+    if (file.size === 0) {
+      setAudioFileError("空の音声ファイルは選択できません。");
+      return false;
+    }
+
+    if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+      setAudioFileError("音声ファイルは64MB以下にしてください。");
+      return false;
+    }
+
+    setAudioFileError("");
     setAudioFile(file);
     setProfile((current) =>
       current ? { ...current, audioUrl: file.name } : current,
@@ -236,11 +275,14 @@ export default function ProfileEditPage() {
       `変更を保存ボタンで${file.name}をアップできます`,
       "（音源はサーバー側でAACファイルに変換されます）",
     ]);
+    return true;
   };
 
   const handleAudioInput = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (file) handleAudioFile(file);
+    if (file && !handleAudioFile(file)) {
+      event.target.value = "";
+    }
   };
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
@@ -315,6 +357,11 @@ export default function ProfileEditPage() {
       // 音声ファイルが選択されている場合は先にアップロード
       let finalAudioUrl = profile.audioUrl;
       if (audioFile) {
+        if (audioFile.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+          setAudioFileError("音声ファイルは64MB以下にしてください。");
+          throw new Error("音声ファイルは64MB以下にしてください。");
+        }
+
         const formData = new FormData();
         formData.append("file", audioFile);
         formData.append("userId", savedUserId);
@@ -330,9 +377,10 @@ export default function ProfileEditPage() {
         const uploadResult = await uploadResponse.json().catch(() => ({}));
 
         if (!uploadResponse.ok) {
-          throw new Error(
-            uploadResult.error || "音声のアップロードに失敗しました。",
-          );
+          throw new Error(getAudioUploadErrorMessage(
+            uploadResponse.status,
+            uploadResult,
+          ));
         }
 
         finalAudioUrl = uploadResult.audioUrl;
@@ -476,7 +524,7 @@ export default function ProfileEditPage() {
                     <input
                       id="audioFile"
                       type="file"
-                      accept="audio/*"
+                      accept={AUDIO_FILE_ACCEPT}
                       className={styles.hiddenFileInput}
                       onChange={handleAudioInput}
                     />
@@ -500,6 +548,14 @@ export default function ProfileEditPage() {
                       </p>
                     </label>
                   </div>
+                  <p className={styles.uploadRequirements}>
+                    {AUDIO_UPLOAD_REQUIREMENTS}
+                  </p>
+                  {audioFileError ? (
+                    <p className={styles.audioFileError} role="alert">
+                      {audioFileError}
+                    </p>
+                  ) : null}
                   {(audioPreviewUrl || profile.audioUrl) && (
                     <div>
                       <audio

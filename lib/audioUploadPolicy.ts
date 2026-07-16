@@ -2,8 +2,8 @@ import type {
   AudioFileMetadata,
   AudioStreamMetadata,
 } from "@/lib/audioInspector";
+import { MAX_AUDIO_DURATION_SECONDS } from "@/lib/audioUploadConstraints";
 
-export const MAX_AUDIO_DURATION_SECONDS = 180;
 export const MAX_AUDIO_STREAMS = 4;
 export const MAX_AUDIO_CHANNELS = 8;
 export const MAX_AUDIO_SAMPLE_RATE = 192_000;

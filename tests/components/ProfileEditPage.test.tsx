@@ -135,6 +135,55 @@ describe("ProfileEditPage", () => {
     );
   });
 
+  it("音声ファイルの制限と対応形式を表示する", async () => {
+    await renderLoadedPage();
+
+    expect(screen.getByText(/3分以内・64MB以下/)).toBeDefined();
+    const input = document.querySelector<HTMLInputElement>("input[type='file']");
+    expect(input?.accept).toContain(".m4a");
+    expect(input?.accept).toContain(".caf");
+    expect(input?.accept).toContain(".webm");
+    expect(input?.accept).toContain("audio/*");
+  });
+
+  it("64MiBを超える音声は送信前に拒否する", async () => {
+    await renderLoadedPage();
+    const oversizedFile = new File(["audio bytes"], "large.wav", {
+      type: "audio/wav",
+    });
+    Object.defineProperty(oversizedFile, "size", {
+      value: 64 * 1024 * 1024 + 1,
+    });
+
+    const input = document.querySelector<HTMLInputElement>("input[type='file']");
+    fireEvent.change(input!, { target: { files: [oversizedFile] } });
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "音声ファイルは64MB以下にしてください。",
+    );
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it("アップロードAPIの413を日本語で表示しプロフィール保存へ進まない", async () => {
+    const fetchMock = await renderLoadedPage();
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ error: "request too large" }, { status: 413 }),
+    );
+
+    const input = document.querySelector<HTMLInputElement>("input[type='file']");
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(["audio bytes"], "voice.mp3", { type: "audio/mpeg" })],
+      },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "変更を保存" })[0]);
+
+    expect(
+      await screen.findAllByText("音声ファイルは64MB以下にしてください。"),
+    ).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("SNSリンクが4件ある場合は追加ボタンを無効にする", async () => {
     await renderLoadedPage({
       ...baseProfile,
