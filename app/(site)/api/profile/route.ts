@@ -132,6 +132,7 @@ export async function POST(request: Request) {
       displayName,
       bio,
       audioUrl,
+      audioKey,
       audioTitle,
       theme,
       sns: socialLinks,
@@ -162,6 +163,7 @@ export async function POST(request: Request) {
           displayName: displayName || userId,
           bio,
           audioUrl,
+          audioKey,
           audioTitle,
           theme,
           sns: {
@@ -195,13 +197,13 @@ export async function POST(request: Request) {
         );
       }
 
-      // audioUrlが変更された場合、古い音源をR2から削除
+      // 音源が変更された場合、古いR2オブジェクトを削除
       if (
         existingProfile.audioUrl &&
-        existingProfile.audioUrl !== audioUrl
+        (existingProfile.audioUrl !== audioUrl || existingProfile.audioKey !== audioKey)
       ) {
         try {
-          const oldKey = extractKeyFromUrl(existingProfile.audioUrl);
+          const oldKey = existingProfile.audioKey || extractKeyFromUrl(existingProfile.audioUrl);
           await deleteFromR2(oldKey);
           console.log("Deleted old audio file from R2:", oldKey);
         } catch (error) {
@@ -217,6 +219,7 @@ export async function POST(request: Request) {
           displayName: displayName || userId,
           bio,
           audioUrl,
+          audioKey,
           audioTitle,
           theme,
         },

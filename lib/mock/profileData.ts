@@ -27,6 +27,7 @@ interface ProfileData {
   displayName: string;
   bio: string;
   audioUrl: string;
+  audioKey?: string;
   audioTitle: string;
   sns: SocialLink[];
 }

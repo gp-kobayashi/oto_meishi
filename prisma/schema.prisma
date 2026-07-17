@@ -105,6 +105,7 @@ model Profile {
   displayName String
   bio         String
   audioUrl    String
+  audioKey    String                @default("")
   audioTitle  String
   audioStatus AudioModerationStatus @default(active)
   sns         SocialLink[]

@@ -451,6 +451,7 @@ export default function ProfileEditPage() {
     try {
       // 音声ファイルが選択されている場合は先にアップロード
       let finalAudioUrl = profile.audioUrl;
+      let finalAudioKey = profile.audioKey || "";
       if (audioFile) {
         if (audioFile.size > MAX_AUDIO_FILE_SIZE_BYTES) {
           setAudioFileError("音声ファイルは64MB以下にしてください。");
@@ -479,6 +480,7 @@ export default function ProfileEditPage() {
         }
 
         finalAudioUrl = uploadResult.audioUrl;
+        finalAudioKey = uploadResult.audioKey;
         setAudioUploadMessages(["音源をアップロードしました"]);
       }
 
@@ -491,6 +493,7 @@ export default function ProfileEditPage() {
         body: JSON.stringify({
           ...profile,
           audioUrl: finalAudioUrl,
+          audioKey: finalAudioKey,
           userId: savedUserId,
         }),
       });

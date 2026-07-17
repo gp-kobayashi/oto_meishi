@@ -38,6 +38,7 @@ describe("DELETE /api/audio", () => {
     });
     mocks.findUnique.mockResolvedValue({
       audioUrl: "https://r2.example/audio/test/old.m4a",
+      audioKey: "audio/test/old.m4a",
     });
     mocks.extractKeyFromUrl.mockReturnValue("audio/test/old.m4a");
     mocks.deleteFromR2.mockResolvedValue(undefined);
@@ -50,12 +51,12 @@ describe("DELETE /api/audio", () => {
     expect(response.status).toBe(200);
     expect(mocks.findUnique).toHaveBeenCalledWith({
       where: { authId: "auth-user-1" },
-      select: { audioUrl: true },
+      select: { audioUrl: true, audioKey: true },
     });
     expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/test/old.m4a");
     expect(mocks.update).toHaveBeenCalledWith({
       where: { authId: "auth-user-1" },
-      data: { audioUrl: "", audioTitle: "" },
+      data: { audioUrl: "", audioKey: "", audioTitle: "" },
     });
   });
 

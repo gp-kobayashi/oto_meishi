@@ -28,7 +28,7 @@ export async function DELETE(request: Request) {
 
   const profile = await prisma.profile.findUnique({
     where: { authId: user.id },
-    select: { audioUrl: true },
+    select: { audioUrl: true, audioKey: true },
   });
 
   if (!profile) {
@@ -40,7 +40,7 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    const audioKey = extractKeyFromUrl(profile.audioUrl);
+    const audioKey = profile.audioKey || extractKeyFromUrl(profile.audioUrl);
     if (!audioKey) {
       throw new Error("Audio object key is empty.");
     }
@@ -55,7 +55,7 @@ export async function DELETE(request: Request) {
 
   const updatedProfile = await prisma.profile.update({
     where: { authId: user.id },
-    data: { audioUrl: "", audioTitle: "" },
+    data: { audioUrl: "", audioKey: "", audioTitle: "" },
   });
 
   return NextResponse.json({

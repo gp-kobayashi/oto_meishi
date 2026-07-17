@@ -36,6 +36,7 @@ export interface SanitizedProfileData {
   theme: ProfileTheme;
   bio: string;
   audioUrl: string;
+  audioKey: string;
   audioTitle: string;
   sns: Array<{
     service: SocialService;
@@ -199,6 +200,7 @@ export function sanitizeProfileData(
     theme?: string;
     bio?: string;
     audioUrl?: string;
+    audioKey?: string;
     audioTitle?: string;
     sns?: unknown[];
   },
@@ -209,7 +211,23 @@ export function sanitizeProfileData(
   const theme = normalizeTheme(typeof body.theme === "string" ? body.theme : "normal");
   const bio = typeof body.bio === "string" ? body.bio.trim() : "";
   const audioUrl = typeof body.audioUrl === "string" ? body.audioUrl : "";
+  const audioKey = typeof body.audioKey === "string" ? body.audioKey : "";
   const audioTitle = typeof body.audioTitle === "string" ? body.audioTitle.trim() : "";
+
+  const audioKeySegments = audioKey.split("/");
+  const isValidAudioKey =
+    !audioKey ||
+    (audioKey.startsWith(`audio/${encodeURIComponent(userId)}/`) &&
+      !audioKey.includes("\\") &&
+      !audioKeySegments.includes("..") &&
+      audioKeySegments.every(Boolean));
+
+  if (!isValidAudioKey) {
+    return {
+      data: null,
+      error: { field: "audioKey", message: "Invalid audio object key." },
+    };
+  }
 
   // ユーザーIDのバリデーション
   const userIdError = validateUserId(userId);
@@ -268,6 +286,7 @@ export function sanitizeProfileData(
       theme,
       bio,
       audioUrl,
+      audioKey,
       audioTitle,
       sns: socialLinks,
     },

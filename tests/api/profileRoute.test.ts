@@ -233,6 +233,7 @@ describe("/api/profile route", () => {
         displayName: "New",
         bio: "",
         audioUrl: "",
+        audioKey: "",
         audioTitle: "",
         theme: "normal",
       },

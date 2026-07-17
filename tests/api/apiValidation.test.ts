@@ -329,6 +329,29 @@ describe('APIバリデーション関数', () => {
   });
 
   describe('sanitizeProfileData', () => {
+    it('ユーザー自身の音声オブジェクトキーを保持する', () => {
+      const result = sanitizeProfileData({
+        userId: 'testuser',
+        audioKey: 'audio/testuser/voice.m4a',
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data?.audioKey).toBe('audio/testuser/voice.m4a');
+    });
+
+    it('別ユーザー領域の音声オブジェクトキーを拒否する', () => {
+      const result = sanitizeProfileData({
+        userId: 'testuser',
+        audioKey: 'audio/other/voice.m4a',
+      });
+
+      expect(result.data).toBeNull();
+      expect(result.error).toEqual({
+        field: 'audioKey',
+        message: 'Invalid audio object key.',
+      });
+    });
+
     it('正常なプロフィールデータはエラーを返さない', () => {
       const input = {
         userId: 'testuser',
