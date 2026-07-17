@@ -107,6 +107,46 @@ describe("/api/profile route", () => {
     });
   });
 
+  it("公開取得では非公開の音声とリンクをレスポンスから除外する", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      status: "active",
+      audioUrl: "https://example.com/audio.m4a",
+      audioTitle: "音声",
+      audioStatus: "hidden",
+      sns: [
+        { id: "link-1", status: "active" },
+        { id: "link-2", status: "hidden" },
+      ],
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?userId=testuser"),
+    );
+    const profile = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(profile.audioUrl).toBe("");
+    expect(profile.audioTitle).toBe("");
+    expect(profile.sns).toEqual([{ id: "link-1", status: "active" }]);
+  });
+
+  it("非公開プロフィールは公開取得で404を返す", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      status: "hidden",
+      sns: [],
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?userId=testuser"),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
   it("ルート実体で文字数制限エラーを返し、DBを書き換えない", async () => {
     const response = await POST(
       postRequest({
@@ -122,6 +162,26 @@ describe("/api/profile route", () => {
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
     expect(mocks.profileCreate).not.toHaveBeenCalled();
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
+  });
+
+  it("管理対応中のプロフィールはユーザー自身でも変更できない", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "hidden",
+      audioStatus: "active",
+      audioUrl: "",
+      sns: [],
+    });
+
+    const response = await POST(
+      postRequest({ userId: "testuser", displayName: "変更後" }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
   });
 
   it("既存プロフィール更新時にthemeとSNS serviceを正規化し、SNSを置き換える", async () => {

@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
     const profile = await prisma.profile.findUnique({
       where: { userId },
-      select: { authId: true },
+      select: { authId: true, status: true, audioStatus: true },
     });
 
     if (!profile) {
@@ -107,6 +107,16 @@ export async function POST(request: NextRequest) {
     if (profile.authId !== authenticatedUserId) {
       return NextResponse.json(
         { error: "このプロフィールに音声をアップロードする権限がありません。" },
+        { status: 403 },
+      );
+    }
+
+    if (
+      (profile.status ?? "active") !== "active" ||
+      (profile.audioStatus ?? "active") !== "active"
+    ) {
+      return NextResponse.json(
+        { error: "管理対応中のため、音声をアップロードできません。" },
         { status: 403 },
       );
     }

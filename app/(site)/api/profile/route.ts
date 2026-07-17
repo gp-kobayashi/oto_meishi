@@ -65,13 +65,18 @@ export async function GET(request: Request) {
       include: { sns: true },
     });
 
-    if (!profile) {
+    if (!profile || (profile.status ?? "active") !== "active") {
       return NextResponse.json({ error: "profile not found" }, { status: 404 });
     }
 
-    console.log("Profile fetched:", { userId, audioUrl: profile.audioUrl });
+    const publicProfile = {
+      ...profile,
+      audioUrl: (profile.audioStatus ?? "active") === "active" ? profile.audioUrl : "",
+      audioTitle: (profile.audioStatus ?? "active") === "active" ? profile.audioTitle : "",
+      sns: profile.sns.filter((link) => (link.status ?? "active") === "active"),
+    };
 
-    return NextResponse.json(profile);
+    return NextResponse.json(publicProfile);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Unknown server error" },
@@ -174,6 +179,18 @@ export async function POST(request: Request) {
       ) {
         return NextResponse.json(
           { error: "別のユーザーのプロフィールを変更する権限がありません。" },
+          { status: 403 },
+        );
+      }
+
+
+      if (
+        (existingProfile.status ?? "active") !== "active" ||
+        (existingProfile.audioStatus ?? "active") !== "active" ||
+        existingProfile.sns.some((link) => (link.status ?? "active") !== "active")
+      ) {
+        return NextResponse.json(
+          { error: "管理対応中のため、プロフィールを変更できません。" },
           { status: 403 },
         );
       }

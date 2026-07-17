@@ -262,7 +262,7 @@ describe("/api/audio/upload route", () => {
     await expect(response.json()).resolves.toEqual({ error: "profile not found" });
     expect(mocks.findUniqueProfile).toHaveBeenCalledWith({
       where: { userId: "testuser" },
-      select: { authId: true },
+      select: { authId: true, status: true, audioStatus: true },
     });
     expect(mocks.writeFile).not.toHaveBeenCalled();
     expect(mocks.convertToAac).not.toHaveBeenCalled();
