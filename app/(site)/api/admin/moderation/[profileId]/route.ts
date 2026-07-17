@@ -49,6 +49,23 @@ export async function GET(
       );
     }
 
+    const history = await prisma.moderationAction.findMany({
+      where: { profileId },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 50,
+      select: {
+        id: true,
+        targetType: true,
+        targetId: true,
+        action: true,
+        previousStatus: true,
+        newStatus: true,
+        reason: true,
+        createdAt: true,
+        adminUser: { select: { authId: true, role: true } },
+      },
+    });
+
     return Response.json({
       profile: {
         id: profile.id,
@@ -63,6 +80,18 @@ export async function GET(
         createdAt: profile.createdAt.toISOString(),
         updatedAt: profile.updatedAt.toISOString(),
         links: profile.sns,
+        history: history.map((entry) => ({
+          id: entry.id,
+          targetType: entry.targetType,
+          targetId: entry.targetId,
+          action: entry.action,
+          previousStatus: entry.previousStatus,
+          newStatus: entry.newStatus,
+          reason: entry.reason,
+          adminIdentifier: entry.adminUser.authId.slice(0, 8),
+          adminRole: entry.adminUser.role,
+          createdAt: entry.createdAt.toISOString(),
+        })),
       },
     });
   } catch (error) {

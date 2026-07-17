@@ -308,6 +308,71 @@
   opacity: 0.45;
 }
 
+.historyList {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyList li {
+  padding: 16px;
+  border-left: 4px solid #94a3b8;
+  border-radius: 0 10px 10px 0;
+  background: #f8fafc;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.historyHeader > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.historyHeader time,
+.historyAdmin,
+.historyNote,
+.emptyHistory {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.historyTarget {
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: #e2e8f0;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.statusChange {
+  margin: 10px 0 0;
+  color: #475569;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.historyReason {
+  margin: 9px 0 0;
+  white-space: pre-wrap;
+}
+
+.historyAdmin {
+  margin: 9px 0 0;
+}
+
+.historyNote,
+.emptyHistory {
+  margin: 14px 0 0;
+}
+
 .message,
 .error {
   text-align: center;
@@ -338,5 +403,11 @@
 
   .definitionList {
     grid-template-columns: 1fr;
+  }
+
+  .historyHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 }

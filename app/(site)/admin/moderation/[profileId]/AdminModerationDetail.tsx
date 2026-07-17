@@ -23,6 +23,19 @@ const linkStatusLabels = {
   hidden: "非公開",
 };
 
+const targetTypeLabels = {
+  profile: "プロフィール",
+  audio: "音声",
+  socialLink: "リンク",
+};
+
+const actionLabels = {
+  hide: "非公開",
+  restore: "復旧",
+  suspend: "利用停止",
+  remove: "削除",
+};
+
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "medium",
@@ -358,6 +371,42 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
               ) : (
                 <p>リンクは登録されていません。</p>
               )}
+            </section>
+
+            <section className={styles.panel} aria-labelledby="history-heading">
+              <div className={styles.sectionHeading}>
+                <h2 id="history-heading">管理操作履歴</h2>
+                <span>最新{data.profile.history.length}件</span>
+              </div>
+              {data.profile.history.length ? (
+                <ol className={styles.historyList}>
+                  {data.profile.history.map((entry) => (
+                    <li key={entry.id}>
+                      <div className={styles.historyHeader}>
+                        <div>
+                          <span className={styles.historyTarget}>
+                            {targetTypeLabels[entry.targetType]}
+                          </span>
+                          <strong>{actionLabels[entry.action]}</strong>
+                        </div>
+                        <time dateTime={entry.createdAt}>{formatDate(entry.createdAt)}</time>
+                      </div>
+                      <p className={styles.statusChange}>
+                        {entry.previousStatus} → {entry.newStatus}
+                      </p>
+                      <p className={styles.historyReason}>{entry.reason}</p>
+                      <p className={styles.historyAdmin}>
+                        実行者: {entry.adminRole} / {entry.adminIdentifier}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className={styles.emptyHistory}>管理操作履歴はありません。</p>
+              )}
+              {data.profile.history.length === 50 ? (
+                <p className={styles.historyNote}>最新50件を表示しています。</p>
+              ) : null}
             </section>
 
             {pendingAction ? (

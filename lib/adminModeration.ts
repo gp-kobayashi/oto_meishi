@@ -52,6 +52,18 @@ export type ModerationDetailResponse = {
       sortOrder: number;
       status: "active" | "hidden";
     }[];
+    history: {
+      id: string;
+      targetType: "profile" | "audio" | "socialLink";
+      targetId: string;
+      action: "hide" | "restore" | "suspend" | "remove";
+      previousStatus: string;
+      newStatus: string;
+      reason: string;
+      adminIdentifier: string;
+      adminRole: "moderator" | "admin";
+      createdAt: string;
+    }[];
   };
 };
 

@@ -45,6 +45,20 @@ describe("AdminModerationDetail", () => {
                 status: "hidden",
               },
             ],
+            history: [
+              {
+                id: "action-1",
+                targetType: "socialLink",
+                targetId: "link-1",
+                action: "hide",
+                previousStatus: "active",
+                newStatus: "hidden",
+                reason: "危険なリンクのため",
+                adminIdentifier: "auth-adm",
+                adminRole: "admin",
+                createdAt: "2026-07-17T01:00:00.000Z",
+              },
+            ],
           },
         }),
         { status: 200 },
@@ -57,6 +71,8 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("自己紹介音声")).toBeDefined();
     expect(screen.getByRole("link", { name: "リンク先を別タブで開く" }).getAttribute("href"))
       .toBe("https://youtube.com/example");
+    expect(screen.getByRole("heading", { name: "管理操作履歴" })).toBeDefined();
+    expect(screen.getByText("危険なリンクのため")).toBeDefined();
 
     fireEvent.click(
       screen.getByRole("button", { name: "プロフィールを非公開" }),

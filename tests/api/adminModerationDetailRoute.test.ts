@@ -4,6 +4,7 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     authorizeAdminRequest: vi.fn(),
     findUnique: vi.fn(),
+    historyFindMany: vi.fn(),
   },
 }));
 
@@ -12,7 +13,10 @@ vi.mock("@/lib/adminAuth", () => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { profile: { findUnique: mocks.findUnique } },
+  prisma: {
+    profile: { findUnique: mocks.findUnique },
+    moderationAction: { findMany: mocks.historyFindMany },
+  },
 }));
 
 import { GET } from "@/app/(site)/api/admin/moderation/[profileId]/route";
@@ -56,6 +60,19 @@ describe("GET /api/admin/moderation/[profileId]", () => {
         },
       ],
     });
+    mocks.historyFindMany.mockResolvedValue([
+      {
+        id: "action-1",
+        targetType: "socialLink",
+        targetId: "link-1",
+        action: "hide",
+        previousStatus: "active",
+        newStatus: "hidden",
+        reason: "危険なリンクのため",
+        createdAt: new Date("2026-07-17T01:00:00.000Z"),
+        adminUser: { authId: "auth-admin-123456", role: "admin" },
+      },
+    ]);
   });
 
   it("プロフィール・音声・リンクの詳細を返す", async () => {
@@ -68,6 +85,13 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       userId: "sample-user",
       createdAt: "2026-07-16T00:00:00.000Z",
       links: [{ id: "link-1", status: "hidden" }],
+      history: [
+        {
+          id: "action-1",
+          adminIdentifier: "auth-adm",
+          reason: "危険なリンクのため",
+        },
+      ],
     });
   });
 
