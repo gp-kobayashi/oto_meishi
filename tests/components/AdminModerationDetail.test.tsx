@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mocks } = vi.hoisted(() => ({
@@ -57,5 +57,18 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("自己紹介音声")).toBeDefined();
     expect(screen.getByRole("link", { name: "リンク先を別タブで開く" }).getAttribute("href"))
       .toBe("https://youtube.com/example");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "プロフィールを非公開" }),
+    );
+    const submitButton = screen.getByRole("button", {
+      name: "理由を記録して実行",
+    }) as HTMLButtonElement;
+    expect(submitButton.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("対応理由（必須）"), {
+      target: { value: "不適切な内容を確認" },
+    });
+    expect(submitButton.disabled).toBe(false);
   });
 });
