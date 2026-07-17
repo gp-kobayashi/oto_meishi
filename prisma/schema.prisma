@@ -55,13 +55,45 @@ enum SocialLinkModerationStatus {
   hidden
 }
 
+enum ModerationTargetType {
+  profile
+  audio
+  socialLink
+}
+
+enum ModerationActionType {
+  hide
+  restore
+  suspend
+  remove
+}
+
 model AdminUser {
-  id        String    @id @default(uuid())
-  authId    String    @unique
-  role      AdminRole @default(moderator)
-  isActive  Boolean   @default(true)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                String             @id @default(uuid()) @db.Uuid
+  authId            String             @unique
+  role              AdminRole          @default(moderator)
+  isActive          Boolean            @default(true)
+  moderationActions ModerationAction[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model ModerationAction {
+  id             String               @id @default(uuid()) @db.Uuid
+  adminUser      AdminUser            @relation(fields: [adminUserId], references: [id])
+  adminUserId    String               @db.Uuid
+  profileId      String
+  targetType     ModerationTargetType
+  targetId       String
+  action         ModerationActionType
+  previousStatus String               @db.VarChar(32)
+  newStatus      String               @db.VarChar(32)
+  reason         String               @db.VarChar(500)
+  createdAt      DateTime             @default(now())
+
+  @@index([profileId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([adminUserId, createdAt])
 }
 
 model Profile {
