@@ -43,6 +43,7 @@ describe("GET /api/admin/moderation", () => {
           userId: "sample-user",
           displayName: "サンプル",
           status: "hidden",
+          audioKey: "audio/sample-user/audio.m4a",
           audioUrl: "https://example.com/audio.m4a",
           audioTitle: "自己紹介",
           audioStatus: "active",
@@ -61,10 +62,12 @@ describe("GET /api/admin/moderation", () => {
     expect(response.status).toBe(200);
     expect(result.items[0]).toMatchObject({
       userId: "sample-user",
+      hasAudio: true,
       linkCount: 2,
       hiddenLinkCount: 1,
       updatedAt: "2026-07-17T00:00:00.000Z",
     });
+    expect(result.items[0].audioUrl).toBeUndefined();
     expect(result.pagination).toEqual({
       page: 2,
       pageSize: 20,

@@ -13,7 +13,7 @@ export type ModerationListItem = {
   userId: string;
   displayName: string;
   status: "active" | "hidden" | "suspended";
-  audioUrl: string;
+  hasAudio: boolean;
   audioTitle: string;
   audioStatus: "active" | "hidden" | "removed";
   linkCount: number;
@@ -39,7 +39,7 @@ export type ModerationDetailResponse = {
     bio: string;
     theme: "normal" | "dark" | "light" | "colorful";
     status: "active" | "hidden" | "suspended";
-    audioUrl: string;
+    hasAudio: boolean;
     audioTitle: string;
     audioStatus: "active" | "hidden" | "removed";
     createdAt: string;

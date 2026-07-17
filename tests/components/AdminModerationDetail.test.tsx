@@ -30,7 +30,7 @@ describe("AdminModerationDetail", () => {
             bio: "自己紹介です",
             theme: "normal",
             status: "active",
-            audioUrl: "https://example.com/audio.m4a",
+            hasAudio: true,
             audioTitle: "自己紹介音声",
             audioStatus: "active",
             createdAt: "2026-07-16T00:00:00.000Z",

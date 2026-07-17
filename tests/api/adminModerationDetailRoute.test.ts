@@ -44,6 +44,7 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       bio: "自己紹介",
       theme: "normal",
       status: "active",
+      audioKey: "audio/sample-user/audio.m4a",
       audioUrl: "https://example.com/audio.m4a",
       audioTitle: "音声",
       audioStatus: "active",
@@ -83,6 +84,7 @@ describe("GET /api/admin/moderation/[profileId]", () => {
     expect(result.profile).toMatchObject({
       id: "profile-1",
       userId: "sample-user",
+      hasAudio: true,
       createdAt: "2026-07-16T00:00:00.000Z",
       links: [{ id: "link-1", status: "hidden" }],
       history: [
@@ -93,6 +95,7 @@ describe("GET /api/admin/moderation/[profileId]", () => {
         },
       ],
     });
+    expect(result.profile.audioUrl).toBeUndefined();
   });
 
   it("プロフィールが存在しない場合は404を返す", async () => {

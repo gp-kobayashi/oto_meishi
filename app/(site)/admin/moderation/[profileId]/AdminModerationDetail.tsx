@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import styles from "./page.module.css";
+import AdminAudioPlayer from "@/components/admin/AdminAudioPlayer";
 
 const profileStatusLabels = {
   active: "公開中",
@@ -289,10 +290,10 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
               <p className={styles.audioTitle}>
                 {data.profile.audioTitle || "音声は登録されていません。"}
               </p>
-              {data.profile.audioUrl ? (
-                <audio controls preload="none" src={data.profile.audioUrl} />
+              {data.profile.hasAudio ? (
+                <AdminAudioPlayer profileId={data.profile.id} />
               ) : null}
-              {data.profile.audioUrl && data.profile.audioStatus !== "removed" ? (
+              {data.profile.hasAudio && data.profile.audioStatus !== "removed" ? (
                 <div className={styles.actions}>
                   <button
                     type="button"

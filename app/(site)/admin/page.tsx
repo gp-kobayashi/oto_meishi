@@ -8,6 +8,7 @@ import {
   type ModerationListResponse,
 } from "@/lib/adminModeration";
 import styles from "./page.module.css";
+import AdminAudioPlayer from "@/components/admin/AdminAudioPlayer";
 
 const filterOptions: { value: ModerationFilter; label: string }[] = [
   { value: "all", label: "すべて" },
@@ -168,9 +169,7 @@ export default function AdminPage() {
                         {audioStatusLabels[item.audioStatus]}
                       </span>
                     </div>
-                    {item.audioUrl ? (
-                      <audio controls preload="none" src={item.audioUrl} />
-                    ) : null}
+                    {item.hasAudio ? <AdminAudioPlayer profileId={item.id} /> : null}
                   </div>
                   <div>
                     <p className={styles.label}>リンク</p>

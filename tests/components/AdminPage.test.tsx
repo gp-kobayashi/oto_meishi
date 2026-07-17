@@ -31,7 +31,7 @@ describe("AdminPage", () => {
               userId: "sample-user",
               displayName: "サンプル",
               status: "hidden",
-              audioUrl: "",
+              hasAudio: false,
               audioTitle: "",
               audioStatus: "active",
               linkCount: 2,
