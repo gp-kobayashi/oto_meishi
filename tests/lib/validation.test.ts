@@ -4,6 +4,7 @@ import {
   validateBio,
   validateAudioTitle,
   validateSocialLabel,
+  validateSocialUrl,
   validateProfile,
   MAX_DISPLAY_NAME_LENGTH,
   MAX_BIO_LENGTH,
@@ -76,6 +77,29 @@ describe('バリデーション関数', () => {
     });
   });
 
+  describe('validateSocialUrl', () => {
+    it('HTTPSのURLはエラーを返さない', () => {
+      expect(validateSocialUrl('https://x.com/test')).toBeUndefined();
+    });
+
+    it('空文字はエラーを返さない', () => {
+      expect(validateSocialUrl('')).toBeUndefined();
+    });
+
+    it('HTTPと危険なスキームはHTTPSエラーを返す', () => {
+      expect(validateSocialUrl('http://x.com/test')).toBe(
+        'URLはhttps://から入力してください。',
+      );
+      expect(validateSocialUrl('javascript:alert(1)')).toBe(
+        'URLはhttps://から入力してください。',
+      );
+    });
+
+    it('不正なURLは形式エラーを返す', () => {
+      expect(validateSocialUrl('x.com/test')).toBe('無効なURL形式です。');
+    });
+  });
+
   describe('validateProfile', () => {
     it('すべてのフィールドが正常な場合はエラーを返さない', () => {
       const profile = {
@@ -140,6 +164,21 @@ describe('バリデーション関数', () => {
 
       const result = validateProfile(profile);
       expect(result.sns?.[0]?.label).toBe(`文字数制限を超えています（${MAX_SOCIAL_LABEL_LENGTH}文字まで）`);
+    });
+
+    it('SNS URLがHTTPSでない場合はエラーを返す', () => {
+      const result = validateProfile({
+        displayName: 'テストユーザー',
+        bio: 'テスト自己紹介',
+        audioTitle: 'テスト音声',
+        sns: [
+          { service: 'x', url: 'http://x.com/test', label: 'Twitter' },
+        ],
+      });
+
+      expect(result.sns?.[0]?.url).toBe(
+        'URLはhttps://から入力してください。',
+      );
     });
 
     it('複数のSNSラベルが文字数制限を超える場合はすべてのエラーを返す', () => {

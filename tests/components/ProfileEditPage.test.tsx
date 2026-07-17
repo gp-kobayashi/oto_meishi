@@ -60,15 +60,19 @@ async function renderLoadedPage(profile = baseProfile) {
 describe("ProfileEditPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.clearAllMocks();
     window.localStorage.clear();
     window.localStorage.setItem(OTO_MEISHI_USER_ID_KEY, "testuser");
     mocks.getSession.mockResolvedValue({
       data: { session: { access_token: "session-token" } },
     });
-    vi.stubGlobal("URL", {
-      ...URL,
-      createObjectURL: vi.fn(() => "blob:audio-preview"),
-      revokeObjectURL: vi.fn(),
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:audio-preview"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
     });
     vi.stubGlobal("confirm", vi.fn(() => true));
   });
@@ -242,5 +246,34 @@ describe("ProfileEditPage", () => {
       expect(screen.getByText("文字数制限を超えています（60文字まで）")).toBeDefined();
       expect(screen.getByText("文字数制限を超えています（25文字まで）")).toBeDefined();
     });
+  });
+
+  it("HTTPSでないSNS URLには入力エラーを表示する", async () => {
+    await renderLoadedPage();
+
+    const urlInput = screen.getByLabelText<HTMLInputElement>("URL");
+    expect(urlInput.type).toBe("url");
+
+    fireEvent.change(urlInput, {
+      target: { value: "http://x.com/test" },
+    });
+
+    expect(
+      await screen.findByText("URLはhttps://から入力してください。"),
+    ).toBeDefined();
+  });
+
+  it("不正なSNS URLがある場合は保存処理へ進まない", async () => {
+    const fetchMock = await renderLoadedPage();
+
+    fireEvent.change(screen.getByLabelText("URL"), {
+      target: { value: "javascript:alert(1)" },
+    });
+    fireEvent.click(screen.getAllByRole("button", { name: "変更を保存" })[0]);
+
+    expect(await screen.findAllByText("入力内容を確認してください。")).toHaveLength(3);
+    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith("/api/profile?userId=testuser");
   });
 });

@@ -8,7 +8,7 @@ export interface ValidationError {
   displayName?: string;
   bio?: string;
   audioTitle?: string;
-  sns?: Record<number, { label?: string }>;
+  sns?: Record<number, { label?: string; url?: string }>;
 }
 
 export interface SocialLink {
@@ -65,6 +65,27 @@ export function validateSocialLabel(value: string): string | undefined {
 }
 
 /**
+ * SNS URLのHTTPS形式チェック
+ * 空欄のリンク行は保存時に除外されるため、入力がある場合だけ検証する
+ */
+export function validateSocialUrl(value: string): string | undefined {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return undefined;
+  }
+
+  try {
+    const parsedUrl = new URL(trimmedValue);
+    if (parsedUrl.protocol !== "https:") {
+      return "URLはhttps://から入力してください。";
+    }
+    return undefined;
+  } catch {
+    return "無効なURL形式です。";
+  }
+}
+
+/**
  * プロフィールデータのバリデーション
  */
 export function validateProfile(data: ProfileData): ValidationError {
@@ -86,11 +107,15 @@ export function validateProfile(data: ProfileData): ValidationError {
   }
 
   // SNSラベルのバリデーション
-  const snsErrors: Record<number, { label?: string }> = {};
+  const snsErrors: Record<number, { label?: string; url?: string }> = {};
   data.sns.forEach((link, index) => {
     const labelError = validateSocialLabel(link.label);
-    if (labelError) {
-      snsErrors[index] = { label: labelError };
+    const urlError = validateSocialUrl(link.url);
+    if (labelError || urlError) {
+      snsErrors[index] = {
+        label: labelError,
+        url: urlError,
+      };
     }
   });
 

@@ -12,6 +12,8 @@ import {
   validateBio,
   validateAudioTitle,
   validateSocialLabel,
+  validateSocialUrl,
+  validateProfile,
 } from "@/lib/validation";
 import { supabase } from "@/lib/supabaseClient";
 import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
@@ -153,7 +155,7 @@ export default function ProfileEditPage() {
     displayName?: string;
     bio?: string;
     audioTitle?: string;
-    socialLinks?: Record<number, { label?: string }>;
+    socialLinks?: Record<number, { label?: string; url?: string }>;
   }>({});
 
   useEffect(() => {
@@ -243,6 +245,19 @@ export default function ProfileEditPage() {
             [index]: {
               ...prev.socialLinks?.[index],
               label: validateSocialLabel(value),
+            },
+          },
+        }));
+      }
+
+      if (field === "url") {
+        setValidationErrors((prev) => ({
+          ...prev,
+          socialLinks: {
+            ...prev.socialLinks,
+            [index]: {
+              ...prev.socialLinks?.[index],
+              url: validateSocialUrl(value),
             },
           },
         }));
@@ -376,6 +391,19 @@ export default function ProfileEditPage() {
 
   const handleSave = async () => {
     if (!profile) return;
+
+    const profileErrors = validateProfile(profile);
+    setValidationErrors({
+      displayName: profileErrors.displayName,
+      bio: profileErrors.bio,
+      audioTitle: profileErrors.audioTitle,
+      socialLinks: profileErrors.sns,
+    });
+    if (Object.keys(profileErrors).length > 0) {
+      setSaveState("error");
+      setSaveMessage("入力内容を確認してください。");
+      return;
+    }
 
     const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
     if (!savedUserId) {
@@ -687,16 +715,16 @@ export default function ProfileEditPage() {
                     </div>
 
                     <div className={styles.serviceRow}>
-                      <label
-                        className={styles.smallLabel}
+                      <ValidatedFieldLabel
                         htmlFor={`url-${index}`}
-                      >
-                        URL
-                      </label>
+                        label="URL"
+                        error={validationErrors.socialLinks?.[index]?.url}
+                        className={styles.smallLabel}
+                      />
                       <input
                         id={`url-${index}`}
                         className={`${styles.input} ${styles.smallInput}`}
-                        type="text"
+                        type="url"
                         value={link.url}
                         onChange={(event) =>
                           updateSocialLink(index, "url", event.target.value)
