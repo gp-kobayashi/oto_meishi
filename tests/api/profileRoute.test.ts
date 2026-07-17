@@ -113,11 +113,12 @@ describe("/api/profile route", () => {
       userId: "testuser",
       status: "active",
       audioUrl: "https://example.com/audio.m4a",
+      audioKey: "audio/testuser/audio.m4a",
       audioTitle: "音声",
       audioStatus: "hidden",
       sns: [
-        { id: "link-1", status: "active" },
-        { id: "link-2", status: "hidden" },
+        { id: "link-1", status: "active", service: "x", url: "https://x.com/test", label: "X" },
+        { id: "link-2", status: "hidden", service: "website", url: "https://example.com", label: "Web" },
       ],
     });
 
@@ -128,8 +129,13 @@ describe("/api/profile route", () => {
 
     expect(response.status).toBe(200);
     expect(profile.audioUrl).toBe("");
+    expect(profile.audioKey).toBeUndefined();
+    expect(profile.authId).toBeUndefined();
+    expect(profile.hasAudio).toBe(false);
     expect(profile.audioTitle).toBe("");
-    expect(profile.sns).toEqual([{ id: "link-1", status: "active" }]);
+    expect(profile.sns).toEqual([
+      { service: "x", url: "https://x.com/test", label: "X" },
+    ]);
   });
 
   it("非公開プロフィールは公開取得で404を返す", async () => {
@@ -145,6 +151,35 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(404);
+  });
+
+  it("公開中の音声は保存先を隠して存在だけを返す", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      theme: "normal",
+      displayName: "Test",
+      bio: "",
+      audioUrl: "https://r2.example/audio/testuser/voice.m4a",
+      audioKey: "audio/testuser/voice.m4a",
+      audioTitle: "自己紹介",
+      audioStatus: "active",
+      sns: [],
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?userId=testuser"),
+    );
+    const profile = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(profile.audioUrl).toBe("");
+    expect(profile.audioKey).toBeUndefined();
+    expect(profile.authId).toBeUndefined();
+    expect(profile.hasAudio).toBe(true);
+    expect(profile.audioTitle).toBe("自己紹介");
   });
 
   it("ルート実体で文字数制限エラーを返し、DBを書き換えない", async () => {

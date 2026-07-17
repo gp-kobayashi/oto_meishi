@@ -12,10 +12,10 @@ function formatTime(seconds: number): string {
 }
 
 const AudioPlayer = ({
-  audioUrl,
+  userId,
   audioTitle,
 }: {
-  audioUrl: string;
+  userId: string;
   audioTitle: string;
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -24,6 +24,8 @@ const AudioPlayer = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [playbackError, setPlaybackError] = useState("");
 
   /* ---------- audio イベント ---------- */
   useEffect(() => {
@@ -53,10 +55,41 @@ const AudioPlayer = ({
     if (isPlaying) {
       audio.pause();
     } else {
-      await audio.play();
+      setPlaybackError("");
+
+      if (!audio.src) {
+        setIsLoading(true);
+        try {
+          const response = await fetch(
+            `/api/audio/playback?userId=${encodeURIComponent(userId)}`,
+            { cache: "no-store" },
+          );
+          const result = await response.json().catch(() => ({}));
+
+          if (!response.ok || typeof result.audioUrl !== "string") {
+            throw new Error(result.error || "音声を再生できませんでした。");
+          }
+
+          audio.src = result.audioUrl;
+        } catch (error) {
+          setPlaybackError(
+            error instanceof Error ? error.message : "音声を再生できませんでした。",
+          );
+          return;
+        } finally {
+          setIsLoading(false);
+        }
+      }
+
+      try {
+        await audio.play();
+      } catch {
+        setPlaybackError("音声を再生できませんでした。");
+        return;
+      }
     }
     setIsPlaying(!isPlaying);
-  }, [isPlaying]);
+  }, [isPlaying, userId]);
 
   /* ---------- シークバー クリック ---------- */
   const handleSeek = useCallback(
@@ -74,15 +107,10 @@ const AudioPlayer = ({
 
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
-  // audioUrlが空の場合はプレイヤーを表示しない
-  if (!audioUrl) {
-    return null;
-  }
-
   return (
     <div className={styles.audioContainer}>
       {/* 非表示の audio 要素 */}
-      <audio ref={audioRef} src={audioUrl} preload="metadata" />
+      <audio ref={audioRef} preload="none" />
 
       {/* 上段: 再生ボタン ＋ プログレスバー + 時間*/}
       <div className={styles.controls}>
@@ -90,6 +118,7 @@ const AudioPlayer = ({
           type="button"
           className={styles.playButton}
           onClick={togglePlay}
+          disabled={isLoading}
           aria-label={isPlaying ? "一時停止" : "再生"}
         >
           {isPlaying ? (
@@ -134,6 +163,9 @@ const AudioPlayer = ({
         </p>
       </div>
       <p className={styles.title}>{audioTitle}</p>
+      {playbackError ? (
+        <p className={styles.title} role="alert">{playbackError}</p>
+      ) : null}
 
     </div>
   );

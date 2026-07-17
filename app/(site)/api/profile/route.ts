@@ -69,11 +69,21 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "profile not found" }, { status: 404 });
     }
 
+    const hasAudio =
+      (profile.audioStatus ?? "active") === "active" &&
+      Boolean(profile.audioKey || profile.audioUrl);
     const publicProfile = {
-      ...profile,
-      audioUrl: (profile.audioStatus ?? "active") === "active" ? profile.audioUrl : "",
-      audioTitle: (profile.audioStatus ?? "active") === "active" ? profile.audioTitle : "",
-      sns: profile.sns.filter((link) => (link.status ?? "active") === "active"),
+      id: profile.id,
+      userId: profile.userId,
+      theme: profile.theme,
+      displayName: profile.displayName,
+      bio: profile.bio,
+      audioUrl: "",
+      hasAudio,
+      audioTitle: hasAudio ? profile.audioTitle : "",
+      sns: profile.sns
+        .filter((link) => (link.status ?? "active") === "active")
+        .map(({ service, url, label }) => ({ service, url, label })),
     };
 
     return NextResponse.json(publicProfile);
