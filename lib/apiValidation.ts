@@ -133,7 +133,13 @@ export function validateUrlFormat(url: string): ApiValidationError | null {
   }
 
   try {
-    new URL(url);
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== "https:") {
+      return {
+        field: "sns",
+        message: "URLはhttps://から入力してください。",
+      };
+    }
     return null;
   } catch {
     return { field: "sns", message: "無効なURL形式です。" };

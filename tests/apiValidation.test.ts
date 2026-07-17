@@ -112,10 +112,27 @@ describe('APIバリデーション関数', () => {
   });
 
   describe('validateUrlFormat', () => {
-    it('正常なURLはエラーを返さない', () => {
+    it('HTTPSのURLはエラーを返さない', () => {
       expect(validateUrlFormat('https://example.com')).toBeNull();
-      expect(validateUrlFormat('http://test.com')).toBeNull();
       expect(validateUrlFormat('https://x.com/test')).toBeNull();
+    });
+
+    it('HTTPのURLはエラーを返す', () => {
+      expect(validateUrlFormat('http://test.com')).toEqual({
+        field: 'sns',
+        message: 'URLはhttps://から入力してください。',
+      });
+    });
+
+    it.each([
+      'javascript:alert(1)',
+      'data:text/html,<h1>test</h1>',
+      'file:///C:/test.txt',
+    ])('HTTPS以外のスキームを拒否する: %s', (url) => {
+      expect(validateUrlFormat(url)).toEqual({
+        field: 'sns',
+        message: 'URLはhttps://から入力してください。',
+      });
     });
 
     it('空文字はエラーを返す', () => {
