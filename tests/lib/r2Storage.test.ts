@@ -1,7 +1,72 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { generateAudioKey, extractKeyFromUrl } from '@/lib/r2Storage';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import {
+  createSignedAudioUrl,
+  extractKeyFromUrl,
+  generateAudioKey,
+} from '@/lib/r2Storage';
+
+vi.mock('@aws-sdk/s3-request-presigner', () => ({
+  getSignedUrl: vi.fn(),
+}));
 
 describe('R2ストレージ機能', () => {
+  describe('createSignedAudioUrl', () => {
+    beforeEach(() => {
+      process.env.R2_ACCOUNT_ID = 'test-account';
+      process.env.R2_ACCESS_KEY_ID = 'test-access-key';
+      process.env.R2_SECRET_ACCESS_KEY = 'test-secret-key';
+      process.env.R2_BUCKET = 'test-bucket';
+      vi.mocked(getSignedUrl).mockResolvedValue('https://signed.example.com/audio');
+    });
+
+    afterEach(() => {
+      delete process.env.R2_ACCOUNT_ID;
+      delete process.env.R2_ACCESS_KEY_ID;
+      delete process.env.R2_SECRET_ACCESS_KEY;
+      delete process.env.R2_BUCKET;
+      vi.clearAllMocks();
+    });
+
+    it('公開URLの設定なしで60秒間有効な署名付きURLを生成する', async () => {
+      delete process.env.R2_PUBLIC_URL;
+
+      const url = await createSignedAudioUrl('audio/testuser/test.m4a');
+
+      expect(url).toBe('https://signed.example.com/audio');
+      expect(getSignedUrl).toHaveBeenCalledOnce();
+      const [, command, options] = vi.mocked(getSignedUrl).mock.calls[0];
+      expect(command.input).toEqual({
+        Bucket: 'test-bucket',
+        Key: 'audio/testuser/test.m4a',
+      });
+      expect(options).toEqual({ expiresIn: 60 });
+    });
+
+    it('有効期限を指定できる', async () => {
+      await createSignedAudioUrl('audio/testuser/test.m4a', 120);
+
+      expect(vi.mocked(getSignedUrl).mock.calls[0][2]).toEqual({ expiresIn: 120 });
+    });
+
+    it.each([
+      'other/test.m4a',
+      'audio/../secret.m4a',
+      'audio\\testuser\\test.m4a',
+      'audio//test.m4a',
+    ])('音声領域外または不正なキーを拒否する: %s', async (key) => {
+      await expect(createSignedAudioUrl(key)).rejects.toThrow('Invalid audio object key.');
+      expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+
+    it.each([0, 301, 1.5])('不正な有効期限を拒否する: %s', async (expiry) => {
+      await expect(createSignedAudioUrl('audio/testuser/test.m4a', expiry)).rejects.toThrow(
+        'Audio URL expiry must be an integer between 1 and 300 seconds.',
+      );
+      expect(getSignedUrl).not.toHaveBeenCalled();
+    });
+  });
+
   describe('generateAudioKey', () => {
     it('正しい形式のキーを生成する', () => {
       const userId = 'testuser';

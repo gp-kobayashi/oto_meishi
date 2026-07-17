@@ -1,4 +1,10 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import fs from "fs/promises";
 import { randomUUID } from "crypto";
 
@@ -13,6 +19,9 @@ export interface R2Config {
 
 // R2クライアントのシングルトン
 let r2Client: S3Client | null = null;
+
+export const DEFAULT_AUDIO_URL_EXPIRY_SECONDS = 60;
+const MAX_AUDIO_URL_EXPIRY_SECONDS = 300;
 
 /**
  * R2クライアントを初期化する
@@ -29,10 +38,6 @@ function getR2Client(): S3Client {
 
     if (!config.accountId || !config.accessKeyId || !config.secretAccessKey || !config.bucketName) {
       throw new Error("Missing required R2 configuration. Please check environment variables.");
-    }
-
-    if (!process.env.R2_PUBLIC_URL) {
-      throw new Error("R2_PUBLIC_URL is required. Please set it in your environment variables.");
     }
 
     r2Client = new S3Client({
@@ -60,6 +65,10 @@ export async function uploadToR2(
   key: string,
   contentType: string = "audio/mp4",
 ): Promise<string> {
+  if (!process.env.R2_PUBLIC_URL) {
+    throw new Error("R2_PUBLIC_URL is required while uploads return a public URL.");
+  }
+
   const client = getR2Client();
   const bucketName = process.env.R2_BUCKET!;  // .envの変数名に合わせて R2_BUCKET を使用
   const r2PublicUrl = process.env.R2_PUBLIC_URL || "";
@@ -79,6 +88,45 @@ export async function uploadToR2(
 
   // 公開URLを返す（R2_PUBLIC_URLから生成）
   return `${r2PublicUrl}/${key}`;
+}
+
+/**
+ * 音声オブジェクトを一時的に再生できる署名付きURLを生成する
+ * @param key R2内の音声オブジェクトキー
+ * @param expiresInSeconds URLの有効期限（秒）
+ */
+export async function createSignedAudioUrl(
+  key: string,
+  expiresInSeconds: number = DEFAULT_AUDIO_URL_EXPIRY_SECONDS,
+): Promise<string> {
+  const pathSegments = key.split("/");
+  const isAudioKey =
+    key.startsWith("audio/") &&
+    !key.includes("\\") &&
+    !pathSegments.includes("..") &&
+    pathSegments.every(Boolean);
+
+  if (!isAudioKey) {
+    throw new Error("Invalid audio object key.");
+  }
+
+  if (
+    !Number.isInteger(expiresInSeconds) ||
+    expiresInSeconds < 1 ||
+    expiresInSeconds > MAX_AUDIO_URL_EXPIRY_SECONDS
+  ) {
+    throw new Error(
+      `Audio URL expiry must be an integer between 1 and ${MAX_AUDIO_URL_EXPIRY_SECONDS} seconds.`,
+    );
+  }
+
+  const client = getR2Client();
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET!,
+    Key: key,
+  });
+
+  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
 }
 
 /**
