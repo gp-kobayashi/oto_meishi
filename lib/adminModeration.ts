@@ -31,6 +31,30 @@ export type ModerationListResponse = {
   };
 };
 
+export type ModerationDetailResponse = {
+  profile: {
+    id: string;
+    userId: string;
+    displayName: string;
+    bio: string;
+    theme: "normal" | "dark" | "light" | "colorful";
+    status: "active" | "hidden" | "suspended";
+    audioUrl: string;
+    audioTitle: string;
+    audioStatus: "active" | "hidden" | "removed";
+    createdAt: string;
+    updatedAt: string;
+    links: {
+      id: string;
+      service: string;
+      label: string;
+      url: string;
+      sortOrder: number;
+      status: "active" | "hidden";
+    }[];
+  };
+};
+
 export function isModerationFilter(value: string): value is ModerationFilter {
   return moderationFilters.some((filter) => filter === value);
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import {
   type ModerationFilter,
@@ -189,6 +190,11 @@ export default function AdminPage() {
                       }).format(new Date(item.updatedAt))}
                     </time>
                   </div>
+                </div>
+                <div className={styles.itemFooter}>
+                  <Link href={`/admin/moderation/${encodeURIComponent(item.id)}`}>
+                    詳細を確認
+                  </Link>
                 </div>
               </article>
             ))}

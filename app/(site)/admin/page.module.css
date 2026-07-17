@@ -214,6 +214,24 @@
   font-size: 14px;
 }
 
+.itemFooter {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #eef2f6;
+}
+
+.itemFooter a {
+  padding: 9px 14px;
+  border-radius: 9px;
+  background: #1d4ed8;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .message,
 .error {
   padding: 48px 20px;
