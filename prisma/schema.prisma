@@ -38,6 +38,23 @@ enum AdminRole {
   admin
 }
 
+enum ProfileStatus {
+  active
+  hidden
+  suspended
+}
+
+enum AudioModerationStatus {
+  active
+  hidden
+  removed
+}
+
+enum SocialLinkModerationStatus {
+  active
+  hidden
+}
+
 model AdminUser {
   id        String    @id @default(uuid())
   authId    String    @unique
@@ -48,27 +65,34 @@ model AdminUser {
 }
 
 model Profile {
-  id          String       @id @default(uuid())
-  userId      String       @unique
-  authId      String?      @unique
-  theme       Theme        @default(normal)
+  id          String                @id @default(uuid())
+  userId      String                @unique
+  authId      String?               @unique
+  status      ProfileStatus         @default(active)
+  theme       Theme                 @default(normal)
   displayName String
   bio         String
   audioUrl    String
   audioTitle  String
+  audioStatus AudioModerationStatus @default(active)
   sns         SocialLink[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([status])
+  @@index([audioStatus])
 }
 
 model SocialLink {
-  id         String        @id @default(uuid())
-  profile    Profile       @relation(fields: [profileId], references: [id])
-  profileId  String
-  service    SocialService
-  url        String
-  label      String
-  sortOrder  Int           @default(0)
+  id        String                     @id @default(uuid())
+  profile   Profile                    @relation(fields: [profileId], references: [id])
+  profileId String
+  service   SocialService
+  url       String
+  label     String
+  sortOrder Int                        @default(0)
+  status    SocialLinkModerationStatus @default(active)
 
   @@index([profileId])
+  @@index([status])
 }
