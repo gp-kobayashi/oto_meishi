@@ -47,6 +47,22 @@ const serviceOptions: Array<{ value: SocialService; label: string }> = [
   { value: "other", label: "その他" },
 ];
 
+const serviceUrlPlaceholders: Record<SocialService, string> = {
+  x: "https://x.com/yourname",
+  instagram: "https://www.instagram.com/yourname",
+  youtube: "https://www.youtube.com/@yourname",
+  tiktok: "https://www.tiktok.com/@yourname",
+  github: "https://github.com/yourname",
+  discord: "https://discord.gg/invite-code",
+  facebook: "https://www.facebook.com/yourname",
+  linkedin: "https://www.linkedin.com/in/yourname",
+  bluesky: "https://bsky.app/profile/yourname.bsky.social",
+  threads: "https://www.threads.net/@yourname",
+  note: "https://note.com/yourname",
+  website: "https://example.com",
+  other: "https://example.com",
+};
+
 type SaveState = "idle" | "saving" | "success" | "error";
 
 function getAudioUploadErrorMessage(
@@ -725,6 +741,7 @@ export default function ProfileEditPage() {
                         id={`url-${index}`}
                         className={`${styles.input} ${styles.smallInput}`}
                         type="url"
+                        placeholder={serviceUrlPlaceholders[link.service]}
                         value={link.url}
                         onChange={(event) =>
                           updateSocialLink(index, "url", event.target.value)

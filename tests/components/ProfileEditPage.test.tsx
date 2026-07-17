@@ -276,4 +276,35 @@ describe("ProfileEditPage", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("/api/profile?userId=testuser");
   });
+
+  it("選択したサービスに応じたURL入力例を表示する", async () => {
+    await renderLoadedPage();
+
+    const serviceSelect = screen.getByLabelText<HTMLSelectElement>("サービス");
+    const urlInput = screen.getByLabelText<HTMLInputElement>("URL");
+
+    expect(urlInput.placeholder).toBe("https://x.com/yourname");
+
+    fireEvent.change(serviceSelect, { target: { value: "youtube" } });
+
+    expect(screen.getByLabelText<HTMLInputElement>("URL").placeholder).toBe(
+      "https://www.youtube.com/@yourname",
+    );
+  });
+
+  it("サービスを変更しても入力済みURLを上書きしない", async () => {
+    await renderLoadedPage();
+
+    const serviceSelect = screen.getByLabelText<HTMLSelectElement>("サービス");
+    const urlInput = screen.getByLabelText<HTMLInputElement>("URL");
+    const originalUrl = urlInput.value;
+
+    fireEvent.change(serviceSelect, { target: { value: "instagram" } });
+
+    const updatedUrlInput = screen.getByLabelText<HTMLInputElement>("URL");
+    expect(updatedUrlInput.value).toBe(originalUrl);
+    expect(updatedUrlInput.placeholder).toBe(
+      "https://www.instagram.com/yourname",
+    );
+  });
 });
