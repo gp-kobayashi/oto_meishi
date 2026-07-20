@@ -23,7 +23,6 @@ R2_ACCESS_KEY_ID=your_access_key_id
 R2_SECRET_ACCESS_KEY=your_secret_access_key
 R2_BUCKET=your_bucket_name
 R2_REGION=auto
-R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev  # 必須: R2の公開URL
 
 # Supabase Configuration
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
@@ -36,7 +35,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 1. Cloudflare R2でバケットを作成
 2. R2アクセス権を持つAPIトークンを生成
 3. `.env.local`ファイルに認証情報を追加
-4. `R2_PUBLIC_URL`をR2の公開URLに設定（例: `https://pub-xxxxxxxx.r2.dev`）
+4. バケットの公開アクセスは有効にせず、再生時は短時間の署名URLを使用
 
 ### Supabaseの設定手順
 
@@ -57,7 +56,6 @@ R2_ACCESS_KEY_ID=your_access_key_id
 R2_SECRET_ACCESS_KEY=your_secret_access_key
 R2_BUCKET=your_bucket_name
 R2_REGION=auto
-R2_PUBLIC_URL=https://pub-xxxxxxxx.r2.dev
 
 # Supabase Configuration (for local testing)
 NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321

@@ -80,7 +80,7 @@ describe("ProfileEditPage", () => {
   it("確認後に登録済み音源を削除して未選択表示にする", async () => {
     const fetchMock = await renderLoadedPage({
       ...baseProfile,
-      audioUrl: "https://r2.example/audio/testuser/old.m4a",
+      audioKey: "audio/testuser/old.m4a",
     });
     fetchMock.mockResolvedValueOnce(
       Response.json({ success: true, audioUrl: "", audioTitle: "" }),
@@ -110,19 +110,20 @@ describe("ProfileEditPage", () => {
       await screen.findAllByText("セッションがありません。ログインしてください。"),
     ).toHaveLength(3);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/profile?userId=testuser");
+    expect(fetchMock).toHaveBeenCalledWith("/api/profile?mine=true", {
+      headers: { Authorization: "Bearer session-token" },
+    });
   });
 
   it("音声ファイル選択後の保存では、音声アップロード後にプロフィールを保存する", async () => {
     const savedProfile = {
       ...baseProfile,
-      audioUrl: "https://r2.example/audio/testuser/new.m4a",
+      audioKey: "audio/testuser/new.m4a",
     };
     const fetchMock = await renderLoadedPage();
     fetchMock.mockResolvedValueOnce(
       Response.json({
         success: true,
-        audioUrl: "https://r2.example/audio/testuser/new.m4a",
         audioKey: "audio/testuser/new.m4a",
       }),
     );
@@ -158,7 +159,8 @@ describe("ProfileEditPage", () => {
     expect(savedBody).toEqual(
       expect.objectContaining({
         userId: "testuser",
-        audioUrl: "https://r2.example/audio/testuser/new.m4a",
+        audioUrl: "",
+        audioKey: "audio/testuser/new.m4a",
       }),
     );
   });
@@ -272,9 +274,11 @@ describe("ProfileEditPage", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "変更を保存" })[0]);
 
     expect(await screen.findAllByText("入力内容を確認してください。")).toHaveLength(3);
-    expect(mocks.getSession).not.toHaveBeenCalled();
+    expect(mocks.getSession).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith("/api/profile?userId=testuser");
+    expect(fetchMock).toHaveBeenCalledWith("/api/profile?mine=true", {
+      headers: { Authorization: "Bearer session-token" },
+    });
   });
 
   it("選択したサービスに応じたURL入力例を表示する", async () => {

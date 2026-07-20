@@ -23,6 +23,7 @@ import {
   MAX_AUDIO_FILE_SIZE_BYTES,
 } from "@/lib/audioUploadConstraints";
 import styles from "./page.module.css";
+import AudioPlayer from "@/components/card/audioPlayer/AudioPlayer";
 
 const themeOptions = [
   { value: "normal", label: "標準" },
@@ -180,30 +181,47 @@ export default function ProfileEditPage() {
       return;
     }
 
-    fetch(`/api/profile?userId=${encodeURIComponent(savedUserId)}`)
-      .then(async (res) => {
-        if (!res.ok) {
-          const errorResponse = await res.json();
+    const loadProfile = async () => {
+      try {
+        if (!supabase) {
+          throw new Error("認証クライアントが初期化されていません。");
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error("セッションがありません。ログインしてください。");
+        }
+
+        const response = await fetch("/api/profile?mine=true", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!response.ok) {
+          const errorResponse = await response.json();
           throw new Error(
             errorResponse.error || "プロフィールの取得に失敗しました。",
           );
         }
-        return res.json();
-      })
-      .then((profileResponse) => {
+
+        const profileResponse = await response.json();
         setProfile(profileResponse as ProfileData);
-        if (profileResponse.audioUrl) {
+        if (profileResponse.audioKey || profileResponse.audioUrl) {
           setAudioUploadMessages(["音源を変更できます"]);
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         setError(
           err instanceof Error
             ? err.message
             : "プロフィールの取得に失敗しました。",
         );
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const timeoutId = window.setTimeout(() => void loadProfile(), 0);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   useEffect(() => {
@@ -296,9 +314,6 @@ export default function ProfileEditPage() {
 
     setAudioFileError("");
     setAudioFile(file);
-    setProfile((current) =>
-      current ? { ...current, audioUrl: file.name } : current,
-    );
     setAudioPreviewUrl((previousUrl) => {
       if (previousUrl) URL.revokeObjectURL(previousUrl);
       return URL.createObjectURL(file);
@@ -371,7 +386,9 @@ export default function ProfileEditPage() {
         return "";
       });
       setProfile((current) =>
-        current ? { ...current, audioUrl: "", audioTitle: "" } : current,
+        current
+          ? { ...current, audioUrl: "", audioKey: "", audioTitle: "" }
+          : current,
       );
       setValidationErrors((current) => ({ ...current, audioTitle: undefined }));
       setAudioUploadMessages([]);
@@ -479,7 +496,7 @@ export default function ProfileEditPage() {
           ));
         }
 
-        finalAudioUrl = uploadResult.audioUrl;
+        finalAudioUrl = "";
         finalAudioKey = uploadResult.audioKey;
         setAudioUploadMessages(["音源をアップロードしました"]);
       }
@@ -506,6 +523,10 @@ export default function ProfileEditPage() {
 
       setProfile(savedProfileResponse as ProfileData);
       setAudioFile(null);
+      setAudioPreviewUrl((previousUrl) => {
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
+        return "";
+      });
       setSaveState("success");
       setSaveMessage("プロフィールを保存しました。");
     } catch (err) {
@@ -636,7 +657,12 @@ export default function ProfileEditPage() {
                       <p className={styles.uploadHint}>
                         {(audioUploadMessages.length > 0
                           ? audioUploadMessages
-                          : [audioFile?.name || profile.audioUrl || "未選択"]
+                          : [
+                              audioFile?.name ||
+                                (profile.audioKey || profile.audioUrl
+                                  ? "音源を登録済み"
+                                  : "未選択"),
+                            ]
                         ).map((line, index, lines) => (
                           <span key={`${line}-${index}`}>
                             {line}
@@ -654,14 +680,21 @@ export default function ProfileEditPage() {
                       {audioFileError}
                     </p>
                   ) : null}
-                  {(audioPreviewUrl || profile.audioUrl) && (
+                  {(audioPreviewUrl || profile.audioKey || profile.audioUrl) && (
                     <div>
-                      <audio
-                        controls
-                        className={styles.audioPlayer}
-                        src={audioPreviewUrl || profile.audioUrl}
-                      />
-                      {profile.audioUrl ? (
+                      {audioPreviewUrl ? (
+                        <audio
+                          controls
+                          className={styles.audioPlayer}
+                          src={audioPreviewUrl}
+                        />
+                      ) : (
+                        <AudioPlayer
+                          userId={profile.userId}
+                          audioTitle={profile.audioTitle}
+                        />
+                      )}
+                      {profile.audioKey || profile.audioUrl ? (
                         <button
                           type="button"
                           className={styles.deleteAudioButton}

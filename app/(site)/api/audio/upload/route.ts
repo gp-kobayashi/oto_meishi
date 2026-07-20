@@ -175,13 +175,12 @@ export async function POST(request: NextRequest) {
 
       // R2ストレージにアップロード
       const audioKey = generateAudioKey(userId);
-      const audioUrl = await uploadToR2(convertedPath, audioKey, "audio/mp4");
+      await uploadToR2(convertedPath, audioKey, "audio/mp4");
 
-      console.log("Audio uploaded successfully:", { audioKey, audioUrl });
+      console.log("Audio uploaded successfully:", { audioKey });
 
       return NextResponse.json({
         success: true,
-        audioUrl,
         audioKey,
       });
     } finally {

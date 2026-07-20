@@ -136,7 +136,7 @@ describe("/api/audio/upload route", () => {
     mocks.stat.mockResolvedValue({ size: 2 * 1024 * 1024 });
     mocks.convertToAac.mockResolvedValue("C:\\project\\.tmp\\upload-123\\output.m4a");
     mocks.generateAudioKey.mockReturnValue("audio/testuser/voice-123.m4a");
-    mocks.uploadToR2.mockResolvedValue("https://r2.example/audio/testuser/voice-123.m4a");
+    mocks.uploadToR2.mockResolvedValue(undefined);
   });
 
   it("トークン無しの場合は401を返す", async () => {
@@ -392,13 +392,12 @@ describe("/api/audio/upload route", () => {
     expect(mocks.uploadToR2).not.toHaveBeenCalled();
   });
 
-  it("変換とR2アップロードに成功したらURLとキーを返し、一時ファイルを削除する", async () => {
+  it("変換とR2アップロードに成功したらキーを返し、一時ファイルを削除する", async () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       success: true,
-      audioUrl: "https://r2.example/audio/testuser/voice-123.m4a",
       audioKey: "audio/testuser/voice-123.m4a",
     });
     expect(mocks.writeFile).toHaveBeenCalledWith(

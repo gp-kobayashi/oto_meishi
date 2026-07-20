@@ -58,20 +58,14 @@ function getR2Client(): S3Client {
  * @param filePath アップロードするファイルのローカルパス
  * @param key R2内のオブジェクトキー（ファイルパス）
  * @param contentType MIMEタイプ
- * @returns アップロードされたファイルの公開URL
  */
 export async function uploadToR2(
   filePath: string,
   key: string,
   contentType: string = "audio/mp4",
-): Promise<string> {
-  if (!process.env.R2_PUBLIC_URL) {
-    throw new Error("R2_PUBLIC_URL is required while uploads return a public URL.");
-  }
-
+): Promise<void> {
   const client = getR2Client();
   const bucketName = process.env.R2_BUCKET!;  // .envの変数名に合わせて R2_BUCKET を使用
-  const r2PublicUrl = process.env.R2_PUBLIC_URL || "";
 
   // ファイルを読み込む
   const fileBuffer = await fs.readFile(filePath);
@@ -85,9 +79,6 @@ export async function uploadToR2(
   });
 
   await client.send(command);
-
-  // 公開URLを返す（R2_PUBLIC_URLから生成）
-  return `${r2PublicUrl}/${key}`;
 }
 
 /**
@@ -160,7 +151,10 @@ export async function deleteFromR2(key: string): Promise<void> {
  * @returns R2オブジェクトキー
  */
 export function extractKeyFromUrl(url: string): string {
-  const r2PublicUrl = process.env.R2_PUBLIC_URL!.replace(/\/$/, "");
+  const r2PublicUrl = process.env.R2_PUBLIC_URL?.replace(/\/$/, "");
+  if (!r2PublicUrl) {
+    return url;
+  }
   if (url.startsWith(`${r2PublicUrl}/`)) {
     return url.substring(r2PublicUrl.length + 1);
   }

@@ -35,7 +35,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "profile not found" }, { status: 404 });
   }
 
-  if (!profile.audioUrl) {
+  if (!profile.audioKey && !profile.audioUrl) {
     return NextResponse.json({ success: true, audioUrl: "", audioTitle: "" });
   }
 
