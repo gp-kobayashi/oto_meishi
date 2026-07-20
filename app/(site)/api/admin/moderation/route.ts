@@ -5,6 +5,7 @@ import {
 } from "@/lib/adminModeration";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 
 const PAGE_SIZE = 20;
 
@@ -87,27 +88,31 @@ export async function GET(request: Request) {
       prisma.profile.count({ where }),
     ]);
 
-    return Response.json({
-      items: profiles.map((profile) => ({
-        id: profile.id,
-        userId: profile.userId,
-        displayName: profile.displayName,
-        status: profile.status,
-        hasAudio: Boolean(profile.audioKey || profile.audioUrl),
-        audioTitle: profile.audioTitle,
-        audioStatus: profile.audioStatus,
-        linkCount: profile.sns.length,
-        hiddenLinkCount: profile.sns.filter((link) => link.status === "hidden")
-          .length,
-        updatedAt: profile.updatedAt.toISOString(),
-      })),
-      pagination: {
-        page,
-        pageSize: PAGE_SIZE,
-        total,
-        totalPages: Math.ceil(total / PAGE_SIZE),
+    return Response.json(
+      {
+        items: profiles.map((profile) => ({
+          id: profile.id,
+          userId: profile.userId,
+          displayName: profile.displayName,
+          status: profile.status,
+          hasAudio: Boolean(profile.audioKey || profile.audioUrl),
+          audioTitle: profile.audioTitle,
+          audioStatus: profile.audioStatus,
+          linkCount: profile.sns.length,
+          hiddenLinkCount: profile.sns.filter(
+            (link) => link.status === "hidden",
+          ).length,
+          updatedAt: profile.updatedAt.toISOString(),
+        })),
+        pagination: {
+          page,
+          pageSize: PAGE_SIZE,
+          total,
+          totalPages: Math.ceil(total / PAGE_SIZE),
+        },
       },
-    });
+      { headers: PRIVATE_NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error("Failed to load moderation list", error);
     return Response.json(

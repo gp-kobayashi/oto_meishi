@@ -60,6 +60,7 @@ describe("GET /api/admin/moderation", () => {
     const result = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(result.items[0]).toMatchObject({
       userId: "sample-user",
       hasAudio: true,
