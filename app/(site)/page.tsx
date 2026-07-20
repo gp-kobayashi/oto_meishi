@@ -46,10 +46,10 @@ export default function Home() {
             aria-label="profile card preview"
           >
             <Image
-              src="/meishi_demo.png"
+              src="/meishi_sample.png"
               alt="profile card preview"
-              width={216}
-              height={326}
+              width={464}
+              height={888}
             />
           </div>
         </div>
