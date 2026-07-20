@@ -1,6 +1,7 @@
 node_modules
 .next
 .git
+.env*
 .tmp
 coverage
 npm-debug.log*
