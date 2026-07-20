@@ -9,6 +9,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkFindUnique: vi.fn(),
     socialLinkUpdate: vi.fn(),
     actionCreate: vi.fn(),
+    consumeAdminActionRateLimit: vi.fn(),
   },
 }));
 
@@ -18,6 +19,10 @@ vi.mock("@/lib/adminAuth", () => ({
 
 vi.mock("@/lib/prisma", () => ({
   prisma: { $transaction: mocks.transaction },
+}));
+
+vi.mock("@/lib/adminActionRateLimit", () => ({
+  consumeAdminActionRateLimit: mocks.consumeAdminActionRateLimit,
 }));
 
 import { PATCH } from "@/app/(site)/api/admin/moderation/actions/route";
@@ -49,6 +54,13 @@ describe("PATCH /api/admin/moderation/actions", () => {
     mocks.profileFindUnique.mockResolvedValue({ id: "profile-1", status: "active" });
     mocks.profileUpdate.mockResolvedValue({});
     mocks.actionCreate.mockResolvedValue({});
+    mocks.consumeAdminActionRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 60,
+      remaining: 59,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
   });
 
   it("プロフィールを非公開にして履歴を同じトランザクションで保存する", async () => {
@@ -100,6 +112,36 @@ describe("PATCH /api/admin/moderation/actions", () => {
     await expect(response.json()).resolves.toEqual({
       error: "管理操作データは16KB以下にしてください。",
     });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("管理者の操作回数が上限に達した場合は本文解析前に429を返す", async () => {
+    mocks.consumeAdminActionRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 60,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 120,
+    });
+    const moderationRequest = request({
+      targetType: "profile",
+      targetId: "profile-1",
+      action: "hide",
+      reason: "不適切な内容のため",
+    });
+
+    const response = await PATCH(moderationRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("60");
+    expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "管理操作の回数が上限に達しました。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeAdminActionRateLimit).toHaveBeenCalledWith("admin-1");
+    expect(moderationRequest.bodyUsed).toBe(false);
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 

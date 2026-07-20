@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
+import { consumeAdminActionRateLimit } from "@/lib/adminActionRateLimit";
 
 const MAX_MODERATION_ACTION_BODY_BYTES = 16 * 1024;
 
@@ -36,6 +37,25 @@ export async function PATCH(request: Request) {
   try {
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
+
+    const rateLimit = consumeAdminActionRateLimit(authorization.admin.id);
+    if (!rateLimit.allowed) {
+      return Response.json(
+        {
+          error:
+            "管理操作の回数が上限に達しました。しばらく待ってから再度お試しください。",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "X-RateLimit-Limit": String(rateLimit.limit),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+            "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetAt / 1000)),
+          },
+        },
+      );
+    }
 
     if (!hasJsonContentType(request)) {
       return Response.json(
