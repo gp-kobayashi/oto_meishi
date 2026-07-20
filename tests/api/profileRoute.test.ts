@@ -90,6 +90,7 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual(profile);
     expect(mocks.getUser).toHaveBeenCalledWith("valid-token");
     expect(mocks.profileFindUnique).toHaveBeenCalledWith({
@@ -159,6 +160,7 @@ describe("/api/profile route", () => {
     const profile = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBeNull();
     expect(profile.audioUrl).toBe("");
     expect(profile.audioKey).toBeUndefined();
     expect(profile.authId).toBeUndefined();

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { sanitizeProfileData } from "@/lib/apiValidation";
+import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 
 type ProfileRequestBody = Parameters<typeof sanitizeProfileData>[0];
 
@@ -52,7 +53,9 @@ export async function GET(request: Request) {
         );
       }
 
-      return NextResponse.json(profile);
+      return NextResponse.json(profile, {
+        headers: PRIVATE_NO_STORE_HEADERS,
+      });
     }
 
     if (!userId) {
