@@ -4,7 +4,11 @@ import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { sanitizeProfileData } from "@/lib/apiValidation";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
-import { consumeProfileSaveUserRateLimit } from "@/lib/profileSaveRateLimit";
+import {
+  consumeProfileSaveIpRateLimit,
+  consumeProfileSaveUserRateLimit,
+} from "@/lib/profileSaveRateLimit";
+import { getClientIp } from "@/lib/clientIp";
 
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -149,6 +153,30 @@ export async function POST(request: Request) {
           },
         },
       );
+    }
+
+    const clientIp = getClientIp(request.headers);
+    if (clientIp) {
+      const ipRateLimit = consumeProfileSaveIpRateLimit(clientIp);
+      if (!ipRateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              "この接続元からのプロフィール保存が集中しています。しばらく待ってから再度お試しください。",
+          },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(ipRateLimit.retryAfterSeconds),
+              "X-RateLimit-Limit": String(ipRateLimit.limit),
+              "X-RateLimit-Remaining": String(ipRateLimit.remaining),
+              "X-RateLimit-Reset": String(
+                Math.ceil(ipRateLimit.resetAt / 1000),
+              ),
+            },
+          },
+        );
+      }
     }
 
     const jsonBody = await readJsonBody(request, MAX_PROFILE_REQUEST_BODY_BYTES);

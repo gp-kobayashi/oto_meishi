@@ -10,6 +10,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkCreateMany: vi.fn(),
     transaction: vi.fn(),
     consumeProfileSaveUserRateLimit: vi.fn(),
+    consumeProfileSaveIpRateLimit: vi.fn(),
   },
 }));
 
@@ -38,6 +39,7 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/profileSaveRateLimit", () => ({
   consumeProfileSaveUserRateLimit: mocks.consumeProfileSaveUserRateLimit,
+  consumeProfileSaveIpRateLimit: mocks.consumeProfileSaveIpRateLimit,
 }));
 
 import { GET, POST } from "@/app/(site)/api/profile/route";
@@ -81,6 +83,13 @@ describe("/api/profile route", () => {
       allowed: true,
       limit: 30,
       remaining: 29,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
+    mocks.consumeProfileSaveIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 100,
+      remaining: 99,
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
@@ -283,6 +292,69 @@ describe("/api/profile route", () => {
     expect(profileRequest.bodyUsed).toBe(false);
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPの保存回数が上限に達した場合は本文解析前に429を返す", async () => {
+    mocks.consumeProfileSaveIpRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 100,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 90,
+    });
+    const profileRequest = new Request("http://localhost/api/profile", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "CF-Connecting-IP": "203.0.113.10",
+        ...authHeader,
+      },
+      body: JSON.stringify({
+        userId: "testuser",
+        displayName: "Test User",
+      }),
+    });
+
+    const response = await POST(profileRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("90");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("100");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "この接続元からのプロフィール保存が集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeProfileSaveIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(profileRequest.bodyUsed).toBe(false);
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      audioStatus: "active",
+      sns: [],
+    });
+    mocks.profileUpdate.mockResolvedValueOnce({});
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      sns: [],
+    });
+
+    const response = await POST(
+      postRequest({ userId: "testuser", displayName: "Test User" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.consumeProfileSaveIpRateLimit).not.toHaveBeenCalled();
   });
 
   it("不正なJSONの場合は400を返す", async () => {
