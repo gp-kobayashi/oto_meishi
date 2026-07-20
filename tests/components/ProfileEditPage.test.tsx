@@ -104,11 +104,11 @@ describe("ProfileEditPage", () => {
     const fetchMock = await renderLoadedPage();
     mocks.getSession.mockResolvedValueOnce({ data: { session: null } });
 
-    fireEvent.click(screen.getAllByRole("button", { name: "変更を保存" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
 
     expect(
-      await screen.findAllByText("セッションがありません。ログインしてください。"),
-    ).toHaveLength(3);
+      await screen.findByText("セッションがありません。ログインしてください。"),
+    ).toBeDefined();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("/api/profile?mine=true", {
       headers: { Authorization: "Bearer session-token" },
@@ -136,9 +136,9 @@ describe("ProfileEditPage", () => {
         files: [new File(["audio bytes"], "voice.mp3", { type: "audio/mpeg" })],
       },
     });
-    fireEvent.click(screen.getAllByRole("button", { name: "変更を保存" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
 
-    expect(await screen.findAllByText("プロフィールを保存しました。")).toHaveLength(3);
+    expect(await screen.findByText("プロフィールを保存しました。")).toBeDefined();
     expect(fetchMock).toHaveBeenNthCalledWith(2, "/api/audio/upload", {
       method: "POST",
       headers: {
@@ -206,11 +206,11 @@ describe("ProfileEditPage", () => {
         files: [new File(["audio bytes"], "voice.mp3", { type: "audio/mpeg" })],
       },
     });
-    fireEvent.click(screen.getAllByRole("button", { name: "変更を保存" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
 
     expect(
-      await screen.findAllByText("音声ファイルは64MB以下にしてください。"),
-    ).toHaveLength(3);
+      await screen.findByText("音声ファイルは64MB以下にしてください。"),
+    ).toBeDefined();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -271,9 +271,9 @@ describe("ProfileEditPage", () => {
     fireEvent.change(screen.getByLabelText("URL"), {
       target: { value: "javascript:alert(1)" },
     });
-    fireEvent.click(screen.getAllByRole("button", { name: "変更を保存" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
 
-    expect(await screen.findAllByText("入力内容を確認してください。")).toHaveLength(3);
+    expect(await screen.findByText("入力内容を確認してください。")).toBeDefined();
     expect(mocks.getSession).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith("/api/profile?mine=true", {

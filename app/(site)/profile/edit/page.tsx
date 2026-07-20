@@ -556,6 +556,7 @@ export default function ProfileEditPage() {
               state={saveState}
               message={saveMessage}
               onSave={handleSave}
+              className={styles.fixedSaveControls}
             />
             <div className={styles.cardTopBar}>
               <div>
@@ -706,12 +707,6 @@ export default function ProfileEditPage() {
                       ) : null}
                     </div>
                   )}
-                  <ProfileSaveControls
-                    state={saveState}
-                    message={saveMessage}
-                    onSave={handleSave}
-                    className={null}
-                  />
                 </div>
               </div>
 
@@ -805,11 +800,6 @@ export default function ProfileEditPage() {
                 + リンクを追加
               </button>
             </div>
-            <ProfileSaveControls
-              state={saveState}
-              message={saveMessage}
-              onSave={handleSave}
-            />
           </article>
         )}
       </section>

@@ -2,7 +2,7 @@
   min-height: 100vh;
   width: min(1180px, calc(100% - 48px));
   margin: 0 auto;
-  padding: 40px 24px 64px;
+  padding: 40px 24px 128px;
   color: #0f172a;
   background: linear-gradient(180deg, rgba(248, 250, 252, 0.94), #f8fafc 100%);
   display: flex;
@@ -244,6 +244,35 @@
   display: flex;
   gap: 10px;
 }
+
+.fixedSaveControls {
+  position: fixed;
+  right: max(24px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  max-width: calc(100vw - 48px);
+  padding: 10px;
+  border: 3px solid rgba(148, 163, 184, 0.3);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+}
+
+.fixedSaveControls .saveButton {
+  order: 2;
+  flex: none;
+}
+
+.fixedSaveControls .saveMessage {
+  order: 1;
+  margin: 0;
+}
+
 .saveButton {
   border: none;
   max-width: 120px;
@@ -393,7 +422,7 @@
 @media (max-width: 780px) {
   .main {
     width: min(100% - 32px, 760px);
-    padding: 28px 16px 48px;
+    padding: 28px 16px 120px;
   }
 
   .pageSection {
@@ -408,7 +437,14 @@
 @media (max-width: 560px) {
   .main {
     width: min(100% - 24px, 520px);
-    padding: 22px 12px 40px;
+    padding: 22px 12px 120px;
+  }
+
+  .fixedSaveControls {
+    right: max(12px, env(safe-area-inset-right));
+    bottom: max(12px, env(safe-area-inset-bottom));
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
   }
 
   .cardEditor {
