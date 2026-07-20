@@ -154,6 +154,7 @@ export async function POST(request: Request) {
       include: { sns: true },
     });
     let profileId: string;
+    let oldAudioToDelete: { audioKey: string; audioUrl: string } | null = null;
 
     if (!existingProfile) {
       // 新規作成時：このアカウントがすでに別のuserIdでプロフィールを作成していないか確認
@@ -205,19 +206,15 @@ export async function POST(request: Request) {
         );
       }
 
-      // 音源が変更された場合、古いR2オブジェクトを削除
+      // DB保存がすべて成功した後に削除できるよう、古い音源情報を保持する
       if (
         existingProfile.audioUrl &&
         (existingProfile.audioUrl !== audioUrl || existingProfile.audioKey !== audioKey)
       ) {
-        try {
-          const oldKey = existingProfile.audioKey || extractKeyFromUrl(existingProfile.audioUrl);
-          await deleteFromR2(oldKey);
-          console.log("Deleted old audio file from R2:", oldKey);
-        } catch (error) {
-          console.error("Failed to delete old audio file:", error);
-          // 削除に失敗してもプロフィール更新は続行
-        }
+        oldAudioToDelete = {
+          audioKey: existingProfile.audioKey,
+          audioUrl: existingProfile.audioUrl,
+        };
       }
 
       await prisma.profile.update({
@@ -253,6 +250,19 @@ export async function POST(request: Request) {
       where: { userId },
       include: { sns: true },
     });
+
+    if (oldAudioToDelete) {
+      try {
+        const oldKey =
+          oldAudioToDelete.audioKey ||
+          extractKeyFromUrl(oldAudioToDelete.audioUrl);
+        await deleteFromR2(oldKey);
+        console.log("Deleted old audio file from R2:", oldKey);
+      } catch (error) {
+        console.error("Failed to delete old audio file:", error);
+        // 削除に失敗しても、保存済みのプロフィールはそのまま返す
+      }
+    }
 
     return NextResponse.json(savedProfile);
   } catch (error) {
