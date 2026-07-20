@@ -88,8 +88,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json(publicProfile);
   } catch (error) {
+    console.error("Failed to get profile", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown server error" },
+      { error: "プロフィールの取得に失敗しました。" },
       { status: 500 },
     );
   }

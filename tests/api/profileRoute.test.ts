@@ -107,6 +107,31 @@ describe("/api/profile route", () => {
     });
   });
 
+  it("プロフィール取得の内部エラーをレスポンスへ公開しない", async () => {
+    const internalError = new Error(
+      "database connection failed: postgresql://internal-host",
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.profileFindUnique.mockRejectedValueOnce(internalError);
+
+    try {
+      const response = await GET(
+        new Request("http://localhost/api/profile?userId=testuser"),
+      );
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "プロフィールの取得に失敗しました。",
+      });
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failed to get profile",
+        internalError,
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("公開取得では非公開の音声とリンクをレスポンスから除外する", async () => {
     mocks.profileFindUnique.mockResolvedValueOnce({
       id: "profile-1",
