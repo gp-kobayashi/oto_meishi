@@ -6,13 +6,20 @@ describe("securityHeaders", () => {
     expect(Object.fromEntries(
       securityHeaders.map(({ key, value }) => [key, value]),
     )).toEqual({
-      "Content-Security-Policy-Report-Only": contentSecurityPolicy,
+      "Content-Security-Policy": contentSecurityPolicy,
       "X-Content-Type-Options": "nosniff",
       "X-Frame-Options": "DENY",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Permissions-Policy":
         "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
     });
+  });
+
+  it("CSPをレポート専用ではなく強制モードで設定する", () => {
+    const headerNames = securityHeaders.map(({ key }) => key);
+
+    expect(headerNames).toContain("Content-Security-Policy");
+    expect(headerNames).not.toContain("Content-Security-Policy-Report-Only");
   });
 
   it("CSPで必要な通信先だけを許可する", () => {

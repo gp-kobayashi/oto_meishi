@@ -20,7 +20,7 @@ export const contentSecurityPolicy = [
 
 export const securityHeaders = [
   {
-    key: "Content-Security-Policy-Report-Only",
+    key: "Content-Security-Policy",
     value: contentSecurityPolicy,
   },
   {
