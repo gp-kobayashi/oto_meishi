@@ -177,6 +177,33 @@ describe("/api/audio/upload route", () => {
     expect(mocks.writeFile).toHaveBeenCalled();
   });
 
+  it("音声変換中の追加アップロードには429を返す", async () => {
+    let finishConversion: ((value: string) => void) | undefined;
+    mocks.convertToAac.mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finishConversion = resolve;
+        }),
+    );
+
+    const firstUpload = POST(uploadRequest(formDataWithFile()));
+    await vi.waitFor(() => {
+      expect(mocks.convertToAac).toHaveBeenCalledTimes(1);
+    });
+
+    const secondResponse = await POST(uploadRequest(formDataWithFile()));
+
+    expect(secondResponse.status).toBe(429);
+    expect(secondResponse.headers.get("Retry-After")).toBe("30");
+    await expect(secondResponse.json()).resolves.toEqual({
+      error: "ほかの音声を変換中です。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.convertToAac).toHaveBeenCalledTimes(1);
+
+    finishConversion?.("C:\\project\\.tmp\\upload-123\\output.m4a");
+    await expect(firstUpload).resolves.toMatchObject({ status: 200 });
+  });
+
   it("fileが無い場合は400を返す", async () => {
     const formData = new FormData();
     formData.append("userId", "testuser");

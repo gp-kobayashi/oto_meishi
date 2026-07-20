@@ -14,6 +14,7 @@ import {
   validateConvertedAudioMetadata,
 } from "@/lib/audioUploadPolicy";
 import { MAX_AUDIO_FILE_SIZE_BYTES } from "@/lib/audioUploadConstraints";
+import { tryAcquireAudioConversionSlot } from "@/lib/audioConversionGuard";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -121,6 +122,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const releaseConversionSlot = tryAcquireAudioConversionSlot();
+    if (!releaseConversionSlot) {
+      return NextResponse.json(
+        {
+          error:
+            "ほかの音声を変換中です。しばらく待ってから再度お試しください。",
+        },
+        { status: 429, headers: { "Retry-After": "30" } },
+      );
+    }
+
     let tempDir: string | null = null;
     try {
       // 一時ディレクトリを作成（ASCIIパスのみのプロジェクト内ディレクトリを使用）
@@ -191,6 +203,7 @@ export async function POST(request: NextRequest) {
           console.error("Failed to cleanup audio upload directory:", cleanupError);
         }
       }
+      releaseConversionSlot();
     }
   } catch (error) {
     console.error("Audio upload failed:", error);
