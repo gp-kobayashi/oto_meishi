@@ -5,6 +5,7 @@ const { mocks } = vi.hoisted(() => ({
     findUnique: vi.fn(),
     createSignedAudioUrl: vi.fn(),
     extractKeyFromUrl: vi.fn(),
+    consumePublicPlaybackIpRateLimit: vi.fn(),
   },
 }));
 
@@ -17,6 +18,11 @@ vi.mock("@/lib/r2Storage", () => ({
   extractKeyFromUrl: mocks.extractKeyFromUrl,
 }));
 
+vi.mock("@/lib/audioPlaybackRateLimit", () => ({
+  consumePublicPlaybackIpRateLimit:
+    mocks.consumePublicPlaybackIpRateLimit,
+}));
+
 import { GET } from "@/app/(site)/api/audio/playback/route";
 
 const request = (userId: string) =>
@@ -27,6 +33,13 @@ describe("GET /api/audio/playback", () => {
     vi.clearAllMocks();
     mocks.createSignedAudioUrl.mockResolvedValue("https://signed.example/audio");
     mocks.extractKeyFromUrl.mockReturnValue("audio/testuser/legacy.m4a");
+    mocks.consumePublicPlaybackIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 120,
+      remaining: 119,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
   });
 
   it("公開中の音声に5分間有効な署名URLを返す", async () => {
@@ -93,5 +106,49 @@ describe("GET /api/audio/playback", () => {
 
     expect(response.status).toBe(400);
     expect(mocks.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPの発行回数が上限に達した場合はDB照会前に429を返す", async () => {
+    mocks.consumePublicPlaybackIpRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 120,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 90,
+    });
+    const playbackRequest = new Request(
+      "http://localhost/api/audio/playback?userId=testuser",
+      { headers: { "CF-Connecting-IP": "203.0.113.10" } },
+    );
+
+    const response = await GET(playbackRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Retry-After")).toBe("90");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("120");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "音声の再生リクエストが集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumePublicPlaybackIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(mocks.findUnique).not.toHaveBeenCalled();
+    expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+    mocks.findUnique.mockResolvedValue({
+      status: "active",
+      audioStatus: "active",
+      audioKey: "audio/testuser/voice.m4a",
+      audioUrl: "",
+    });
+
+    const response = await GET(request("testuser"));
+
+    expect(response.status).toBe(200);
+    expect(mocks.consumePublicPlaybackIpRateLimit).not.toHaveBeenCalled();
   });
 });
