@@ -15,6 +15,9 @@ const { mocks } = vi.hoisted(() => ({
     inspectAudioFile: vi.fn(),
     consumeAudioUploadUserRateLimit: vi.fn(),
     consumeAudioUploadIpRateLimit: vi.fn(),
+    updateProfile: vi.fn(),
+    deleteFromR2: vi.fn(),
+    extractKeyFromUrl: vi.fn(),
   },
 }));
 
@@ -30,6 +33,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     profile: {
       findUnique: mocks.findUniqueProfile,
+      update: mocks.updateProfile,
     },
   },
 }));
@@ -56,6 +60,8 @@ vi.mock("@/lib/audioConverter", () => ({
 vi.mock("@/lib/r2Storage", () => ({
   uploadToR2: mocks.uploadToR2,
   generateAudioKey: mocks.generateAudioKey,
+  deleteFromR2: mocks.deleteFromR2,
+  extractKeyFromUrl: mocks.extractKeyFromUrl,
 }));
 
 vi.mock("@/lib/audioUploadRateLimit", () => ({
@@ -130,7 +136,13 @@ describe("/api/audio/upload route", () => {
       data: { user: { id: "auth-user-1" } },
       error: null,
     });
-    mocks.findUniqueProfile.mockResolvedValue({ authId: "auth-user-1" });
+    mocks.findUniqueProfile.mockResolvedValue({
+      authId: "auth-user-1",
+      status: "active",
+      audioStatus: "active",
+      audioKey: "",
+      audioUrl: "",
+    });
     mocks.inspectAudioFile.mockImplementation(async (filePath: string) =>
       filePath.endsWith("output.m4a")
         ? validOutputMetadata()
@@ -144,6 +156,9 @@ describe("/api/audio/upload route", () => {
     mocks.convertToAac.mockResolvedValue("C:\\project\\.tmp\\upload-123\\output.m4a");
     mocks.generateAudioKey.mockReturnValue("audio/testuser/voice-123.m4a");
     mocks.uploadToR2.mockResolvedValue(undefined);
+    mocks.updateProfile.mockResolvedValue(undefined);
+    mocks.deleteFromR2.mockResolvedValue(undefined);
+    mocks.extractKeyFromUrl.mockReturnValue("audio/testuser/legacy.m4a");
     mocks.consumeAudioUploadUserRateLimit.mockReturnValue({
       allowed: true,
       limit: 10,
@@ -377,7 +392,13 @@ describe("/api/audio/upload route", () => {
     await expect(response.json()).resolves.toEqual({ error: "profile not found" });
     expect(mocks.findUniqueProfile).toHaveBeenCalledWith({
       where: { userId: "testuser" },
-      select: { authId: true, status: true, audioStatus: true },
+      select: {
+        authId: true,
+        status: true,
+        audioStatus: true,
+        audioKey: true,
+        audioUrl: true,
+      },
     });
     expect(mocks.writeFile).not.toHaveBeenCalled();
     expect(mocks.convertToAac).not.toHaveBeenCalled();
@@ -542,10 +563,82 @@ describe("/api/audio/upload route", () => {
       "audio/testuser/voice-123.m4a",
       "audio/mp4",
     );
+    expect(mocks.updateProfile).toHaveBeenCalledWith({
+      where: {
+        userId: "testuser",
+        authId: "auth-user-1",
+        status: "active",
+        audioStatus: "active",
+      },
+      data: {
+        audioKey: "audio/testuser/voice-123.m4a",
+        audioUrl: "",
+      },
+    });
     expect(mocks.rm).toHaveBeenCalledWith("C:\\project\\.tmp\\upload-123", {
       recursive: true,
       force: true,
     });
+  });
+
+  it("DBへの紐付け失敗時は新しいR2音声を削除する", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.updateProfile.mockRejectedValueOnce(new Error("update failed"));
+
+    try {
+      const response = await POST(uploadRequest(formDataWithFile()));
+
+      expect(response.status).toBe(500);
+      expect(mocks.deleteFromR2).toHaveBeenCalledWith(
+        "audio/testuser/voice-123.m4a",
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("DBへの紐付け後に置き換え前のR2音声を削除する", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      authId: "auth-user-1",
+      status: "active",
+      audioStatus: "active",
+      audioKey: "audio/testuser/old.m4a",
+      audioUrl: "",
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(200);
+    expect(mocks.deleteFromR2).toHaveBeenCalledWith(
+      "audio/testuser/old.m4a",
+    );
+    expect(mocks.updateProfile.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.deleteFromR2.mock.invocationCallOrder[0],
+    );
+  });
+
+  it("置き換え前のR2音声を削除できなくてもアップロードは成功する", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      authId: "auth-user-1",
+      status: "active",
+      audioStatus: "active",
+      audioKey: "audio/testuser/old.m4a",
+      audioUrl: "",
+    });
+    mocks.deleteFromR2.mockRejectedValueOnce(new Error("delete failed"));
+
+    try {
+      const response = await POST(uploadRequest(formDataWithFile()));
+
+      expect(response.status).toBe(200);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failed to delete replaced audio file:",
+        expect.any(Error),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 
   it("変換失敗時は入力ファイルと一時ディレクトリを削除する", async () => {

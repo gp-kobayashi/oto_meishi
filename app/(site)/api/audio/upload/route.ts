@@ -3,7 +3,12 @@ import {
   convertToAac,
   MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES,
 } from "@/lib/audioConverter";
-import { uploadToR2, generateAudioKey } from "@/lib/r2Storage";
+import {
+  deleteFromR2,
+  extractKeyFromUrl,
+  generateAudioKey,
+  uploadToR2,
+} from "@/lib/r2Storage";
 import path from "path";
 import fs from "fs/promises";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
@@ -146,7 +151,13 @@ export async function POST(request: NextRequest) {
 
     const profile = await prisma.profile.findUnique({
       where: { userId },
-      select: { authId: true, status: true, audioStatus: true },
+      select: {
+        authId: true,
+        status: true,
+        audioStatus: true,
+        audioKey: true,
+        audioUrl: true,
+      },
     });
 
     if (!profile) {
@@ -236,6 +247,39 @@ export async function POST(request: NextRequest) {
       // R2ストレージにアップロード
       const audioKey = generateAudioKey(userId);
       await uploadToR2(convertedPath, audioKey, "audio/mp4");
+
+      try {
+        await prisma.profile.update({
+          where: {
+            userId,
+            authId: authenticatedUserId,
+            status: "active",
+            audioStatus: "active",
+          },
+          data: { audioKey, audioUrl: "" },
+        });
+      } catch (databaseError) {
+        try {
+          await deleteFromR2(audioKey);
+        } catch (cleanupError) {
+          console.error(
+            "Failed to delete unlinked audio file:",
+            cleanupError,
+          );
+        }
+        throw databaseError;
+      }
+
+      const oldAudioKey =
+        profile.audioKey ||
+        (profile.audioUrl ? extractKeyFromUrl(profile.audioUrl) : "");
+      if (oldAudioKey && oldAudioKey !== audioKey) {
+        try {
+          await deleteFromR2(oldAudioKey);
+        } catch (cleanupError) {
+          console.error("Failed to delete replaced audio file:", cleanupError);
+        }
+      }
 
       console.log("Audio uploaded successfully:", { audioKey });
 
