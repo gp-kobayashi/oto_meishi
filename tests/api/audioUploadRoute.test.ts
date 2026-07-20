@@ -13,6 +13,7 @@ const { mocks } = vi.hoisted(() => ({
     generateAudioKey: vi.fn(),
     findUniqueProfile: vi.fn(),
     inspectAudioFile: vi.fn(),
+    consumeAudioUploadUserRateLimit: vi.fn(),
   },
 }));
 
@@ -54,6 +55,10 @@ vi.mock("@/lib/audioConverter", () => ({
 vi.mock("@/lib/r2Storage", () => ({
   uploadToR2: mocks.uploadToR2,
   generateAudioKey: mocks.generateAudioKey,
+}));
+
+vi.mock("@/lib/audioUploadRateLimit", () => ({
+  consumeAudioUploadUserRateLimit: mocks.consumeAudioUploadUserRateLimit,
 }));
 
 import { POST } from "@/app/(site)/api/audio/upload/route";
@@ -137,6 +142,13 @@ describe("/api/audio/upload route", () => {
     mocks.convertToAac.mockResolvedValue("C:\\project\\.tmp\\upload-123\\output.m4a");
     mocks.generateAudioKey.mockReturnValue("audio/testuser/voice-123.m4a");
     mocks.uploadToR2.mockResolvedValue(undefined);
+    mocks.consumeAudioUploadUserRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 10,
+      remaining: 9,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
   });
 
   it("トークン無しの場合は401を返す", async () => {
@@ -175,6 +187,34 @@ describe("/api/audio/upload route", () => {
     expect(response.status).toBe(200);
     expect(mocks.getUser).toHaveBeenCalled();
     expect(mocks.writeFile).toHaveBeenCalled();
+  });
+
+  it("ユーザーのアップロード回数が上限に達した場合は解析前に429を返す", async () => {
+    const formData = vi.fn();
+    mocks.consumeAudioUploadUserRateLimit.mockReturnValue({
+      allowed: false,
+      limit: 10,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 120,
+    });
+
+    const response = await POST({
+      headers: new Headers({ Authorization: "Bearer valid-token" }),
+      formData,
+    } as unknown as Parameters<typeof POST>[0]);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("10");
+    expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
+    expect(response.headers.get("X-RateLimit-Reset")).toBe("901");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "音声アップロードの回数が上限に達しました。しばらく待ってから再度お試しください。",
+    });
+    expect(formData).not.toHaveBeenCalled();
+    expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
   });
 
   it("音声変換中の追加アップロードには429を返す", async () => {

@@ -15,6 +15,7 @@ import {
 } from "@/lib/audioUploadPolicy";
 import { MAX_AUDIO_FILE_SIZE_BYTES } from "@/lib/audioUploadConstraints";
 import { tryAcquireAudioConversionSlot } from "@/lib/audioConversionGuard";
+import { consumeAudioUploadUserRateLimit } from "@/lib/audioUploadRateLimit";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -67,6 +68,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Unauthorized: Token verification failed" },
         { status: 401 },
+      );
+    }
+
+    const rateLimit = consumeAudioUploadUserRateLimit(authenticatedUserId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "音声アップロードの回数が上限に達しました。しばらく待ってから再度お試しください。",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "X-RateLimit-Limit": String(rateLimit.limit),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+            "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetAt / 1000)),
+          },
+        },
       );
     }
 
