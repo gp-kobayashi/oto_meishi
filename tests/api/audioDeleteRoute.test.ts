@@ -54,6 +54,7 @@ describe("DELETE /api/audio", () => {
     const response = await DELETE(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.findUnique).toHaveBeenCalledWith({
       where: { authId: "auth-user-1" },
       select: { audioUrl: true, audioKey: true },
@@ -70,6 +71,17 @@ describe("DELETE /api/audio", () => {
     expect(mocks.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.deleteFromR2.mock.invocationCallOrder[0],
     );
+  });
+
+  it("音声が未登録の場合も成功レスポンスをキャッシュしない", async () => {
+    mocks.findUnique.mockResolvedValueOnce({ audioUrl: "", audioKey: "" });
+
+    const response = await DELETE(request());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
   });
 
   it("R2削除に失敗してもプロフィールの参照解除は成功として返す", async () => {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deleteFromR2, extractKeyFromUrl } from "@/lib/r2Storage";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
+import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 
 export async function DELETE(request: Request) {
   const authHeader = request.headers.get("Authorization");
@@ -36,7 +37,10 @@ export async function DELETE(request: Request) {
   }
 
   if (!profile.audioKey && !profile.audioUrl) {
-    return NextResponse.json({ success: true, audioUrl: "", audioTitle: "" });
+    return NextResponse.json(
+      { success: true, audioUrl: "", audioTitle: "" },
+      { headers: PRIVATE_NO_STORE_HEADERS },
+    );
   }
 
   const audioKey = profile.audioKey || extractKeyFromUrl(profile.audioUrl);
@@ -78,9 +82,12 @@ export async function DELETE(request: Request) {
     console.error("Failed to delete unreferenced audio file from R2:", error);
   }
 
-  return NextResponse.json({
-    success: true,
-    audioUrl: "",
-    audioTitle: "",
-  });
+  return NextResponse.json(
+    {
+      success: true,
+      audioUrl: "",
+      audioTitle: "",
+    },
+    { headers: PRIVATE_NO_STORE_HEADERS },
+  );
 }
