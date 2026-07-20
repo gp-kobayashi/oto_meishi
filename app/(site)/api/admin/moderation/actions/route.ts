@@ -1,5 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
+import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 
 type TargetType = "profile" | "audio" | "socialLink";
 type ActionType = "hide" | "restore" | "suspend";
@@ -127,7 +128,10 @@ export async function PATCH(request: Request) {
       return Response.json({ error: result.error }, { status: result.status });
     }
 
-    return Response.json({ success: true, ...result });
+    return Response.json(
+      { success: true, ...result },
+      { headers: PRIVATE_NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error("Failed to update moderation status", error);
     return Response.json(

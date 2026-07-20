@@ -62,6 +62,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { id: "profile-1" },
       data: { status: "hidden" },
