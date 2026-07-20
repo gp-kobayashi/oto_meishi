@@ -1,0 +1,55 @@
+substitutions:
+  _REGION: asia-northeast1
+  _REPOSITORY: oto-meishi
+  _SERVICE_NAME: oto-meishi
+  _NEXT_PUBLIC_SUPABASE_URL: ""
+  _NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
+  _R2_BUCKET: ""
+
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID
+      - --build-arg
+      - NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL}
+      - --build-arg
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --min=0
+      - --max=1
+      - --concurrency=8
+      - --cpu=1
+      - --memory=512Mi
+      - --timeout=120s
+      - --cpu-throttling
+      - --no-cpu-boost
+      - --set-env-vars=NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY},R2_BUCKET=${_R2_BUCKET},R2_REGION=auto
+      - --set-secrets=DATABASE_URL=oto-meishi-database-url:latest,SUPABASE_SERVICE_ROLE_KEY=oto-meishi-supabase-service-role-key:latest,R2_ACCOUNT_ID=oto-meishi-r2-account-id:latest,R2_ACCESS_KEY_ID=oto-meishi-r2-access-key-id:latest,R2_SECRET_ACCESS_KEY=oto-meishi-r2-secret-access-key:latest
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID
+
+options:
+  substitutionOption: MUST_MATCH
