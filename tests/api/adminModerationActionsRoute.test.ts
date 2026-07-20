@@ -86,6 +86,42 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("管理操作JSONが16KBを超える場合は413を返す", async () => {
+    const response = await PATCH(
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "hide",
+        reason: "a".repeat(16 * 1024),
+      }),
+    );
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "管理操作データは16KB以下にしてください。",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("不正なJSONの場合は400を返す", async () => {
+    const response = await PATCH(
+      new Request("http://localhost/api/admin/moderation/actions", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer token",
+        },
+        body: "{invalid",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "JSONの形式が不正です。",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("同じ状態への変更は409で履歴を作らない", async () => {
     mocks.profileFindUnique.mockResolvedValue({ id: "profile-1", status: "hidden" });
 

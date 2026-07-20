@@ -1,6 +1,9 @@
 import { authorizeAdminRequest } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
+import { readJsonBody } from "@/lib/requestJson";
+
+const MAX_MODERATION_ACTION_BODY_BYTES = 16 * 1024;
 
 type TargetType = "profile" | "audio" | "socialLink";
 type ActionType = "hide" | "restore" | "suspend";
@@ -33,7 +36,26 @@ export async function PATCH(request: Request) {
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const body = (await request.json().catch(() => ({}))) as ActionRequest;
+    const jsonBody = await readJsonBody(
+      request,
+      MAX_MODERATION_ACTION_BODY_BYTES,
+    );
+    if (!jsonBody.ok) {
+      return Response.json(
+        {
+          error:
+            jsonBody.error === "too_large"
+              ? "管理操作データは16KB以下にしてください。"
+              : "JSONの形式が不正です。",
+        },
+        { status: jsonBody.error === "too_large" ? 413 : 400 },
+      );
+    }
+
+    const body =
+      typeof jsonBody.value === "object" && jsonBody.value !== null
+        ? (jsonBody.value as ActionRequest)
+        : {};
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
     if (
       !isTargetType(body.targetType) ||
