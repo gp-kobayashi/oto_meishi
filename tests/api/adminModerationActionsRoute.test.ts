@@ -103,6 +103,35 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("JSON以外のContent-Typeは認可後かつ本文解析前に415を返す", async () => {
+    const moderationRequest = new Request(
+      "http://localhost/api/admin/moderation/actions",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "text/plain",
+          Authorization: "Bearer token",
+        },
+        body: JSON.stringify({
+          targetType: "profile",
+          targetId: "profile-1",
+          action: "hide",
+          reason: "不適切な内容のため",
+        }),
+      },
+    );
+
+    const response = await PATCH(moderationRequest);
+
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toEqual({
+      error: "Content-Typeはapplication/jsonを指定してください。",
+    });
+    expect(mocks.authorizeAdminRequest).toHaveBeenCalledWith(moderationRequest);
+    expect(moderationRequest.bodyUsed).toBe(false);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("不正なJSONの場合は400を返す", async () => {
     const response = await PATCH(
       new Request("http://localhost/api/admin/moderation/actions", {

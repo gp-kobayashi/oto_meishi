@@ -2,6 +2,7 @@ import { authorizeAdminRequest } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
+import { hasJsonContentType } from "@/lib/requestContentType";
 
 const MAX_MODERATION_ACTION_BODY_BYTES = 16 * 1024;
 
@@ -35,6 +36,13 @@ export async function PATCH(request: Request) {
   try {
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
+
+    if (!hasJsonContentType(request)) {
+      return Response.json(
+        { error: "Content-Typeはapplication/jsonを指定してください。" },
+        { status: 415 },
+      );
+    }
 
     const jsonBody = await readJsonBody(
       request,
