@@ -3,10 +3,20 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  width: 100%;
   min-height: 100vh;
+  margin: 0 auto;
   padding: 2rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
   background-color: #f0f2f5;
 }
 .logo {
   margin-bottom: 5px;
+}
+
+@media (max-width: 560px) {
+  .main {
+    padding-inline: 16px;
+  }
 }

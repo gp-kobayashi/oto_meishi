@@ -1,7 +1,9 @@
 .card {
   position: relative;
   overflow: hidden;
-  width: min(520px, calc(100vw - 32px));
+  width: min(520px, 100%);
+  min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
   margin: 0 auto;
   text-align: center;
