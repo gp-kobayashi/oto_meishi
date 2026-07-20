@@ -8,8 +8,6 @@ const { mocks } = vi.hoisted(() => ({
     profileUpdate: vi.fn(),
     socialLinkDeleteMany: vi.fn(),
     socialLinkCreateMany: vi.fn(),
-    deleteFromR2: vi.fn(),
-    extractKeyFromUrl: vi.fn(),
     transaction: vi.fn(),
   },
 }));
@@ -37,11 +35,6 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/r2Storage", () => ({
-  deleteFromR2: mocks.deleteFromR2,
-  extractKeyFromUrl: mocks.extractKeyFromUrl,
-}));
-
 import { GET, POST } from "@/app/(site)/api/profile/route";
 
 const authHeader = { Authorization: "Bearer valid-token" };
@@ -66,8 +59,6 @@ describe("/api/profile route", () => {
     });
     mocks.socialLinkDeleteMany.mockResolvedValue({ count: 0 });
     mocks.socialLinkCreateMany.mockResolvedValue({ count: 0 });
-    mocks.extractKeyFromUrl.mockReturnValue("audio/test/old.m4a");
-    mocks.deleteFromR2.mockResolvedValue(undefined);
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
         profile: {
@@ -306,8 +297,6 @@ describe("/api/profile route", () => {
       data: {
         displayName: "New",
         bio: "",
-        audioUrl: "",
-        audioKey: "",
         audioTitle: "",
         theme: "normal",
       },
@@ -329,81 +318,44 @@ describe("/api/profile route", () => {
     });
   });
 
-  it("既存の音源URLが変更された場合、古いR2オブジェクトを削除する", async () => {
+  it("プロフィール保存ではクライアント指定の音声保存先を更新しない", async () => {
     const existingProfile = {
       id: "profile-1",
       userId: "testuser",
       authId: "auth-user-1",
       displayName: "Old",
       bio: "",
-      audioUrl: "https://r2.example/audio/test/old.m4a",
+      audioUrl: "",
+      audioKey: "audio/testuser/current.m4a",
       audioTitle: "",
       theme: "normal",
       sns: [],
     };
 
     mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
-    mocks.profileUpdate.mockResolvedValueOnce({
-      ...existingProfile,
-      audioUrl: "https://r2.example/audio/test/new.m4a",
-    });
-    mocks.profileFindUnique.mockResolvedValueOnce({
-      ...existingProfile,
-      audioUrl: "https://r2.example/audio/test/new.m4a",
-    });
+    mocks.profileUpdate.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
 
     const response = await POST(
       postRequest({
         userId: "testuser",
         displayName: "Old",
-        audioUrl: "https://r2.example/audio/test/new.m4a",
+        audioUrl: "https://attacker.example/audio.m4a",
+        audioKey: "audio/testuser/untrusted.m4a",
       }),
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.extractKeyFromUrl).toHaveBeenCalledWith(
-      "https://r2.example/audio/test/old.m4a",
-    );
-    expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/test/old.m4a");
-    expect(mocks.profileUpdate.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.deleteFromR2.mock.invocationCallOrder[0],
-    );
-  });
-
-  it("プロフィール保存に失敗した場合は古いR2音声を削除しない", async () => {
-    const existingProfile = {
-      id: "profile-1",
-      userId: "testuser",
-      authId: "auth-user-1",
-      displayName: "Old",
-      bio: "",
-      audioUrl: "https://r2.example/audio/test/old.m4a",
-      audioKey: "audio/test/old.m4a",
-      audioTitle: "",
-      theme: "normal",
-      sns: [],
-    };
-    const internalError = new Error("database update failed");
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
-    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
-    mocks.profileUpdate.mockRejectedValueOnce(internalError);
-
-    try {
-      const response = await POST(
-        postRequest({
-          userId: "testuser",
-          displayName: "Old",
-          audioUrl: "https://r2.example/audio/test/new.m4a",
-          audioKey: "audio/testuser/new.m4a",
-        }),
-      );
-
-      expect(response.status).toBe(500);
-      expect(mocks.deleteFromR2).not.toHaveBeenCalled();
-      expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
-    } finally {
-      consoleError.mockRestore();
-    }
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { userId: "testuser" },
+      data: {
+        displayName: "Old",
+        bio: "",
+        audioTitle: "",
+        theme: "normal",
+      },
+      include: { sns: true },
+    });
   });
 
   it("authId未設定の既存プロフィールは更新も自動取得も拒否する", async () => {
