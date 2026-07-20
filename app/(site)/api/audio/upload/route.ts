@@ -25,6 +25,7 @@ import {
   consumeAudioUploadUserRateLimit,
 } from "@/lib/audioUploadRateLimit";
 import { getClientIp } from "@/lib/clientIp";
+import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -283,10 +284,13 @@ export async function POST(request: NextRequest) {
 
       console.log("Audio uploaded successfully:", { audioKey });
 
-      return NextResponse.json({
-        success: true,
-        audioKey,
-      });
+      return NextResponse.json(
+        {
+          success: true,
+          audioKey,
+        },
+        { headers: PRIVATE_NO_STORE_HEADERS },
+      );
     } finally {
       if (tempDir) {
         try {

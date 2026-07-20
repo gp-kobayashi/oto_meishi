@@ -532,6 +532,7 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({
       success: true,
       audioKey: "audio/testuser/voice-123.m4a",
