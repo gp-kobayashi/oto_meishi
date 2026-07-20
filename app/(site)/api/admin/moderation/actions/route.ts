@@ -3,7 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
-import { consumeAdminActionRateLimit } from "@/lib/adminActionRateLimit";
+import {
+  consumeAdminActionIpRateLimit,
+  consumeAdminActionRateLimit,
+} from "@/lib/adminActionRateLimit";
+import { getClientIp } from "@/lib/clientIp";
 
 const MAX_MODERATION_ACTION_BODY_BYTES = 16 * 1024;
 
@@ -55,6 +59,30 @@ export async function PATCH(request: Request) {
           },
         },
       );
+    }
+
+    const clientIp = getClientIp(request.headers);
+    if (clientIp) {
+      const ipRateLimit = consumeAdminActionIpRateLimit(clientIp);
+      if (!ipRateLimit.allowed) {
+        return Response.json(
+          {
+            error:
+              "この接続元からの管理操作が集中しています。しばらく待ってから再度お試しください。",
+          },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(ipRateLimit.retryAfterSeconds),
+              "X-RateLimit-Limit": String(ipRateLimit.limit),
+              "X-RateLimit-Remaining": String(ipRateLimit.remaining),
+              "X-RateLimit-Reset": String(
+                Math.ceil(ipRateLimit.resetAt / 1000),
+              ),
+            },
+          },
+        );
+      }
     }
 
     if (!hasJsonContentType(request)) {

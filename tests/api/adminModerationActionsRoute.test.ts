@@ -10,6 +10,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkUpdate: vi.fn(),
     actionCreate: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
+    consumeAdminActionIpRateLimit: vi.fn(),
   },
 }));
 
@@ -23,6 +24,7 @@ vi.mock("@/lib/prisma", () => ({
 
 vi.mock("@/lib/adminActionRateLimit", () => ({
   consumeAdminActionRateLimit: mocks.consumeAdminActionRateLimit,
+  consumeAdminActionIpRateLimit: mocks.consumeAdminActionIpRateLimit,
 }));
 
 import { PATCH } from "@/app/(site)/api/admin/moderation/actions/route";
@@ -58,6 +60,13 @@ describe("PATCH /api/admin/moderation/actions", () => {
       allowed: true,
       limit: 60,
       remaining: 59,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
+    mocks.consumeAdminActionIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 120,
+      remaining: 119,
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
@@ -143,6 +152,62 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(mocks.consumeAdminActionRateLimit).toHaveBeenCalledWith("admin-1");
     expect(moderationRequest.bodyUsed).toBe(false);
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPの操作回数が上限に達した場合は本文解析前に429を返す", async () => {
+    mocks.consumeAdminActionIpRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 120,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 90,
+    });
+    const moderationRequest = new Request(
+      "http://localhost/api/admin/moderation/actions",
+      {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer token",
+          "CF-Connecting-IP": "203.0.113.10",
+        },
+        body: JSON.stringify({
+          targetType: "profile",
+          targetId: "profile-1",
+          action: "hide",
+          reason: "不適切な内容のため",
+        }),
+      },
+    );
+
+    const response = await PATCH(moderationRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("90");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("120");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "この接続元からの管理操作が集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeAdminActionIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(moderationRequest.bodyUsed).toBe(false);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+    const response = await PATCH(
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "hide",
+        reason: "不適切な内容のため",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.consumeAdminActionIpRateLimit).not.toHaveBeenCalled();
   });
 
   it("JSON以外のContent-Typeは認可後かつ本文解析前に415を返す", async () => {
