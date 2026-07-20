@@ -404,4 +404,29 @@ describe("/api/profile route", () => {
     expect(mocks.profileCreate).not.toHaveBeenCalled();
     expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
   });
+
+  it("プロフィール保存の内部エラーをレスポンスへ公開しない", async () => {
+    const internalError = new Error(
+      "duplicate key value violates unique constraint Profile_authId_key",
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.profileFindUnique.mockRejectedValueOnce(internalError);
+
+    try {
+      const response = await POST(
+        postRequest({ userId: "testuser", displayName: "Test User" }),
+      );
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({
+        error: "プロフィールの保存に失敗しました。",
+      });
+      expect(consoleError).toHaveBeenCalledWith(
+        "Failed to save profile",
+        internalError,
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
 });

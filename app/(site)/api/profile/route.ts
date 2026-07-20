@@ -256,8 +256,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(savedProfile);
   } catch (error) {
+    console.error("Failed to save profile", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Unknown server error" },
+      { error: "プロフィールの保存に失敗しました。" },
       { status: 500 },
     );
   }
