@@ -6,6 +6,7 @@ const { mocks } = vi.hoisted(() => ({
     findUnique: vi.fn(),
     createSignedAudioUrl: vi.fn(),
     extractKeyFromUrl: vi.fn(),
+    consumeAdminPlaybackRateLimit: vi.fn(),
   },
 }));
 
@@ -18,6 +19,9 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/r2Storage", () => ({
   createSignedAudioUrl: mocks.createSignedAudioUrl,
   extractKeyFromUrl: mocks.extractKeyFromUrl,
+}));
+vi.mock("@/lib/audioPlaybackRateLimit", () => ({
+  consumeAdminPlaybackRateLimit: mocks.consumeAdminPlaybackRateLimit,
 }));
 
 import { GET } from "@/app/(site)/api/admin/audio/playback/route";
@@ -40,6 +44,13 @@ describe("GET /api/admin/audio/playback", () => {
       audioUrl: "",
     });
     mocks.createSignedAudioUrl.mockResolvedValue("https://signed.example/audio");
+    mocks.consumeAdminPlaybackRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 60,
+      remaining: 59,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
   });
 
   it("管理者に5分間有効な署名URLを返す", async () => {
@@ -65,6 +76,32 @@ describe("GET /api/admin/audio/playback", () => {
     const response = await GET(request());
 
     expect(response.status).toBe(403);
+    expect(mocks.findUnique).not.toHaveBeenCalled();
+    expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
+  });
+
+  it("管理者の発行回数が上限に達した場合はプロフィール検索前に429を返す", async () => {
+    mocks.consumeAdminPlaybackRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 60,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 120,
+    });
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("60");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "管理者向け音声の再生リクエストが集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeAdminPlaybackRateLimit).toHaveBeenCalledWith(
+      "admin-1",
+    );
     expect(mocks.findUnique).not.toHaveBeenCalled();
     expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
   });
