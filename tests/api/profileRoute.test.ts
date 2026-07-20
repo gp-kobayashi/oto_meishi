@@ -10,6 +10,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkCreateMany: vi.fn(),
     deleteFromR2: vi.fn(),
     extractKeyFromUrl: vi.fn(),
+    transaction: vi.fn(),
   },
 }));
 
@@ -23,6 +24,7 @@ vi.mock("@/lib/supabaseClient", () => ({
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    $transaction: mocks.transaction,
     profile: {
       findUnique: mocks.profileFindUnique,
       create: mocks.profileCreate,
@@ -66,6 +68,19 @@ describe("/api/profile route", () => {
     mocks.socialLinkCreateMany.mockResolvedValue({ count: 0 });
     mocks.extractKeyFromUrl.mockReturnValue("audio/test/old.m4a");
     mocks.deleteFromR2.mockResolvedValue(undefined);
+    mocks.transaction.mockImplementation(async (callback) =>
+      callback({
+        profile: {
+          findUnique: mocks.profileFindUnique,
+          create: mocks.profileCreate,
+          update: mocks.profileUpdate,
+        },
+        socialLink: {
+          deleteMany: mocks.socialLinkDeleteMany,
+          createMany: mocks.socialLinkCreateMany,
+        },
+      }),
+    );
   });
 
   it("認証ユーザーに紐づく既存プロフィールを返す", async () => {

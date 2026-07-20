@@ -153,7 +153,6 @@ export async function POST(request: Request) {
       where: { userId },
       include: { sns: true },
     });
-    let profileId: string;
     let oldAudioToDelete: { audioKey: string; audioUrl: string } | null = null;
 
     if (!existingProfile) {
@@ -168,23 +167,6 @@ export async function POST(request: Request) {
         );
       }
 
-      const createdProfile = await prisma.profile.create({
-        data: {
-          userId,
-          authId: supabaseUser.id,
-          displayName: displayName || userId,
-          bio,
-          audioUrl,
-          audioKey,
-          audioTitle,
-          theme,
-          sns: {
-            create: [],
-          },
-        },
-        include: { sns: true },
-      });
-      profileId = createdProfile.id;
     } else {
       // 未紐付けプロフィールをリクエストだけで取得できないよう、所有者の完全一致を必須にする
       if (existingProfile.authId !== supabaseUser.id) {
@@ -217,38 +199,63 @@ export async function POST(request: Request) {
         };
       }
 
-      await prisma.profile.update({
+    }
+
+    const savedProfile = await prisma.$transaction(async (transaction) => {
+      let profileId: string;
+
+      if (!existingProfile) {
+        const createdProfile = await transaction.profile.create({
+          data: {
+            userId,
+            authId: supabaseUser.id,
+            displayName: displayName || userId,
+            bio,
+            audioUrl,
+            audioKey,
+            audioTitle,
+            theme,
+            sns: {
+              create: [],
+            },
+          },
+          include: { sns: true },
+        });
+        profileId = createdProfile.id;
+      } else {
+        await transaction.profile.update({
+          where: { userId },
+          data: {
+            displayName: displayName || userId,
+            bio,
+            audioUrl,
+            audioKey,
+            audioTitle,
+            theme,
+          },
+          include: { sns: true },
+        });
+        profileId = existingProfile.id;
+      }
+
+      await transaction.socialLink.deleteMany({ where: { profileId } });
+
+      if (socialLinks.length > 0) {
+        await transaction.socialLink.createMany({
+          data: socialLinks.map((link) => ({
+            profileId,
+            service: link.service,
+            url: link.url,
+            label: link.label,
+            sortOrder: link.sortOrder,
+          })),
+        });
+      }
+
+      return transaction.profile.findUnique({
         where: { userId },
-        data: {
-          displayName: displayName || userId,
-          bio,
-          audioUrl,
-          audioKey,
-          audioTitle,
-          theme,
-        },
         include: { sns: true },
       });
-      profileId = existingProfile.id;
-    }
-
-    await prisma.socialLink.deleteMany({ where: { profileId } });
-
-    if (socialLinks.length > 0) {
-      await prisma.socialLink.createMany({
-        data: socialLinks.map((link) => ({
-          profileId,
-          service: link.service,
-          url: link.url,
-          label: link.label,
-          sortOrder: link.sortOrder,
-        })),
-      });
-    }
-
-    const savedProfile = await prisma.profile.findUnique({
-      where: { userId },
-      include: { sns: true },
     });
 
     if (oldAudioToDelete) {
