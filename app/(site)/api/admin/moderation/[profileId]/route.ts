@@ -1,5 +1,6 @@
 import { authorizeAdminRequest } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
+import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 
 export async function GET(
   request: Request,
@@ -67,34 +68,37 @@ export async function GET(
       },
     });
 
-    return Response.json({
-      profile: {
-        id: profile.id,
-        userId: profile.userId,
-        displayName: profile.displayName,
-        bio: profile.bio,
-        theme: profile.theme,
-        status: profile.status,
-        hasAudio: Boolean(profile.audioKey || profile.audioUrl),
-        audioTitle: profile.audioTitle,
-        audioStatus: profile.audioStatus,
-        createdAt: profile.createdAt.toISOString(),
-        updatedAt: profile.updatedAt.toISOString(),
-        links: profile.sns,
-        history: history.map((entry) => ({
-          id: entry.id,
-          targetType: entry.targetType,
-          targetId: entry.targetId,
-          action: entry.action,
-          previousStatus: entry.previousStatus,
-          newStatus: entry.newStatus,
-          reason: entry.reason,
-          adminIdentifier: entry.adminUser.authId.slice(0, 8),
-          adminRole: entry.adminUser.role,
-          createdAt: entry.createdAt.toISOString(),
-        })),
+    return Response.json(
+      {
+        profile: {
+          id: profile.id,
+          userId: profile.userId,
+          displayName: profile.displayName,
+          bio: profile.bio,
+          theme: profile.theme,
+          status: profile.status,
+          hasAudio: Boolean(profile.audioKey || profile.audioUrl),
+          audioTitle: profile.audioTitle,
+          audioStatus: profile.audioStatus,
+          createdAt: profile.createdAt.toISOString(),
+          updatedAt: profile.updatedAt.toISOString(),
+          links: profile.sns,
+          history: history.map((entry) => ({
+            id: entry.id,
+            targetType: entry.targetType,
+            targetId: entry.targetId,
+            action: entry.action,
+            previousStatus: entry.previousStatus,
+            newStatus: entry.newStatus,
+            reason: entry.reason,
+            adminIdentifier: entry.adminUser.authId.slice(0, 8),
+            adminRole: entry.adminUser.role,
+            createdAt: entry.createdAt.toISOString(),
+          })),
+        },
       },
-    });
+      { headers: PRIVATE_NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error("Failed to load moderation detail", error);
     return Response.json(

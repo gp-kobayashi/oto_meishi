@@ -81,6 +81,7 @@ describe("GET /api/admin/moderation/[profileId]", () => {
     const result = await response.json();
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(result.profile).toMatchObject({
       id: "profile-1",
       userId: "sample-user",
