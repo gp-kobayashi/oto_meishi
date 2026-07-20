@@ -15,7 +15,7 @@
 }
 
 .login {
-  width: min(998px, calc(100% - 48px));
+  width: min(998px, 90%);
   min-height: calc(100vh - 152px);
   margin: 0 auto;
   padding: clamp(42px, 8vw, 88px) 0 88px;
@@ -57,7 +57,7 @@
 
 @media (max-width: 780px) {
   .login {
-    width: 520px;
+    width: min(520px, 90%);
     grid-template-columns: 1fr;
     align-items: start;
     padding: 40px 0 72px;

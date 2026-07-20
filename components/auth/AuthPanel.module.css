@@ -1,11 +1,17 @@
 .panel {
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   padding: clamp(24px, 4vw, 34px);
   border: 1px solid rgba(31, 41, 51, 0.1);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 22px 62px rgba(32, 47, 67, 0.12);
   backdrop-filter: blur(12px);
+}
+
+.panel * {
+  box-sizing: border-box;
 }
 
 .providerStack {
