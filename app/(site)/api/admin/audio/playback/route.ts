@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { authorizeAdminRequest } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { createSignedAudioUrl, extractKeyFromUrl } from "@/lib/r2Storage";
-import { consumeAdminPlaybackRateLimit } from "@/lib/audioPlaybackRateLimit";
+import {
+  consumeAdminPlaybackIpRateLimit,
+  consumeAdminPlaybackRateLimit,
+} from "@/lib/audioPlaybackRateLimit";
+import { getClientIp } from "@/lib/clientIp";
 
 const PLAYBACK_URL_EXPIRY_SECONDS = 300;
 
@@ -28,6 +32,31 @@ export async function GET(request: Request) {
         },
       },
     );
+  }
+
+  const clientIp = getClientIp(request.headers);
+  if (clientIp) {
+    const ipRateLimit = consumeAdminPlaybackIpRateLimit(clientIp);
+    if (!ipRateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "この接続元からの管理者向け音声再生が集中しています。しばらく待ってから再度お試しください。",
+        },
+        {
+          status: 429,
+          headers: {
+            "Cache-Control": "private, no-store",
+            "Retry-After": String(ipRateLimit.retryAfterSeconds),
+            "X-RateLimit-Limit": String(ipRateLimit.limit),
+            "X-RateLimit-Remaining": String(ipRateLimit.remaining),
+            "X-RateLimit-Reset": String(
+              Math.ceil(ipRateLimit.resetAt / 1000),
+            ),
+          },
+        },
+      );
+    }
   }
 
   const profileId = new URL(request.url).searchParams.get("profileId")?.trim();

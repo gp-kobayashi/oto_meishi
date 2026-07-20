@@ -7,6 +7,7 @@ const { mocks } = vi.hoisted(() => ({
     createSignedAudioUrl: vi.fn(),
     extractKeyFromUrl: vi.fn(),
     consumeAdminPlaybackRateLimit: vi.fn(),
+    consumeAdminPlaybackIpRateLimit: vi.fn(),
   },
 }));
 
@@ -22,6 +23,7 @@ vi.mock("@/lib/r2Storage", () => ({
 }));
 vi.mock("@/lib/audioPlaybackRateLimit", () => ({
   consumeAdminPlaybackRateLimit: mocks.consumeAdminPlaybackRateLimit,
+  consumeAdminPlaybackIpRateLimit: mocks.consumeAdminPlaybackIpRateLimit,
 }));
 
 import { GET } from "@/app/(site)/api/admin/audio/playback/route";
@@ -48,6 +50,13 @@ describe("GET /api/admin/audio/playback", () => {
       allowed: true,
       limit: 60,
       remaining: 59,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
+    mocks.consumeAdminPlaybackIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 120,
+      remaining: 119,
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
@@ -104,6 +113,48 @@ describe("GET /api/admin/audio/playback", () => {
     );
     expect(mocks.findUnique).not.toHaveBeenCalled();
     expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPの発行回数が上限に達した場合はプロフィール検索前に429を返す", async () => {
+    mocks.consumeAdminPlaybackIpRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 120,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 90,
+    });
+    const playbackRequest = new Request(
+      "http://localhost/api/admin/audio/playback?profileId=profile-1",
+      {
+        headers: {
+          Authorization: "Bearer admin-token",
+          "CF-Connecting-IP": "203.0.113.10",
+        },
+      },
+    );
+
+    const response = await GET(playbackRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Retry-After")).toBe("90");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("120");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "この接続元からの管理者向け音声再生が集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeAdminPlaybackIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(mocks.findUnique).not.toHaveBeenCalled();
+    expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(mocks.consumeAdminPlaybackIpRateLimit).not.toHaveBeenCalled();
   });
 
   it("音声がなければ署名URLを発行しない", async () => {
