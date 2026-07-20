@@ -232,6 +232,39 @@ describe("/api/profile route", () => {
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
   });
 
+  it("プロフィールJSONが64KBを超える場合は413を返す", async () => {
+    const response = await POST(
+      postRequest({ userId: "testuser", bio: "a".repeat(64 * 1024) }),
+    );
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "プロフィールデータは64KB以下にしてください。",
+    });
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("不正なJSONの場合は400を返す", async () => {
+    const response = await POST(
+      new Request("http://localhost/api/profile", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...authHeader,
+        },
+        body: "{invalid",
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "JSONの形式が不正です。",
+    });
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("管理対応中のプロフィールはユーザー自身でも変更できない", async () => {
     mocks.profileFindUnique.mockResolvedValueOnce({
       id: "profile-1",

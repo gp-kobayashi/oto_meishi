@@ -3,6 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { sanitizeProfileData } from "@/lib/apiValidation";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
+import { readJsonBody } from "@/lib/requestJson";
+
+const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
 type ProfileRequestBody = Parameters<typeof sanitizeProfileData>[0];
 
@@ -128,9 +131,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const rawRequestBody = await request.json().catch(() => ({}));
+    const jsonBody = await readJsonBody(request, MAX_PROFILE_REQUEST_BODY_BYTES);
+    if (!jsonBody.ok) {
+      return NextResponse.json(
+        {
+          error:
+            jsonBody.error === "too_large"
+              ? "プロフィールデータは64KB以下にしてください。"
+              : "JSONの形式が不正です。",
+        },
+        { status: jsonBody.error === "too_large" ? 413 : 400 },
+      );
+    }
+
     const { data: profileInput, error: validationError } = sanitizeProfileData(
-      toProfileRequestBody(rawRequestBody),
+      toProfileRequestBody(jsonBody.value),
     );
 
     if (validationError || !profileInput) {
