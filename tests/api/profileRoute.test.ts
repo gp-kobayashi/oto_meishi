@@ -293,6 +293,7 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual(savedProfile);
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { userId: "testuser" },

@@ -243,7 +243,9 @@ export async function POST(request: Request) {
       });
     });
 
-    return NextResponse.json(savedProfile);
+    return NextResponse.json(savedProfile, {
+      headers: PRIVATE_NO_STORE_HEADERS,
+    });
   } catch (error) {
     console.error("Failed to save profile", error);
     return NextResponse.json(
