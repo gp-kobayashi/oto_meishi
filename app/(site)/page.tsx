@@ -48,8 +48,8 @@ export default function Home() {
             <Image
               src="/meishi_sample.png"
               alt="profile card preview"
-              width={386}
-              height={881}
+              width={546}
+              height={896}
             />
           </div>
         </div>
