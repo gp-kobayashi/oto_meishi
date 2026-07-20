@@ -184,11 +184,8 @@ export async function POST(request: Request) {
       });
       profileId = createdProfile.id;
     } else {
-      // 既存プロフィールの更新時：authIdの一致確認、または既存で設定されていない場合はここで紐付け
-      if (
-        existingProfile.authId &&
-        existingProfile.authId !== supabaseUser.id
-      ) {
+      // 未紐付けプロフィールをリクエストだけで取得できないよう、所有者の完全一致を必須にする
+      if (existingProfile.authId !== supabaseUser.id) {
         return NextResponse.json(
           { error: "別のユーザーのプロフィールを変更する権限がありません。" },
           { status: 403 },
@@ -225,7 +222,6 @@ export async function POST(request: Request) {
       await prisma.profile.update({
         where: { userId },
         data: {
-          authId: existingProfile.authId ? undefined : supabaseUser.id,
           displayName: displayName || userId,
           bio,
           audioUrl,

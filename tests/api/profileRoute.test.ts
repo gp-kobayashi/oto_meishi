@@ -264,7 +264,6 @@ describe("/api/profile route", () => {
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { userId: "testuser" },
       data: {
-        authId: undefined,
         displayName: "New",
         bio: "",
         audioUrl: "",
@@ -328,7 +327,7 @@ describe("/api/profile route", () => {
     expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/test/old.m4a");
   });
 
-  it("authId未設定の既存プロフィールを初回更新した時に認証ユーザーへ紐付ける", async () => {
+  it("authId未設定の既存プロフィールは更新も自動取得も拒否する", async () => {
     const legacyProfile = {
       id: "profile-legacy",
       userId: "legacy",
@@ -342,14 +341,6 @@ describe("/api/profile route", () => {
     };
 
     mocks.profileFindUnique.mockResolvedValueOnce(legacyProfile);
-    mocks.profileUpdate.mockResolvedValueOnce({
-      ...legacyProfile,
-      authId: "auth-user-1",
-    });
-    mocks.profileFindUnique.mockResolvedValueOnce({
-      ...legacyProfile,
-      authId: "auth-user-1",
-    });
 
     const response = await POST(
       postRequest({
@@ -358,12 +349,12 @@ describe("/api/profile route", () => {
       }),
     );
 
-    expect(response.status).toBe(200);
-    expect(mocks.profileUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ authId: "auth-user-1" }),
-      }),
-    );
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "別のユーザーのプロフィールを変更する権限がありません。",
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
   });
 
   it("同一認証ユーザーが別userIdで新規作成しようとした場合は拒否する", async () => {
