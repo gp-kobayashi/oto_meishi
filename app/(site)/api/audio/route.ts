@@ -39,28 +39,48 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true, audioUrl: "", audioTitle: "" });
   }
 
-  try {
-    const audioKey = profile.audioKey || extractKeyFromUrl(profile.audioUrl);
-    if (!audioKey) {
-      throw new Error("Audio object key is empty.");
-    }
-    await deleteFromR2(audioKey);
-  } catch (error) {
-    console.error("Failed to delete audio file from R2:", error);
+  const audioKey = profile.audioKey || extractKeyFromUrl(profile.audioUrl);
+  if (!audioKey) {
     return NextResponse.json(
-      { error: "音源ファイルの削除に失敗しました。" },
+      { error: "音源情報が不正なため削除できませんでした。" },
       { status: 500 },
     );
   }
 
-  const updatedProfile = await prisma.profile.update({
-    where: { authId: user.id },
-    data: { audioUrl: "", audioKey: "", audioTitle: "" },
-  });
+  let updateResult: { count: number };
+  try {
+    updateResult = await prisma.profile.updateMany({
+      where: {
+        authId: user.id,
+        audioUrl: profile.audioUrl,
+        audioKey: profile.audioKey,
+      },
+      data: { audioUrl: "", audioKey: "", audioTitle: "" },
+    });
+  } catch (error) {
+    console.error("Failed to clear profile audio:", error);
+    return NextResponse.json(
+      { error: "音源情報の更新に失敗しました。" },
+      { status: 500 },
+    );
+  }
+
+  if (updateResult.count !== 1) {
+    return NextResponse.json(
+      { error: "音源が更新されているため削除を中止しました。" },
+      { status: 409 },
+    );
+  }
+
+  try {
+    await deleteFromR2(audioKey);
+  } catch (error) {
+    console.error("Failed to delete unreferenced audio file from R2:", error);
+  }
 
   return NextResponse.json({
     success: true,
-    audioUrl: updatedProfile.audioUrl,
-    audioTitle: updatedProfile.audioTitle,
+    audioUrl: "",
+    audioTitle: "",
   });
 }
