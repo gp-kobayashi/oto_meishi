@@ -15,7 +15,11 @@ import {
 } from "@/lib/audioUploadPolicy";
 import { MAX_AUDIO_FILE_SIZE_BYTES } from "@/lib/audioUploadConstraints";
 import { tryAcquireAudioConversionSlot } from "@/lib/audioConversionGuard";
-import { consumeAudioUploadUserRateLimit } from "@/lib/audioUploadRateLimit";
+import {
+  consumeAudioUploadIpRateLimit,
+  consumeAudioUploadUserRateLimit,
+} from "@/lib/audioUploadRateLimit";
+import { getClientIp } from "@/lib/clientIp";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -88,6 +92,30 @@ export async function POST(request: NextRequest) {
           },
         },
       );
+    }
+
+    const clientIp = getClientIp(request.headers);
+    if (clientIp) {
+      const ipRateLimit = consumeAudioUploadIpRateLimit(clientIp);
+      if (!ipRateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              "この接続元からの音声アップロードが集中しています。しばらく待ってから再度お試しください。",
+          },
+          {
+            status: 429,
+            headers: {
+              "Retry-After": String(ipRateLimit.retryAfterSeconds),
+              "X-RateLimit-Limit": String(ipRateLimit.limit),
+              "X-RateLimit-Remaining": String(ipRateLimit.remaining),
+              "X-RateLimit-Reset": String(
+                Math.ceil(ipRateLimit.resetAt / 1000),
+              ),
+            },
+          },
+        );
+      }
     }
 
     const formData = await request.formData();

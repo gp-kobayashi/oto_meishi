@@ -14,6 +14,7 @@ const { mocks } = vi.hoisted(() => ({
     findUniqueProfile: vi.fn(),
     inspectAudioFile: vi.fn(),
     consumeAudioUploadUserRateLimit: vi.fn(),
+    consumeAudioUploadIpRateLimit: vi.fn(),
   },
 }));
 
@@ -59,6 +60,7 @@ vi.mock("@/lib/r2Storage", () => ({
 
 vi.mock("@/lib/audioUploadRateLimit", () => ({
   consumeAudioUploadUserRateLimit: mocks.consumeAudioUploadUserRateLimit,
+  consumeAudioUploadIpRateLimit: mocks.consumeAudioUploadIpRateLimit,
 }));
 
 import { POST } from "@/app/(site)/api/audio/upload/route";
@@ -149,6 +151,13 @@ describe("/api/audio/upload route", () => {
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
+    mocks.consumeAudioUploadIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 30,
+      remaining: 29,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
   });
 
   it("トークン無しの場合は401を返す", async () => {
@@ -215,6 +224,45 @@ describe("/api/audio/upload route", () => {
     });
     expect(formData).not.toHaveBeenCalled();
     expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPのアップロード回数が上限に達した場合は解析前に429を返す", async () => {
+    const formData = vi.fn();
+    mocks.consumeAudioUploadIpRateLimit.mockReturnValue({
+      allowed: false,
+      limit: 30,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 90,
+    });
+
+    const response = await POST({
+      headers: new Headers({
+        Authorization: "Bearer valid-token",
+        "CF-Connecting-IP": "203.0.113.10",
+      }),
+      formData,
+    } as unknown as Parameters<typeof POST>[0]);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("90");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("30");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "この接続元からの音声アップロードが集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeAudioUploadIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(formData).not.toHaveBeenCalled();
+    expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(200);
+    expect(mocks.consumeAudioUploadIpRateLimit).not.toHaveBeenCalled();
   });
 
   it("音声変換中の追加アップロードには429を返す", async () => {
