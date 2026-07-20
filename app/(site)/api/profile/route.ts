@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { sanitizeProfileData } from "@/lib/apiValidation";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
+import { consumeProfileSaveUserRateLimit } from "@/lib/profileSaveRateLimit";
 
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -128,6 +129,25 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Unauthorized: Token verification failed" },
         { status: 401 },
+      );
+    }
+
+    const rateLimit = consumeProfileSaveUserRateLimit(supabaseUser.id);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error:
+            "プロフィール保存の回数が上限に達しました。しばらく待ってから再度お試しください。",
+        },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(rateLimit.retryAfterSeconds),
+            "X-RateLimit-Limit": String(rateLimit.limit),
+            "X-RateLimit-Remaining": String(rateLimit.remaining),
+            "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetAt / 1000)),
+          },
+        },
       );
     }
 

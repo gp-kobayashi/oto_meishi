@@ -9,6 +9,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkDeleteMany: vi.fn(),
     socialLinkCreateMany: vi.fn(),
     transaction: vi.fn(),
+    consumeProfileSaveUserRateLimit: vi.fn(),
   },
 }));
 
@@ -33,6 +34,10 @@ vi.mock("@/lib/prisma", () => ({
       createMany: mocks.socialLinkCreateMany,
     },
   },
+}));
+
+vi.mock("@/lib/profileSaveRateLimit", () => ({
+  consumeProfileSaveUserRateLimit: mocks.consumeProfileSaveUserRateLimit,
 }));
 
 import { GET, POST } from "@/app/(site)/api/profile/route";
@@ -72,6 +77,13 @@ describe("/api/profile route", () => {
         },
       }),
     );
+    mocks.consumeProfileSaveUserRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 30,
+      remaining: 29,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
   });
 
   it("認証ユーザーに紐づく既存プロフィールを返す", async () => {
@@ -241,6 +253,34 @@ describe("/api/profile route", () => {
     await expect(response.json()).resolves.toEqual({
       error: "プロフィールデータは64KB以下にしてください。",
     });
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("ユーザーの保存回数が上限に達した場合は本文解析前に429を返す", async () => {
+    mocks.consumeProfileSaveUserRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 30,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 120,
+    });
+    const profileRequest = postRequest({
+      userId: "testuser",
+      displayName: "Test User",
+    });
+
+    const response = await POST(profileRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("30");
+    expect(response.headers.get("X-RateLimit-Remaining")).toBe("0");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "プロフィール保存の回数が上限に達しました。しばらく待ってから再度お試しください。",
+    });
+    expect(profileRequest.bodyUsed).toBe(false);
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
