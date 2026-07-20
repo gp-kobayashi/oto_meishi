@@ -1,0 +1,155 @@
+# Cloud Runデプロイ手順
+
+この手順では、Next.js・FFmpeg・ffprobeをGoogle Cloud Runで実行し、音声ファイルをCloudflare R2へ保存します。
+
+## 1. 前提
+
+- Google Cloudで請求先アカウントを設定済み
+- Google Cloud CLIをインストール済み
+- SupabaseとCloudflare R2を作成済み
+- リポジトリのルートでコマンドを実行する
+
+Google Cloudへログインし、対象プロジェクトを設定します。
+
+```powershell
+gcloud auth login
+gcloud config set project YOUR_PROJECT_ID
+```
+
+以降の`YOUR_PROJECT_ID`は実際のGoogle CloudプロジェクトIDへ置き換えてください。
+
+## 2. APIを有効化する
+
+```powershell
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
+```
+
+## 3. Artifact Registryを作成する
+
+東京リージョンにDockerリポジトリを作成します。
+
+```powershell
+gcloud artifacts repositories create oto-meishi --repository-format=docker --location=asia-northeast1 --description="oto_meishi container images"
+```
+
+すでに作成済みの場合、この操作は不要です。
+
+## 4. Cloud Run実行アカウントを作成する
+
+```powershell
+gcloud iam service-accounts create oto-meishi-runner --display-name="oto_meishi Cloud Run runtime"
+```
+
+実行アカウントはGoogle Cloud上の秘密値を読むためだけに使用します。R2やSupabaseの秘密値をDockerイメージへ直接設定しないでください。
+
+## 5. Secret Managerへ秘密値を登録する
+
+Google Cloud Consoleの「Secret Manager」で以下の5件を作成し、初期バージョンを`1`として値を登録します。
+
+| Secret名 | 設定する値 |
+| --- | --- |
+| `oto-meishi-database-url` | SupabaseのPostgreSQL接続URL |
+| `oto-meishi-supabase-service-role-key` | Supabaseのservice role key |
+| `oto-meishi-r2-account-id` | CloudflareアカウントID |
+| `oto-meishi-r2-access-key-id` | R2 APIトークンのAccess Key ID |
+| `oto-meishi-r2-secret-access-key` | R2 APIトークンのSecret Access Key |
+
+各Secretに対して、Cloud Run実行アカウントへ「Secret Managerのシークレットアクセサー」権限を付与します。
+
+```powershell
+$PROJECT_ID = gcloud config get-value project
+$RUNNER = "serviceAccount:oto-meishi-runner@$PROJECT_ID.iam.gserviceaccount.com"
+$SECRETS = @(
+  "oto-meishi-database-url",
+  "oto-meishi-supabase-service-role-key",
+  "oto-meishi-r2-account-id",
+  "oto-meishi-r2-access-key-id",
+  "oto-meishi-r2-secret-access-key"
+)
+
+foreach ($SECRET in $SECRETS) {
+  gcloud secrets add-iam-policy-binding $SECRET --member=$RUNNER --role="roles/secretmanager.secretAccessor"
+}
+```
+
+Secretを更新した場合は新しいバージョン番号を確認し、`cloudbuild.yaml`の参照番号も変更してください。
+
+## 6. Cloud Buildの権限を設定する
+
+Google Cloud Consoleの「Cloud Build > 設定」で、ビルドに使用されるサービスアカウントへ以下の権限を付与します。
+
+- Cloud Run管理者
+- Artifact Registry書き込み
+- ログ書き込み
+- Cloud Build編集者
+- `oto-meishi-runner`に対するサービスアカウントユーザー
+
+Google Cloudプロジェクトの作成時期によって、デフォルトのCloud Buildサービスアカウントが異なる場合があります。Consoleに表示される実際のビルドサービスアカウントへ付与してください。
+
+## 7. デプロイする
+
+以下の公開値を準備します。
+
+- `YOUR_SUPABASE_URL`: Supabase Project URL
+- `YOUR_SUPABASE_ANON_KEY`: Supabase anon key
+- `YOUR_R2_BUCKET`: 非公開R2バケット名
+
+これらはブラウザまたは構成上公開される値です。service role keyやR2 Secret Access Keyを`--substitutions`へ指定しないでください。
+
+```powershell
+gcloud builds submit --config=cloudbuild.yaml --substitutions="_NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL,_NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY,_R2_BUCKET=YOUR_R2_BUCKET"
+```
+
+この処理は次の順序で実行されます。
+
+1. Dockerイメージをビルド
+2. Artifact Registryへ保存
+3. Cloud Runへデプロイ
+
+Cloud Runには次の費用抑制設定が適用されます。
+
+- 最小インスタンス0
+- 最大インスタンス1
+- 1 vCPU
+- メモリ512MiB
+- 同時リクエスト8
+- リクエストタイムアウト120秒
+- リクエスト処理中のみCPUを割り当て
+
+## 8. デプロイ結果を確認する
+
+サービスURLを確認します。
+
+```powershell
+gcloud run services describe oto-meishi --region=asia-northeast1 --format="value(status.url)"
+```
+
+ブラウザでサービスURLを開き、次を確認してください。
+
+1. トップページが表示される
+2. Supabaseでログインできる
+3. プロフィールを保存できる
+4. 3分以内の音声をアップロードできる
+5. 公開プロフィールで音声を再生できる
+6. 管理者ページへ管理者だけがアクセスできる
+
+ログを確認する場合は次を実行します。
+
+```powershell
+gcloud run services logs read oto-meishi --region=asia-northeast1 --limit=100
+```
+
+## 9. SupabaseのリダイレクトURLを更新する
+
+Supabase DashboardのAuthentication URL Configurationで、Cloud RunのサービスURLを設定します。
+
+- Site URL: `https://YOUR_CLOUD_RUN_HOST`
+- Redirect URL: `https://YOUR_CLOUD_RUN_HOST/profile`
+
+Google・Facebook側のOAuth設定にも、Supabase Dashboardに表示されるコールバックURLを登録してください。
+
+## 10. 費用を確認する
+
+Cloud Runはアクセスがないとき0インスタンスまで縮小するため、最初のアクセスにはコールドスタートが発生します。
+
+Google Cloud Billingで予算アラートを作成し、Cloud Run、Cloud Build、Artifact Registry、Secret Managerの利用額を確認してください。予算アラートは課金を自動停止する機能ではありません。

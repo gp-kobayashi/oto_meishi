@@ -114,11 +114,10 @@ supabase db reset
 
 ## デプロイ
 
-Vercelを使用してデプロイするのが最も簡単です：
+本番環境はGoogle Cloud Run、音声ストレージはCloudflare R2を使用します。
 
-[Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) からデプロイできます。
-
-詳細は [Next.jsデプロイメントドキュメント](https://nextjs.org/docs/app/building-your-application/deploying) を参照してください。
+初期設定、Secret Manager、Cloud Build、デプロイ確認については
+[Cloud Runデプロイ手順](docs/cloud-run-deployment.md)を参照してください。
 
 ## 依存関係
 
