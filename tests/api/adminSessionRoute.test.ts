@@ -41,6 +41,7 @@ describe("GET /api/admin/session", () => {
     const response = await GET(request());
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(await response.json()).toEqual({
       admin: { id: "admin-1", authId: "auth-admin-1", role: "admin" },
     });
