@@ -357,6 +357,30 @@ describe("/api/profile route", () => {
     expect(mocks.consumeProfileSaveIpRateLimit).not.toHaveBeenCalled();
   });
 
+  it("JSON以外のContent-Typeは本文解析前に415を返す", async () => {
+    const profileRequest = new Request("http://localhost/api/profile", {
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain",
+        ...authHeader,
+      },
+      body: JSON.stringify({ userId: "testuser", displayName: "Test User" }),
+    });
+
+    const response = await POST(profileRequest);
+
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toEqual({
+      error: "Content-Typeはapplication/jsonを指定してください。",
+    });
+    expect(profileRequest.bodyUsed).toBe(false);
+    expect(mocks.consumeProfileSaveUserRateLimit).toHaveBeenCalledWith(
+      "auth-user-1",
+    );
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("不正なJSONの場合は400を返す", async () => {
     const response = await POST(
       new Request("http://localhost/api/profile", {

@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { sanitizeProfileData } from "@/lib/apiValidation";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
+import { hasJsonContentType } from "@/lib/requestContentType";
 import {
   consumeProfileSaveIpRateLimit,
   consumeProfileSaveUserRateLimit,
@@ -177,6 +178,13 @@ export async function POST(request: Request) {
           },
         );
       }
+    }
+
+    if (!hasJsonContentType(request)) {
+      return NextResponse.json(
+        { error: "Content-Typeはapplication/jsonを指定してください。" },
+        { status: 415 },
+      );
     }
 
     const jsonBody = await readJsonBody(request, MAX_PROFILE_REQUEST_BODY_BYTES);
