@@ -8,6 +8,7 @@ describe("securityHeaders", () => {
     )).toEqual({
       "Content-Security-Policy": contentSecurityPolicy,
       "X-Content-Type-Options": "nosniff",
+      "Strict-Transport-Security": "max-age=31536000",
       "X-Frame-Options": "DENY",
       "Referrer-Policy": "strict-origin-when-cross-origin",
       "Permissions-Policy":
