@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FiBell } from "react-icons/fi";
 import styles from "./NotificationBell.module.css";
 
@@ -30,8 +30,13 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [readError, setReadError] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const loadRequestIdRef = useRef(0);
 
   const loadNotifications = useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current;
     setLoading(true);
     setError("");
     try {
@@ -42,36 +47,107 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
       if (!response.ok) {
         throw new Error(result.error || "通知を取得できませんでした。");
       }
-      setNotifications(result.notifications ?? []);
-      setUnreadCount(result.unreadCount ?? 0);
+      if (requestId === loadRequestIdRef.current) {
+        setNotifications(result.notifications ?? []);
+        setUnreadCount(result.unreadCount ?? 0);
+      }
+      return result;
     } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "通知を取得できませんでした。",
-      );
+      if (requestId === loadRequestIdRef.current) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "通知を取得できませんでした。",
+        );
+      }
+      return null;
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestIdRef.current) setLoading(false);
     }
   }, [accessToken]);
+
+  const markNotificationsAsRead = useCallback(async () => {
+    setReadError("");
+    try {
+      const response = await fetch("/api/notifications/read", {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const result = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+      if (!response.ok) {
+        throw new Error(result.error || "通知を既読にできませんでした。");
+      }
+
+      const readAt = new Date().toISOString();
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.readAt ? notification : { ...notification, readAt },
+        ),
+      );
+      setUnreadCount(0);
+    } catch (markError) {
+      setReadError(
+        markError instanceof Error
+          ? markError.message
+          : "通知を既読にできませんでした。",
+      );
+    }
+  }, [accessToken]);
+
+  const refreshOpenedPanel = useCallback(async () => {
+    setReadError("");
+    const result = await loadNotifications();
+    if (result && (result.unreadCount ?? 0) > 0) {
+      await markNotificationsAsRead();
+    }
+  }, [loadNotifications, markNotificationsAsRead]);
+
+  const closePanel = useCallback(() => {
+    setIsOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void loadNotifications(), 0);
     return () => window.clearTimeout(timeoutId);
   }, [loadNotifications]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) closePanel();
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closePanel();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [closePanel, isOpen]);
+
   return (
-    <div className={styles.container}>
+    <div ref={containerRef} className={styles.container}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.trigger}
-        aria-label="通知を開く"
+        aria-label={isOpen ? "通知を閉じる" : "通知を開く"}
         aria-expanded={isOpen}
         aria-controls="notification-panel"
         onClick={() => {
-          const nextOpen = !isOpen;
-          setIsOpen(nextOpen);
-          if (nextOpen) void loadNotifications();
+          if (isOpen) {
+            closePanel();
+          } else {
+            setIsOpen(true);
+            void refreshOpenedPanel();
+          }
         }}
       >
         <FiBell aria-hidden="true" />
@@ -92,12 +168,15 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
             <h2 id="notification-heading">通知</h2>
             {unreadCount > 0 ? <span>未読 {unreadCount}件</span> : null}
           </div>
+          {readError ? (
+            <p className={styles.readError} role="status">{readError}</p>
+          ) : null}
           {loading ? (
             <p className={styles.message}>読み込み中...</p>
           ) : error ? (
             <div className={styles.error} role="alert">
               <p>{error}</p>
-              <button type="button" onClick={() => void loadNotifications()}>
+              <button type="button" onClick={() => void refreshOpenedPanel()}>
                 再読み込み
               </button>
             </div>
