@@ -34,6 +34,11 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const loadRequestIdRef = useRef(0);
+  const triggerLabel = isOpen
+    ? "通知を閉じる"
+    : error
+      ? "通知を開く（取得エラー）"
+      : "通知を開く";
 
   const loadNotifications = useCallback(async () => {
     const requestId = ++loadRequestIdRef.current;
@@ -138,7 +143,7 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
         ref={triggerRef}
         type="button"
         className={styles.trigger}
-        aria-label={isOpen ? "通知を閉じる" : "通知を開く"}
+        aria-label={triggerLabel}
         aria-expanded={isOpen}
         aria-controls="notification-panel"
         onClick={() => {
@@ -155,6 +160,9 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
           <span className={styles.badge} aria-label={`未読通知${unreadCount}件`}>
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
+        ) : null}
+        {error && !isOpen ? (
+          <span className={styles.errorBadge} aria-hidden="true">!</span>
         ) : null}
       </button>
 

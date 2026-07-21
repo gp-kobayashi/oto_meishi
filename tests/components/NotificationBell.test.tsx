@@ -61,6 +61,38 @@ describe("NotificationBell", () => {
     expect(await screen.findByText("通知はありません。")).toBeDefined();
   });
 
+  it("取得エラーをベルに表示し、パネルから再読み込みできる", async () => {
+    let requestCount = 0;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => {
+        requestCount += 1;
+        if (requestCount <= 2) {
+          return new Response(JSON.stringify({ error: "通知を取得できませんでした。" }), {
+            status: 500,
+          });
+        }
+        return new Response(JSON.stringify({ notifications: [], unreadCount: 0 }), {
+          status: 200,
+        });
+      },
+    );
+    render(<NotificationBell accessToken="access-token" />);
+
+    const errorTrigger = await screen.findByRole("button", {
+      name: "通知を開く（取得エラー）",
+    });
+    fireEvent.click(errorTrigger);
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "通知を取得できませんでした。",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "再読み込み" }));
+
+    expect(await screen.findByText("通知はありません。")).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("Escapeキーで閉じ、ベルへフォーカスを戻す", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(
       async () => new Response(JSON.stringify({ notifications: [], unreadCount: 0 }), {
