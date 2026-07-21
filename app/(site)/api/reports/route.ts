@@ -3,6 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
+import { getClientIp } from "@/lib/clientIp";
+import {
+  consumeReportIpRateLimit,
+  consumeReportTargetRateLimit,
+} from "@/lib/reportRateLimit";
 
 const MAX_REPORT_BODY_BYTES = 8 * 1024;
 const MAX_PROFILE_ID_LENGTH = 100;
@@ -33,6 +38,29 @@ function isReportReason(value: unknown): value is ReportReason {
 
 export async function POST(request: Request) {
   try {
+    const clientIp = getClientIp(request.headers);
+    if (clientIp) {
+      const rateLimit = consumeReportIpRateLimit(clientIp);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              "通報の送信回数が上限に達しました。しばらく待ってから再度お試しください。",
+          },
+          {
+            status: 429,
+            headers: {
+              ...PRIVATE_NO_STORE_HEADERS,
+              "Retry-After": String(rateLimit.retryAfterSeconds),
+              "X-RateLimit-Limit": String(rateLimit.limit),
+              "X-RateLimit-Remaining": String(rateLimit.remaining),
+              "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetAt / 1000)),
+            },
+          },
+        );
+      }
+    }
+
     if (!hasJsonContentType(request)) {
       return NextResponse.json(
         { error: "Content-Typeはapplication/jsonを指定してください。" },
@@ -82,6 +110,33 @@ export async function POST(request: Request) {
         { error: "通報の詳細は500文字までです。" },
         { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
       );
+    }
+
+    if (clientIp) {
+      const targetRateLimit = consumeReportTargetRateLimit(
+        clientIp,
+        profileId,
+      );
+      if (!targetRateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              "同じプロフィールへの通報が続いています。しばらく待ってから再度お試しください。",
+          },
+          {
+            status: 429,
+            headers: {
+              ...PRIVATE_NO_STORE_HEADERS,
+              "Retry-After": String(targetRateLimit.retryAfterSeconds),
+              "X-RateLimit-Limit": String(targetRateLimit.limit),
+              "X-RateLimit-Remaining": String(targetRateLimit.remaining),
+              "X-RateLimit-Reset": String(
+                Math.ceil(targetRateLimit.resetAt / 1000),
+              ),
+            },
+          },
+        );
+      }
     }
 
     const profile = await prisma.profile.findUnique({

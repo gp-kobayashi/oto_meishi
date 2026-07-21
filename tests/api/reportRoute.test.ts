@@ -4,6 +4,8 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     profileFindUnique: vi.fn(),
     contentReportCreate: vi.fn(),
+    consumeReportIpRateLimit: vi.fn(),
+    consumeReportTargetRateLimit: vi.fn(),
   },
 }));
 
@@ -12,6 +14,11 @@ vi.mock("@/lib/prisma", () => ({
     profile: { findUnique: mocks.profileFindUnique },
     contentReport: { create: mocks.contentReportCreate },
   },
+}));
+
+vi.mock("@/lib/reportRateLimit", () => ({
+  consumeReportIpRateLimit: mocks.consumeReportIpRateLimit,
+  consumeReportTargetRateLimit: mocks.consumeReportTargetRateLimit,
 }));
 
 import { POST } from "@/app/(site)/api/reports/route";
@@ -32,6 +39,20 @@ describe("POST /api/reports", () => {
       status: "active",
     });
     mocks.contentReportCreate.mockResolvedValue({ id: "report-1" });
+    mocks.consumeReportIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 10,
+      remaining: 9,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
+    mocks.consumeReportTargetRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 3,
+      remaining: 2,
+      resetAt: Date.now() + 60 * 60 * 1000,
+      retryAfterSeconds: 60 * 60,
+    });
   });
 
   it("公開中プロフィールへの通報を保存する", async () => {
@@ -71,6 +92,83 @@ describe("POST /api/reports", () => {
     expect(response.status).toBe(415);
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
     expect(mocks.contentReportCreate).not.toHaveBeenCalled();
+  });
+
+  it("IP全体の上限到達時は本文解析前に429を返す", async () => {
+    mocks.consumeReportIpRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 10,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 120,
+    });
+    const request = new Request("http://localhost/api/reports", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "CF-Connecting-IP": "203.0.113.10",
+      },
+      body: JSON.stringify({ profileId: "profile-1", reason: "other" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("10");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "通報の送信回数が上限に達しました。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeReportIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(request.bodyUsed).toBe(false);
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("同じIPとプロフィールの上限到達時はDB照会前に429を返す", async () => {
+    mocks.consumeReportTargetRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 3,
+      remaining: 0,
+      resetAt: 3_601_000,
+      retryAfterSeconds: 900,
+    });
+    const request = new Request("http://localhost/api/reports", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "CF-Connecting-IP": "203.0.113.10",
+      },
+      body: JSON.stringify({ profileId: "profile-1", reason: "harassment" }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("900");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("3");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "同じプロフィールへの通報が続いています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumeReportTargetRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+      "profile-1",
+    );
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+    expect(mocks.contentReportCreate).not.toHaveBeenCalled();
+  });
+
+  it("接続元IPを取得できない場合は回数制限をスキップする", async () => {
+    const response = await POST(
+      reportRequest({ profileId: "profile-1", reason: "other" }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.consumeReportIpRateLimit).not.toHaveBeenCalled();
+    expect(mocks.consumeReportTargetRateLimit).not.toHaveBeenCalled();
   });
 
   it("8KBを超える通報データを413で拒否する", async () => {
