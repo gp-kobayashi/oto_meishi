@@ -43,7 +43,7 @@ const UserIdPage = async ({
       <Link href="/" className={styles.logo}>
         <Image src="/logo-title.svg" alt="Logo" width={140} height={24} />
       </Link>
-      <Card link={publicProfile} />
+      <Card link={publicProfile} showReportMenu />
     </main>
   );
 };

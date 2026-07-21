@@ -5,8 +5,15 @@ import AudioPlayer from "./audioPlayer/AudioPlayer";
 import SocialLink from "../card/socialLink/SocialLink";
 import QRCode from "./QRCode/QRCode";
 import type { ProfileData } from "@/lib/mock/profileData";
+import ReportMenu from "./reportMenu/ReportMenu";
 
-const Card = ({ link }: { link: ProfileData }) => {
+const Card = ({
+  link,
+  showReportMenu = false,
+}: {
+  link: ProfileData;
+  showReportMenu?: boolean;
+}) => {
   const {
     userId,
     displayName,
@@ -23,6 +30,7 @@ const Card = ({ link }: { link: ProfileData }) => {
   return (
     <div className={`${styles.card} ${themeClass}`}>
       <Background theme={theme} />
+      {showReportMenu ? <ReportMenu /> : null}
       <h2 id="profile-title" className={styles.title}>
         {displayName}
       </h2>

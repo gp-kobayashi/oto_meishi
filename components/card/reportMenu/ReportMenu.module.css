@@ -1,0 +1,85 @@
+.container {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  z-index: 10;
+}
+
+.trigger {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--card-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.trigger:hover,
+.trigger[aria-expanded="true"] {
+  border-color: color-mix(in srgb, currentColor 16%, transparent);
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+}
+
+.trigger:focus-visible,
+.reportButton:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.dots {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.dots span {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 132px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--card-text-secondary) 18%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+  background: color-mix(in srgb, var(--card-bg) 92%, white 8%);
+  backdrop-filter: blur(18px);
+}
+
+.reportButton {
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #dc2626;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.reportButton:hover {
+  background: rgba(220, 38, 38, 0.1);
+}
+
+@media (max-width: 780px) {
+  .container {
+    top: 12px;
+    right: 12px;
+  }
+}
