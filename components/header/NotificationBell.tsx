@@ -31,6 +31,7 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [readError, setReadError] = useState("");
+  const [mobilePanelLeft, setMobilePanelLeft] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const loadRequestIdRef = useRef(0);
@@ -114,6 +115,24 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
     window.requestAnimationFrame(() => triggerRef.current?.focus());
   }, []);
 
+  const updatePanelPosition = useCallback(() => {
+    if (window.innerWidth > 720) {
+      setMobilePanelLeft(null);
+      return;
+    }
+
+    const containerRect = containerRef.current?.getBoundingClientRect();
+    if (!containerRect) return;
+
+    const sideMargin = 16;
+    const panelWidth = Math.min(380, window.innerWidth - sideMargin * 2);
+    const viewportLeft = Math.min(
+      Math.max(containerRect.right - panelWidth, sideMargin),
+      window.innerWidth - panelWidth - sideMargin,
+    );
+    setMobilePanelLeft(viewportLeft - containerRect.left);
+  }, []);
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void loadNotifications(), 0);
     return () => window.clearTimeout(timeoutId);
@@ -131,11 +150,13 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("resize", updatePanelPosition);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("resize", updatePanelPosition);
     };
-  }, [closePanel, isOpen]);
+  }, [closePanel, isOpen, updatePanelPosition]);
 
   return (
     <div ref={containerRef} className={styles.container}>
@@ -150,6 +171,7 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
           if (isOpen) {
             closePanel();
           } else {
+            updatePanelPosition();
             setIsOpen(true);
             void refreshOpenedPanel();
           }
@@ -170,6 +192,7 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
         <section
           id="notification-panel"
           className={styles.panel}
+          style={mobilePanelLeft === null ? undefined : { left: mobilePanelLeft }}
           aria-labelledby="notification-heading"
         >
           <div className={styles.heading}>

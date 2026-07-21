@@ -3,7 +3,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import NotificationBell from "@/components/header/NotificationBell";
 
 describe("NotificationBell", () => {
-  afterEach(() => vi.restoreAllMocks());
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 1024,
+    });
+  });
 
   it("未読件数を表示し、ベルを押すと通知一覧を開く", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(
@@ -123,5 +129,36 @@ describe("NotificationBell", () => {
     fireEvent.pointerDown(document.body);
 
     expect(screen.queryByRole("heading", { name: "通知" })).toBeNull();
+  });
+
+  it("狭い画面では通知パネルを画面内に収める", async () => {
+    Object.defineProperty(window, "innerWidth", {
+      configurable: true,
+      value: 320,
+    });
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
+      bottom: 100,
+      height: 38,
+      left: 250,
+      right: 288,
+      top: 62,
+      width: 38,
+      x: 250,
+      y: 62,
+      toJSON: () => ({}),
+    });
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response(JSON.stringify({ notifications: [], unreadCount: 0 }), {
+        status: 200,
+      }),
+    );
+    render(<NotificationBell accessToken="access-token" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "通知を開く" }));
+
+    const panel = (await screen.findByRole("heading", { name: "通知" })).closest(
+      "section",
+    );
+    await waitFor(() => expect(panel?.style.left).toBe("-234px"));
   });
 });
