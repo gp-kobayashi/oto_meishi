@@ -55,7 +55,10 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
   });
 
   it("管理者が通報状態を変更できる", async () => {
-    const response = await PATCH(request({ status: "reviewed" }), context());
+    const response = await PATCH(
+      request({ status: "reviewed", note: "内容を確認しました" }),
+      context(),
+    );
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -65,13 +68,17 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
         status: "reviewed",
         reviewedByAdminUserId: "admin-1",
         reviewedAt: expect.any(Date),
+        reviewNote: "内容を確認しました",
       },
       select: { id: true },
     });
   });
 
   it("許可されていない状態は拒否する", async () => {
-    const response = await PATCH(request({ status: "pending" }), context());
+    const response = await PATCH(
+      request({ status: "pending", note: "確認" }),
+      context(),
+    );
 
     expect(response.status).toBe(400);
     expect(mocks.update).not.toHaveBeenCalled();
@@ -83,9 +90,22 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
       response: Response.json({ error: "権限なし" }, { status: 403 }),
     });
 
-    const response = await PATCH(request({ status: "resolved" }), context());
+    const response = await PATCH(
+      request({ status: "resolved", note: "対応完了" }),
+      context(),
+    );
 
     expect(response.status).toBe(403);
     expect(mocks.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("対応メモが空の場合は拒否する", async () => {
+    const response = await PATCH(
+      request({ status: "reviewed", note: "" }),
+      context(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });

@@ -63,6 +63,7 @@ export type ModerationDetailResponse = {
         | "other";
       details: string;
       status: "pending" | "reviewed" | "resolved" | "dismissed";
+      reviewNote: string;
       reviewerIdentifier: string | null;
       reviewerRole: "moderator" | "admin" | null;
       reviewedAt: string | null;

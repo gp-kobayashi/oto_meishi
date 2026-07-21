@@ -386,6 +386,17 @@
   font-size: 12px;
 }
 
+.reportReviewNote {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
 .reportActions {
   display: flex;
   flex-wrap: wrap;

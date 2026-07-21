@@ -122,6 +122,7 @@ model ContentReport {
   reviewedByAdminUser   AdminUser?   @relation("ReportReviewer", fields: [reviewedByAdminUserId], references: [id], onDelete: SetNull)
   reviewedByAdminUserId String?      @db.Uuid
   reviewedAt            DateTime?
+  reviewNote            String       @default("") @db.VarChar(500)
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt
 

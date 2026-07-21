@@ -51,6 +51,7 @@ describe("AdminModerationDetail", () => {
                 reason: "unsafe_link",
                 details: "外部サイトへ誘導されます",
                 status: "pending",
+                reviewNote: "リンク先を確認しました",
                 reviewerIdentifier: "auth-adm",
                 reviewerRole: "admin",
                 reviewedAt: "2026-07-17T03:00:00.000Z",
@@ -96,8 +97,17 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("外部サイトへ誘導されます")).toBeDefined();
     expect(screen.getByText("未確認")).toBeDefined();
     expect(screen.getByText(/最終変更:.*admin.*auth-adm/)).toBeDefined();
+    expect(screen.getByText(/対応メモ: リンク先を確認しました/)).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "確認済みにする" }));
+    const reportSubmitButton = screen.getByRole("button", {
+      name: "メモを記録して変更",
+    }) as HTMLButtonElement;
+    expect(reportSubmitButton.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("対応メモ（必須）"), {
+      target: { value: "内容を確認しました" },
+    });
+    fireEvent.click(reportSubmitButton);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith("/api/admin/reports/report-1", {
         method: "PATCH",
@@ -105,7 +115,10 @@ describe("AdminModerationDetail", () => {
           "Content-Type": "application/json",
           Authorization: "Bearer admin-token",
         },
-        body: JSON.stringify({ status: "reviewed" }),
+        body: JSON.stringify({
+          status: "reviewed",
+          note: "内容を確認しました",
+        }),
       });
     });
 

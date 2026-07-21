@@ -13,7 +13,7 @@ const MAX_REPORT_STATUS_BODY_BYTES = 4 * 1024;
 const reportStatuses = ["reviewed", "resolved", "dismissed"] as const;
 
 type ReportStatus = (typeof reportStatuses)[number];
-type ReportStatusRequest = { status?: unknown };
+type ReportStatusRequest = { status?: unknown; note?: unknown };
 
 const isReportStatus = (value: unknown): value is ReportStatus =>
   typeof value === "string" && reportStatuses.includes(value as ReportStatus);
@@ -82,6 +82,13 @@ export async function PATCH(
         { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
       );
     }
+    const note = typeof body.note === "string" ? body.note.trim() : "";
+    if (!note || note.length > 500) {
+      return Response.json(
+        { error: "対応メモは1文字以上500文字以内で入力してください。" },
+        { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
 
     const { reportId } = await params;
     if (!reportId) {
@@ -114,6 +121,7 @@ export async function PATCH(
         status: body.status,
         reviewedByAdminUserId: authorization.admin.id,
         reviewedAt: new Date(),
+        reviewNote: note,
       },
       select: { id: true },
     });

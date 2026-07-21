@@ -74,6 +74,12 @@ type PendingAction = {
   actionLabel: string;
 };
 
+type PendingReportAction = {
+  reportId: string;
+  status: "reviewed" | "resolved" | "dismissed";
+  statusLabel: string;
+};
+
 export default function AdminModerationDetail({ profileId }: { profileId: string }) {
   const [data, setData] = useState<ModerationDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,6 +91,9 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   const [submitting, setSubmitting] = useState(false);
   const [updatingReportId, setUpdatingReportId] = useState("");
   const [reportError, setReportError] = useState("");
+  const [pendingReportAction, setPendingReportAction] =
+    useState<PendingReportAction | null>(null);
+  const [reportNote, setReportNote] = useState("");
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -186,6 +195,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   const updateReportStatus = async (
     reportId: string,
     status: "reviewed" | "resolved" | "dismissed",
+    note: string,
   ) => {
     if (updatingReportId) return;
 
@@ -207,7 +217,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ status }),
+          body: JSON.stringify({ status, note }),
         },
       );
       const result = await response.json().catch(() => ({}));
@@ -216,6 +226,8 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
       }
 
       await loadDetail();
+      setPendingReportAction(null);
+      setReportNote("");
       setActionMessage(`通報を「${reportStatusLabels[status]}」に変更しました。`);
     } catch (updateError) {
       setReportError(
@@ -464,6 +476,11 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                           最終変更: {formatDate(report.reviewedAt)} / {report.reviewerRole} / {report.reviewerIdentifier}
                         </p>
                       ) : null}
+                      {report.reviewNote ? (
+                        <p className={styles.reportReviewNote}>
+                          対応メモ: {report.reviewNote}
+                        </p>
+                      ) : null}
                       {report.status === "pending" || report.status === "reviewed" ? (
                         <div className={styles.reportActions}>
                           {report.status === "pending" ? (
@@ -471,7 +488,11 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                               type="button"
                               disabled={Boolean(updatingReportId)}
                               onClick={() =>
-                                void updateReportStatus(report.id, "reviewed")
+                                setPendingReportAction({
+                                  reportId: report.id,
+                                  status: "reviewed",
+                                  statusLabel: "確認済み",
+                                })
                               }
                             >
                               確認済みにする
@@ -481,7 +502,11 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                             type="button"
                             disabled={Boolean(updatingReportId)}
                             onClick={() =>
-                              void updateReportStatus(report.id, "resolved")
+                              setPendingReportAction({
+                                reportId: report.id,
+                                status: "resolved",
+                                statusLabel: "対応済み",
+                              })
                             }
                           >
                             対応済みにする
@@ -490,7 +515,11 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                             type="button"
                             disabled={Boolean(updatingReportId)}
                             onClick={() =>
-                              void updateReportStatus(report.id, "dismissed")
+                              setPendingReportAction({
+                                reportId: report.id,
+                                status: "dismissed",
+                                statusLabel: "対応不要",
+                              })
                             }
                           >
                             対応不要にする
@@ -592,6 +621,71 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                         disabled={!reason.trim() || submitting}
                       >
                         {submitting ? "変更中..." : "理由を記録して実行"}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+            ) : null}
+            {pendingReportAction ? (
+              <div className={styles.modalBackdrop}>
+                <section
+                  className={styles.actionDialog}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="report-action-dialog-title"
+                >
+                  <p className={styles.dialogEyebrow}>通報状態の変更</p>
+                  <h2 id="report-action-dialog-title">
+                    通報を「{pendingReportAction.statusLabel}」にします
+                  </h2>
+                  <p>判断理由を対応メモとして記録します。</p>
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (!reportNote.trim()) return;
+                      void updateReportStatus(
+                        pendingReportAction.reportId,
+                        pendingReportAction.status,
+                        reportNote.trim(),
+                      );
+                    }}
+                  >
+                    <label htmlFor="report-review-note">対応メモ（必須）</label>
+                    <textarea
+                      id="report-review-note"
+                      value={reportNote}
+                      maxLength={500}
+                      rows={5}
+                      autoFocus
+                      onChange={(event) => setReportNote(event.target.value)}
+                    />
+                    <p className={styles.characterCount}>
+                      {reportNote.length} / 500
+                    </p>
+                    {reportError ? (
+                      <p className={styles.actionError} role="alert">
+                        {reportError}
+                      </p>
+                    ) : null}
+                    <div className={styles.dialogActions}>
+                      <button
+                        type="button"
+                        disabled={Boolean(updatingReportId)}
+                        onClick={() => {
+                          setPendingReportAction(null);
+                          setReportNote("");
+                          setReportError("");
+                        }}
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        type="submit"
+                        className={styles.confirmButton}
+                        disabled={!reportNote.trim() || Boolean(updatingReportId)}
+                      >
+                        {updatingReportId ? "変更中..." : "メモを記録して変更"}
                       </button>
                     </div>
                   </form>

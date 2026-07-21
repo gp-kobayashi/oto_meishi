@@ -49,6 +49,7 @@ export async function GET(
             reason: true,
             details: true,
             status: true,
+            reviewNote: true,
             reviewedAt: true,
             reviewedByAdminUser: {
               select: { authId: true, role: true },
@@ -104,6 +105,7 @@ export async function GET(
             reason: report.reason,
             details: report.details,
             status: report.status,
+            reviewNote: report.reviewNote,
             reviewerIdentifier:
               report.reviewedByAdminUser?.authId.slice(0, 8) ?? null,
             reviewerRole: report.reviewedByAdminUser?.role ?? null,
