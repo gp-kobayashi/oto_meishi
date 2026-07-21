@@ -8,6 +8,7 @@ import {
   consumeAdminActionRateLimit,
 } from "@/lib/adminActionRateLimit";
 import { getClientIp } from "@/lib/clientIp";
+import { getModerationNotification } from "@/lib/moderationNotification";
 
 const MAX_MODERATION_ACTION_BODY_BYTES = 16 * 1024;
 
@@ -186,7 +187,7 @@ export async function PATCH(request: Request) {
         });
       }
 
-      await tx.moderationAction.create({
+      const moderationAction = await tx.moderationAction.create({
         data: {
           adminUserId: authorization.admin.id,
           profileId,
@@ -196,6 +197,16 @@ export async function PATCH(request: Request) {
           previousStatus,
           newStatus: nextStatus,
           reason,
+        },
+        select: { id: true },
+      });
+      const notification = getModerationNotification(targetType, action);
+      await tx.userNotification.create({
+        data: {
+          profileId,
+          moderationActionId: moderationAction.id,
+          title: notification.title,
+          message: notification.message,
         },
       });
 

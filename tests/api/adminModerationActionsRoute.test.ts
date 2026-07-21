@@ -9,6 +9,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkFindUnique: vi.fn(),
     socialLinkUpdate: vi.fn(),
     actionCreate: vi.fn(),
+    notificationCreate: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
   },
@@ -36,6 +37,7 @@ const tx = {
     update: mocks.socialLinkUpdate,
   },
   moderationAction: { create: mocks.actionCreate },
+  userNotification: { create: mocks.notificationCreate },
 };
 
 const request = (body: unknown) =>
@@ -55,7 +57,8 @@ describe("PATCH /api/admin/moderation/actions", () => {
     mocks.transaction.mockImplementation((callback) => callback(tx));
     mocks.profileFindUnique.mockResolvedValue({ id: "profile-1", status: "active" });
     mocks.profileUpdate.mockResolvedValue({});
-    mocks.actionCreate.mockResolvedValue({});
+    mocks.actionCreate.mockResolvedValue({ id: "action-1" });
+    mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
     mocks.consumeAdminActionRateLimit.mockReturnValue({
       allowed: true,
       limit: 60,
@@ -95,6 +98,16 @@ describe("PATCH /api/admin/moderation/actions", () => {
         newStatus: "hidden",
         reason: "不適切な内容のため",
       }),
+      select: { id: true },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledWith({
+      data: {
+        profileId: "profile-1",
+        moderationActionId: "action-1",
+        title: "プロフィールの公開状態について",
+        message:
+          "規約違反が確認されたため、プロフィールを非公開にしました。",
+      },
     });
   });
 
@@ -267,5 +280,6 @@ describe("PATCH /api/admin/moderation/actions", () => {
 
     expect(response.status).toBe(409);
     expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 });
