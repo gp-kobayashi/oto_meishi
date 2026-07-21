@@ -45,6 +45,16 @@ describe("AdminModerationDetail", () => {
                 status: "hidden",
               },
             ],
+            reports: [
+              {
+                id: "report-1",
+                reason: "unsafe_link",
+                details: "外部サイトへ誘導されます",
+                status: "pending",
+                createdAt: "2026-07-17T02:00:00.000Z",
+                updatedAt: "2026-07-17T02:00:00.000Z",
+              },
+            ],
             history: [
               {
                 id: "action-1",
@@ -73,6 +83,10 @@ describe("AdminModerationDetail", () => {
       .toBe("https://youtube.com/example");
     expect(screen.getByRole("heading", { name: "管理操作履歴" })).toBeDefined();
     expect(screen.getByText("危険なリンクのため")).toBeDefined();
+    expect(screen.getByRole("heading", { name: "通報" })).toBeDefined();
+    expect(screen.getByText("危険または不正なリンク")).toBeDefined();
+    expect(screen.getByText("外部サイトへ誘導されます")).toBeDefined();
+    expect(screen.getByText("未確認")).toBeDefined();
 
     fireEvent.click(
       screen.getByRole("button", { name: "プロフィールを非公開" }),

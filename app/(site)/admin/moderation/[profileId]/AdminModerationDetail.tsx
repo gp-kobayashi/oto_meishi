@@ -37,6 +37,21 @@ const actionLabels = {
   remove: "削除",
 };
 
+const reportReasonLabels = {
+  inappropriate_audio: "不適切な音声",
+  harassment: "誹謗中傷・嫌がらせ",
+  unsafe_link: "危険または不正なリンク",
+  impersonation: "なりすまし",
+  other: "その他",
+};
+
+const reportStatusLabels = {
+  pending: "未確認",
+  reviewed: "確認済み",
+  resolved: "対応済み",
+  dismissed: "対応不要",
+};
+
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "medium",
@@ -372,6 +387,40 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
               ) : (
                 <p>リンクは登録されていません。</p>
               )}
+            </section>
+
+            <section className={styles.panel} aria-labelledby="reports-heading">
+              <div className={styles.sectionHeading}>
+                <h2 id="reports-heading">通報</h2>
+                <span>最新{data.profile.reports.length}件</span>
+              </div>
+              {data.profile.reports.length ? (
+                <ol className={styles.reportList}>
+                  {data.profile.reports.map((report) => (
+                    <li key={report.id}>
+                      <div className={styles.reportHeader}>
+                        <strong>{reportReasonLabels[report.reason]}</strong>
+                        <span
+                          className={`${styles.reportStatus} ${styles[report.status]}`}
+                        >
+                          {reportStatusLabels[report.status]}
+                        </span>
+                      </div>
+                      <p className={styles.reportDetails}>
+                        {report.details || "詳細は入力されていません。"}
+                      </p>
+                      <time dateTime={report.createdAt}>
+                        受付日時: {formatDate(report.createdAt)}
+                      </time>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className={styles.emptyHistory}>通報はありません。</p>
+              )}
+              {data.profile.reports.length === 50 ? (
+                <p className={styles.historyNote}>最新50件を表示しています。</p>
+              ) : null}
             </section>
 
             <section className={styles.panel} aria-labelledby="history-heading">

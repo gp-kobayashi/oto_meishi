@@ -41,6 +41,18 @@ export async function GET(
             status: true,
           },
         },
+        reports: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 50,
+          select: {
+            id: true,
+            reason: true,
+            details: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
       },
     });
 
@@ -83,6 +95,11 @@ export async function GET(
           createdAt: profile.createdAt.toISOString(),
           updatedAt: profile.updatedAt.toISOString(),
           links: profile.sns,
+          reports: profile.reports.map((report) => ({
+            ...report,
+            createdAt: report.createdAt.toISOString(),
+            updatedAt: report.updatedAt.toISOString(),
+          })),
           history: history.map((entry) => ({
             id: entry.id,
             targetType: entry.targetType,

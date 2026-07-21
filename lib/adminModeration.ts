@@ -53,6 +53,19 @@ export type ModerationDetailResponse = {
       sortOrder: number;
       status: "active" | "hidden";
     }[];
+    reports: {
+      id: string;
+      reason:
+        | "inappropriate_audio"
+        | "harassment"
+        | "unsafe_link"
+        | "impersonation"
+        | "other";
+      details: string;
+      status: "pending" | "reviewed" | "resolved" | "dismissed";
+      createdAt: string;
+      updatedAt: string;
+    }[];
     history: {
       id: string;
       targetType: "profile" | "audio" | "socialLink";

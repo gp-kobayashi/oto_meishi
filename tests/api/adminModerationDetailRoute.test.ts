@@ -60,6 +60,16 @@ describe("GET /api/admin/moderation/[profileId]", () => {
           status: "hidden",
         },
       ],
+      reports: [
+        {
+          id: "report-1",
+          reason: "unsafe_link",
+          details: "外部サイトへ誘導される",
+          status: "pending",
+          createdAt: new Date("2026-07-17T02:00:00.000Z"),
+          updatedAt: new Date("2026-07-17T02:00:00.000Z"),
+        },
+      ],
     });
     mocks.historyFindMany.mockResolvedValue([
       {
@@ -88,6 +98,14 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       hasAudio: true,
       createdAt: "2026-07-16T00:00:00.000Z",
       links: [{ id: "link-1", status: "hidden" }],
+      reports: [
+        {
+          id: "report-1",
+          reason: "unsafe_link",
+          status: "pending",
+          createdAt: "2026-07-17T02:00:00.000Z",
+        },
+      ],
       history: [
         {
           id: "action-1",
