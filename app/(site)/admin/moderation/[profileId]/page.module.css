@@ -380,6 +380,32 @@
   font-size: 12px;
 }
 
+.reportActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #fecaca;
+}
+
+.reportActions button {
+  padding: 7px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reportActions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .historyList li {
   padding: 16px;
   border-left: 4px solid #94a3b8;

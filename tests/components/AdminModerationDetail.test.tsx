@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mocks } = vi.hoisted(() => ({
@@ -20,7 +20,7 @@ describe("AdminModerationDetail", () => {
   });
 
   it("音声とリンクの詳細を表示する", async () => {
-    vi.spyOn(global, "fetch").mockResolvedValue(
+    const detailResponse = () =>
       new Response(
         JSON.stringify({
           profile: {
@@ -72,7 +72,12 @@ describe("AdminModerationDetail", () => {
           },
         }),
         { status: 200 },
-      ),
+      );
+    const fetchMock = vi.spyOn(global, "fetch").mockImplementation(
+      async (_input, init) =>
+        init?.method === "PATCH"
+          ? new Response(JSON.stringify({ success: true }), { status: 200 })
+          : detailResponse(),
     );
 
     render(<AdminModerationDetail profileId="profile-1" />);
@@ -87,6 +92,18 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("危険または不正なリンク")).toBeDefined();
     expect(screen.getByText("外部サイトへ誘導されます")).toBeDefined();
     expect(screen.getByText("未確認")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "確認済みにする" }));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/admin/reports/report-1", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer admin-token",
+        },
+        body: JSON.stringify({ status: "reviewed" }),
+      });
+    });
 
     fireEvent.click(
       screen.getByRole("button", { name: "プロフィールを非公開" }),

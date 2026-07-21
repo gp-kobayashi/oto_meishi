@@ -83,6 +83,8 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [updatingReportId, setUpdatingReportId] = useState("");
+  const [reportError, setReportError] = useState("");
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -178,6 +180,51 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const updateReportStatus = async (
+    reportId: string,
+    status: "reviewed" | "resolved" | "dismissed",
+  ) => {
+    if (updatingReportId) return;
+
+    setUpdatingReportId(reportId);
+    setReportError("");
+    setActionMessage("");
+    try {
+      if (!supabase) throw new Error("認証クライアントが初期化されていません。");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("管理者アカウントでログインしてください。");
+
+      const response = await fetch(
+        `/api/admin/reports/${encodeURIComponent(reportId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ status }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "通報状態を変更できませんでした。");
+      }
+
+      await loadDetail();
+      setActionMessage(`通報を「${reportStatusLabels[status]}」に変更しました。`);
+    } catch (updateError) {
+      setReportError(
+        updateError instanceof Error
+          ? updateError.message
+          : "通報状態を変更できませんでした。",
+      );
+    } finally {
+      setUpdatingReportId("");
     }
   };
 
@@ -412,6 +459,39 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                       <time dateTime={report.createdAt}>
                         受付日時: {formatDate(report.createdAt)}
                       </time>
+                      {report.status === "pending" || report.status === "reviewed" ? (
+                        <div className={styles.reportActions}>
+                          {report.status === "pending" ? (
+                            <button
+                              type="button"
+                              disabled={Boolean(updatingReportId)}
+                              onClick={() =>
+                                void updateReportStatus(report.id, "reviewed")
+                              }
+                            >
+                              確認済みにする
+                            </button>
+                          ) : null}
+                          <button
+                            type="button"
+                            disabled={Boolean(updatingReportId)}
+                            onClick={() =>
+                              void updateReportStatus(report.id, "resolved")
+                            }
+                          >
+                            対応済みにする
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(updatingReportId)}
+                            onClick={() =>
+                              void updateReportStatus(report.id, "dismissed")
+                            }
+                          >
+                            対応不要にする
+                          </button>
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ol>
@@ -420,6 +500,11 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
               )}
               {data.profile.reports.length === 50 ? (
                 <p className={styles.historyNote}>最新50件を表示しています。</p>
+              ) : null}
+              {reportError ? (
+                <p className={styles.actionError} role="alert">
+                  {reportError}
+                </p>
               ) : null}
             </section>
 
