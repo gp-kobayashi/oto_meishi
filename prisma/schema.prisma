@@ -106,6 +106,7 @@ model ModerationAction {
   newStatus      String               @db.VarChar(32)
   reason         String               @db.VarChar(500)
   createdAt      DateTime             @default(now())
+  notification   UserNotification?
 
   @@index([profileId, createdAt])
   @@index([targetType, targetId, createdAt])
@@ -132,24 +133,39 @@ model ContentReport {
 }
 
 model Profile {
-  id          String                @id @default(uuid())
-  userId      String                @unique
-  authId      String?               @unique
-  status      ProfileStatus         @default(active)
-  theme       Theme                 @default(normal)
-  displayName String
-  bio         String
-  audioUrl    String
-  audioKey    String                @default("")
-  audioTitle  String
-  audioStatus AudioModerationStatus @default(active)
-  sns         SocialLink[]
-  reports     ContentReport[]
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  id            String                @id @default(uuid())
+  userId        String                @unique
+  authId        String?               @unique
+  status        ProfileStatus         @default(active)
+  theme         Theme                 @default(normal)
+  displayName   String
+  bio           String
+  audioUrl      String
+  audioKey      String                @default("")
+  audioTitle    String
+  audioStatus   AudioModerationStatus @default(active)
+  sns           SocialLink[]
+  reports       ContentReport[]
+  notifications UserNotification[]
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 
   @@index([status])
   @@index([audioStatus])
+}
+
+model UserNotification {
+  id                 String           @id @default(uuid()) @db.Uuid
+  profile            Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId          String
+  moderationAction   ModerationAction @relation(fields: [moderationActionId], references: [id], onDelete: Cascade)
+  moderationActionId String           @unique @db.Uuid
+  title              String           @db.VarChar(100)
+  message            String           @db.VarChar(300)
+  readAt             DateTime?
+  createdAt          DateTime         @default(now())
+
+  @@index([profileId, readAt, createdAt(sort: Desc)])
 }
 
 model SocialLink {
