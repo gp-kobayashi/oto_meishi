@@ -11,6 +11,7 @@ const { mocks } = vi.hoisted(() => ({
     transaction: vi.fn(),
     consumeProfileSaveUserRateLimit: vi.fn(),
     consumeProfileSaveIpRateLimit: vi.fn(),
+    consumePublicProfileReadIpRateLimit: vi.fn(),
   },
 }));
 
@@ -40,6 +41,11 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/profileSaveRateLimit", () => ({
   consumeProfileSaveUserRateLimit: mocks.consumeProfileSaveUserRateLimit,
   consumeProfileSaveIpRateLimit: mocks.consumeProfileSaveIpRateLimit,
+}));
+
+vi.mock("@/lib/profileReadRateLimit", () => ({
+  consumePublicProfileReadIpRateLimit:
+    mocks.consumePublicProfileReadIpRateLimit,
 }));
 
 import { GET, POST } from "@/app/(site)/api/profile/route";
@@ -90,6 +96,13 @@ describe("/api/profile route", () => {
       allowed: true,
       limit: 100,
       remaining: 99,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
+    mocks.consumePublicProfileReadIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 300,
+      remaining: 299,
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
@@ -234,6 +247,35 @@ describe("/api/profile route", () => {
     expect(profile.authId).toBeUndefined();
     expect(profile.hasAudio).toBe(true);
     expect(profile.audioTitle).toBe("自己紹介");
+  });
+
+  it("公開取得がIP上限に達した場合はDB照会前に429を返す", async () => {
+    mocks.consumePublicProfileReadIpRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 300,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 90,
+    });
+    const profileRequest = new Request(
+      "http://localhost/api/profile?userId=testuser",
+      { headers: { "CF-Connecting-IP": "203.0.113.10" } },
+    );
+
+    const response = await GET(profileRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Retry-After")).toBe("90");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("300");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "プロフィールの閲覧が集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumePublicProfileReadIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
   });
 
   it("ルート実体で文字数制限エラーを返し、DBを書き換えない", async () => {

@@ -10,6 +10,7 @@ import {
   consumeProfileSaveUserRateLimit,
 } from "@/lib/profileSaveRateLimit";
 import { getClientIp } from "@/lib/clientIp";
+import { consumePublicProfileReadIpRateLimit } from "@/lib/profileReadRateLimit";
 
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -69,6 +70,29 @@ export async function GET(request: Request) {
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
+    }
+
+    const clientIp = getClientIp(request.headers);
+    if (clientIp) {
+      const rateLimit = consumePublicProfileReadIpRateLimit(clientIp);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              "プロフィールの閲覧が集中しています。しばらく待ってから再度お試しください。",
+          },
+          {
+            status: 429,
+            headers: {
+              ...PRIVATE_NO_STORE_HEADERS,
+              "Retry-After": String(rateLimit.retryAfterSeconds),
+              "X-RateLimit-Limit": String(rateLimit.limit),
+              "X-RateLimit-Remaining": String(rateLimit.remaining),
+              "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetAt / 1000)),
+            },
+          },
+        );
+      }
     }
 
     const profile = await prisma.profile.findUnique({
