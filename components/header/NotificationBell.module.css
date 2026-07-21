@@ -1,0 +1,24 @@
+.container { position: relative; flex: 0 0 auto; }
+.trigger { position: relative; display: inline-flex; width: 38px; height: 38px; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 50%; background: transparent; color: #334155; cursor: pointer; font-size: 20px; }
+.trigger:hover { background: rgba(22, 119, 194, 0.1); color: #135f9e; }
+.trigger:focus-visible { outline: 3px solid rgba(22, 119, 194, 0.28); outline-offset: 2px; }
+.badge { position: absolute; top: -2px; right: -4px; display: inline-flex; min-width: 18px; height: 18px; align-items: center; justify-content: center; padding: 0 5px; border: 2px solid #fff; border-radius: 999px; background: #dc2626; color: #fff; font-size: 10px; font-weight: 800; line-height: 1; }
+.panel { position: absolute; z-index: 20; top: calc(100% + 10px); right: 0; width: min(380px, calc(100vw - 32px)); max-height: min(520px, calc(100dvh - 100px)); overflow: hidden; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 20px 55px rgba(15, 23, 42, 0.2); background: #fff; color: #1e293b; text-align: left; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border-bottom: 1px solid #e2e8f0; }
+.heading h2 { margin: 0; font-size: 17px; }
+.heading span { color: #dc2626; font-size: 12px; font-weight: 700; }
+.list { max-height: 440px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.list li { padding: 16px 18px; border-bottom: 1px solid #eef2f6; }
+.list li:last-child { border-bottom: 0; }
+.unread { background: #eff6ff; }
+.read { background: #fff; }
+.itemHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.itemHeading h3, .list p, .error p { margin: 0; }
+.itemHeading h3 { font-size: 14px; line-height: 1.5; }
+.itemHeading span { flex: 0 0 auto; padding: 3px 6px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-size: 10px; font-weight: 800; }
+.list p { margin-top: 7px; color: #475569; font-size: 13px; line-height: 1.65; }
+.list time { display: block; margin-top: 8px; color: #94a3b8; font-size: 11px; }
+.message, .error { margin: 0; padding: 36px 18px; color: #64748b; font-size: 13px; text-align: center; }
+.error { color: #b91c1c; }
+.error button { margin-top: 12px; padding: 7px 11px; border: 0; border-radius: 8px; background: #e2e8f0; cursor: pointer; font: inherit; font-weight: 700; }
+@media (max-width: 720px) { .panel { right: auto; left: 0; } }

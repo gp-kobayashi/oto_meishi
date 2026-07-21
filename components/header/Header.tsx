@@ -5,28 +5,30 @@ import Image from "next/image";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./Header.module.css";
+import NotificationBell from "./NotificationBell";
 
 const Header = () => {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [accessToken, setAccessToken] = useState("");
+  const isLoggedIn = Boolean(accessToken);
 
   useEffect(() => {
     const updateSessionState = async () => {
       if (!supabase) {
-        setIsLoggedIn(false);
+        setAccessToken("");
         return;
       }
 
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      setIsLoggedIn(Boolean(session));
+      setAccessToken(session?.access_token ?? "");
     };
 
     updateSessionState();
 
     const { data: authListener } = supabase?.auth.onAuthStateChange(
       (_event, session) => {
-        setIsLoggedIn(Boolean(session));
+        setAccessToken(session?.access_token ?? "");
       },
     ) ?? { data: null };
 
@@ -54,6 +56,7 @@ const Header = () => {
         )}
         <Link href="/help">ヘルプ</Link>
         <Link href="/terms">利用規約</Link>
+        {isLoggedIn ? <NotificationBell accessToken={accessToken} /> : null}
       </nav>
     </header>
   );
