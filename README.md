@@ -1,128 +1,265 @@
-# 音声付き名刺アプリ（oto_meishi）
+# oto_meishi
 
-音声ファイルを添付できるデジタル名刺アプリです。プロフィール情報、SNSリンク、音声ファイルを管理・共有できます。
+音声を添えたデジタル名刺を作成・共有できるWebアプリケーションです。プロフィール、SNS・Webサイトへのリンク、音声を1枚のカードにまとめ、ユーザーごとの公開URLから閲覧できます。
 
-## 機能
+## 主な機能
 
-- **プロフィール管理**: 表示名、自己紹介、テーマの設定
-- **SNSリンク**: 複数のSNSサービスのリンク追加（最大4つ）
-- **音声ファイル**: 音声ファイルのアップロードと再生
-- **音声変換**: アップロードされた音声ファイルをAAC形式（.m4a）に自動変換
-- **古い音源削除**: 新しい音源をアップロード時、古い音源を自動削除
-- **文字数制限**: 表示名（20文字）、自己紹介（60文字）、音声タイトル（25文字）、SNSラベル（25文字）
-- **テーマ切り替え**: 標準、ダーク、ライト、カラフルの4つのテーマ
+### ユーザー向け
 
-## 環境設定
+- Supabase Authを利用した新規登録、ログイン、ログアウト
+- ユーザーIDごとの公開名刺ページ
+- 表示名、自己紹介、テーマ、音声タイトルの編集
+- SNS・Webサイトリンクの登録（最大4件、`https://`のみ）
+- QRコードによる公開ページの共有
+- 音声ファイルのアップロード、差し替え、削除、再生
+- FFmpegによる音声検査、AAC（M4A）変換、2パスのラウドネス正規化
+- 不適切な音声、誹謗中傷、危険なリンクなどの通報
+- モデレーション対応内容の通知と既読管理
+- ヘルプページ、利用規約ページ
 
-プロジェクトルートに `.env.local` ファイルを作成し、以下の環境変数を設定してください。
+### 管理者向け
 
-```env
-# Cloudflare R2 Storage Configuration
-R2_ACCOUNT_ID=your_account_id
-R2_ACCESS_KEY_ID=your_access_key_id
-R2_SECRET_ACCESS_KEY=your_secret_access_key
-R2_BUCKET=your_bucket_name
-R2_REGION=auto
+- 管理者ロール（`moderator` / `admin`）によるアクセス制御
+- プロフィール、音声、リンク、通報の一覧・詳細確認
+- プロフィールや音声の非公開・復旧、プロフィールの利用停止
+- リンクの非公開・復旧
+- 通報ステータスと対応メモの管理
+- モデレーション履歴の保存
+- 対応時に対象ユーザーへ定型通知を作成
 
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+### 音声とストレージ
+
+- 入力上限: 64 MiB、180秒
+- 出力: AAC-LC / M4A、既定128 kbps、最大5 MiB
+- ラウドネス目標: -16 LUFS、True Peak -1.5 dBTP、LRA 11 LU
+- FFprobeでストリーム、長さ、サンプルレート、チャンネル数などを検査
+- 変換処理は同時実行数を制限し、一時ファイルを処理後に削除
+- 音声は非公開のCloudflare R2バケットへ保存
+- 再生時のみ短時間（既定60秒、最大300秒）の署名付きURLを発行
+- 音声差し替え時に古いR2オブジェクトを削除
+
+## 使用技術
+
+| 分類 | 技術 |
+| --- | --- |
+| フロントエンド / API | Next.js 16（App Router）、React 19、TypeScript |
+| 認証 | Supabase Auth |
+| データベース | Supabase Postgres |
+| ORM | Prisma 7、`@prisma/adapter-pg` |
+| オブジェクトストレージ | Cloudflare R2、AWS SDK for JavaScript |
+| 音声処理 | FFmpeg、FFprobe |
+| テスト | Vitest、Testing Library、jsdom |
+| スタイル | CSS Modules、Tailwind CSS 4 |
+| コンテナ | Docker、Next.js standalone output |
+
+## ディレクトリ構成
+
+```text
+app/                  Next.js App RouterのページとRoute Handler
+components/           UIコンポーネント
+lib/                  認証、DB、R2、音声処理、検証などのロジック
+prisma/               Prismaスキーマと設定
+supabase/migrations/  Supabase Postgresのマイグレーション
+tests/                API、コンポーネント、ライブラリのテスト
+public/               画像やSVGなどの静的ファイル
+docs/                 補足ドキュメント
 ```
 
-### R2の設定手順
+## セットアップ
 
-1. Cloudflare R2でバケットを作成
-2. R2アクセス権を持つAPIトークンを生成
-3. `.env.local`ファイルに認証情報を追加
-4. バケットの公開アクセスは有効にせず、再生時は短時間の署名URLを使用
+### 前提環境
 
-### Supabaseの設定手順
+- Node.js 22
+- npm
+- Supabaseプロジェクト
+- 非公開のCloudflare R2バケット
+- Supabase CLI（`npx supabase ...`でも実行可能）
 
-1. `supabase start` を実行してローカルSupabaseを起動
-2. 出力された `API URL` を `NEXT_PUBLIC_SUPABASE_URL` にコピー
-3. 出力された `anon key` を `NEXT_PUBLIC_SUPABASE_ANON_KEY` にコピー
-4. 出力された `service_role key` を `SUPABASE_SERVICE_ROLE_KEY` にコピー
+FFmpegとFFprobeの実行ファイルはnpmパッケージに含まれるため、通常はOSへ別途インストールする必要はありません。
 
-### Docker環境での開発
+### 1. 依存関係をインストール
 
-Dockerを使用した開発環境を設定する場合：
-
-1. `.env.docker` ファイルを作成し、以下の変数を設定：
-```env
-# Cloudflare R2 Storage Configuration
-R2_ACCOUNT_ID=your_account_id
-R2_ACCESS_KEY_ID=your_access_key_id
-R2_SECRET_ACCESS_KEY=your_secret_access_key
-R2_BUCKET=your_bucket_name
-R2_REGION=auto
-
-# Supabase Configuration (for local testing)
-NEXT_PUBLIC_SUPABASE_URL=http://host.docker.internal:54321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
-
-2. Docker Composeで実行：
 ```bash
-docker-compose up --build
+npm ci
 ```
 
-3. アプリにアクセス: http://localhost:3000
+### 2. 環境変数を用意
 
-## 音声変換について
+`.env.example`をコピーして、プロジェクトルートに`.env.local`を作成します。
 
-アップロードされた音声ファイルは、FFmpegを使用してAAC形式（.m4a, 128kbps）に自動変換されます。これにより、すべてのブラウザでの互換性が確保され、MP3よりも良い圧縮率が提供されます。変換はサーバーサイドでffmpeg-staticを使用して処理されます。
+```powershell
+Copy-Item .env.example .env.local
+```
 
-## 開始方法
+macOS / Linuxの場合:
 
-まず、開発サーバーを起動します：
+```bash
+cp .env.example .env.local
+```
+
+設定する変数は次のとおりです。
+
+| 変数 | 公開範囲 | 必須 | 用途 |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | ブラウザへ公開 | 必須 | SupabaseプロジェクトURL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ブラウザへ公開 | 必須 | Supabaseのanon key。RLSと組み合わせて使用 |
+| `DATABASE_URL` | サーバーのみ | 必須 | Prismaが利用するPostgres接続文字列 |
+| `SUPABASE_SERVICE_ROLE_KEY` | サーバーのみ | 必須 | サーバー側でユーザーを検証するservice role key |
+| `R2_ACCOUNT_ID` | サーバーのみ | 必須 | CloudflareアカウントID |
+| `R2_ACCESS_KEY_ID` | サーバーのみ | 必須 | R2 APIトークンのAccess Key ID |
+| `R2_SECRET_ACCESS_KEY` | サーバーのみ | 必須 | R2 APIトークンのSecret Access Key |
+| `R2_BUCKET` | サーバーのみ | 必須 | 非公開R2バケット名 |
+| `R2_REGION` | サーバーのみ | 必須 | 通常は`auto` |
+| `R2_PUBLIC_URL` | サーバーのみ | 任意 | 過去の公開R2 URLをオブジェクトキーへ移行するときだけ使用 |
+
+設定例:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+DATABASE_URL=postgresql://user:password@host:5432/postgres
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+R2_ACCOUNT_ID=your-account-id
+R2_ACCESS_KEY_ID=your-access-key-id
+R2_SECRET_ACCESS_KEY=your-secret-access-key
+R2_BUCKET=your-private-bucket
+R2_REGION=auto
+R2_PUBLIC_URL=
+```
+
+`.env.local`は`.gitignore`の対象です。`DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2の認証情報をGitへコミットしたり、`NEXT_PUBLIC_`を付けたりしないでください。`NEXT_PUBLIC_`付きの値はブラウザへ含まれるため、秘密情報には使用できません。
+
+### 3. Supabaseを設定
+
+Supabase CLIへログインし、対象プロジェクトをリンクします。
+
+```bash
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+```
+
+適用予定のSQLを確認してから、マイグレーションを反映します。
+
+```bash
+npx supabase db push --linked --dry-run
+npx supabase db push --linked
+npx supabase migration list
+```
+
+このプロジェクトでは`supabase/migrations/`をDB変更履歴の正として扱います。既存DBへ安易に`prisma db push`を実行せず、マイグレーションファイルを経由してください。
+
+Supabase AuthではEmail認証を有効にし、Site URLとRedirect URLへローカルURLおよびデプロイ先URLを登録してください。
+
+### 4. Cloudflare R2を設定
+
+1. R2でバケットを作成し、公開アクセスを無効にする
+2. 対象バケットの読み書き権限を持つR2 APIトークンを作成する
+3. アカウントID、Access Key ID、Secret Access Key、バケット名を`.env.local`へ設定する
+
+音声の公開URLをDBへ保存する構成ではありません。DBにはR2のオブジェクトキーを保存し、再生APIが認可・公開状態を確認してから署名付きURLを返します。
+
+### 5. Prisma Clientを生成
+
+```bash
+npx prisma generate
+```
+
+### 6. 開発サーバーを起動
 
 ```bash
 npm run dev
-# または
-yarn dev
-# または
-pnpm dev
-# または
-bun dev
 ```
 
-ブラウザで [http://localhost:3000](http://localhost:3000) を開いてアプリを確認してください。
+[http://localhost:3000](http://localhost:3000)を開きます。
 
-`app/page.tsx` を編集することでページを変更できます。ファイルを編集するとページが自動的に更新されます。
+## 管理者の登録
 
-## プロジェクト構成
+管理画面を使用するには、Supabase Authで作成済みのユーザーIDを`AdminUser.authId`へ登録します。`AUTH_USER_ID`はSupabase DashboardのAuthentication > Usersで確認できます。
 
-- `app/`: Next.jsのApp Routerを使用したページ構成
-- `components/`: Reactコンポーネント
-- `lib/`: ユーティリティ関数（R2ストレージ、Supabaseクライアント、音声変換など）
-- `prisma/`: データベーススキーマ
-- `supabase/`: Supabaseのマイグレーションファイル
+```sql
+insert into public."AdminUser" ("authId", "role", "isActive")
+values ('AUTH_USER_ID', 'admin', true);
+```
 
-## データベースのセットアップ
+通常の確認・対応だけを行うユーザーには`moderator`を指定できます。管理者権限はクライアント側の情報ではなく、サーバーがSupabaseのユーザーIDと`AdminUser`を照合して判断します。
 
-1. Prismaスキーマをデータベースに適用：
+## 開発用コマンド
+
 ```bash
-npx prisma db push
+npm run dev         # 開発サーバー
+npm run build       # 本番ビルド
+npm run start       # ビルド済みアプリを起動
+npm run lint        # ESLint
+npm test            # Vitestを1回実行
+npm run test:watch  # Vitestのwatchモード
 ```
 
-2. Supabaseのマイグレーションを実行：
+## セキュリティ上の主な対策
+
+- Supabaseアクセストークンをサーバーで検証し、プロフィール所有者・管理者を認可
+- PostgresのRLSと権限設定
+- service role keyとR2認証情報をサーバー環境に限定
+- 非公開R2バケットと短時間の署名付き再生URL
+- プロフィール、音声、リンクの公開状態を再生・表示時に確認
+- 音声・JSON・URL・文字数・Content-Typeの検証
+- APIごとのユーザー単位・IP単位のレート制限
+- CSP、HSTS、`X-Frame-Options`などのセキュリティヘッダー
+- 管理操作、通報対応、通知作成をDBトランザクションで保存
+- 個人向けAPIレスポンスの`private, no-store`指定
+
+レート制限は現在アプリプロセス内のメモリで管理しています。Cloud Runを複数インスタンスへ水平分散する場合は、Redisなどの共有ストアへの移行を検討してください。
+
+## Dockerでの起動
+
+開発用Docker Composeを使用する場合は`.env.docker`を作成し、`.env.local`と同じ変数を設定します。コンテナからホスト上のローカルSupabaseへ接続する場合、URLには`host.docker.internal`を使用します。
+
 ```bash
-supabase db reset
+docker compose up --build
 ```
 
-## デプロイ
+本番向け`Dockerfile`はNext.js standalone output、FFmpeg、FFprobeを含むNode.jsコンテナを生成します。
 
-本番環境はGoogle Cloud Run、音声ストレージはCloudflare R2を使用します。
+## デプロイ予定
 
-初期設定、Secret Manager、Cloud Build、デプロイ確認については
-[Cloud Runデプロイ手順](docs/cloud-run-deployment.md)を参照してください。
+アプリケーションのデプロイ先はGoogle Cloud Runを予定しています。認証とデータベースにはSupabase、音声ストレージにはCloudflare R2を引き続き使用します。
 
-## 依存関係
+```text
+GitHub
+  └─ Cloud Build
+       ├─ Dockerイメージをビルド
+       ├─ Artifact Registryへ保存
+       └─ Cloud Runへデプロイ
+            ├─ Supabase Auth / Postgres
+            ├─ Cloudflare R2
+            └─ Secret Manager
+```
 
-- Next.js: Reactフレームワーク
-- Supabase: 認証とデータベース
-- Prisma: ORM
-- Cloudflare R2: オブジェクトストレージ
-- FFmpeg: 音声変換
+リポジトリには、Next.js standalone outputとFFmpeg / FFprobeを含む`Dockerfile`、Cloud Buildからビルド・保存・デプロイする`cloudbuild.yaml`が含まれています。現在の設定は費用を抑えるため、次の構成です。
+
+- リージョン: `asia-northeast1`
+- 最小インスタンス数: 0
+- 最大インスタンス数: 1
+- CPU: 1 vCPU
+- メモリ: 512 MiB
+- 同時リクエスト数: 8
+- リクエストタイムアウト: 120秒
+- リクエスト処理中のみCPUを割り当て
+
+最大インスタンス数を1にすることで、ポートフォリオ運用時の想定外の課金と音声変換の多重実行を抑えます。アクセスがない場合は0インスタンスまで縮小するため、最初のアクセスではコールドスタートが発生する場合があります。音声変換時のメモリ使用量は、デプロイ後にCloud Runのメトリクスで確認してください。
+
+本番環境では、公開値と秘密値を分けて設定してください。
+
+- Dockerビルド時と実行時の公開値: `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Secret Manager: `DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2認証情報
+- Cloud Runの通常環境変数: `R2_BUCKET`、`R2_REGION`
+
+Google CloudのAPI有効化、Artifact Registry、実行サービスアカウント、Secret Manager、Cloud Buildの権限、デプロイコマンドについては[Cloud Runデプロイ手順](docs/cloud-run-deployment.md)を参照してください。
+
+## 補足
+
+- プロフィールのテーマは`normal`、`dark`、`light`、`colorful`の4種類です。
+- 表示名は20文字、自己紹介は60文字、音声タイトルとSNSラベルは25文字までです。
+- SNS・WebサイトURLは`https://`で始まるURLだけを登録できます。
+- 管理機能や通知機能を追加・変更した場合は、PrismaスキーマだけでなくSupabaseマイグレーションも更新してください。
