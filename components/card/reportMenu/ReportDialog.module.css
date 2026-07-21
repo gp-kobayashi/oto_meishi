@@ -103,6 +103,50 @@
   accent-color: #dc2626;
 }
 
+.detailsLabel {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detailsLabel textarea {
+  min-height: 96px;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #1e293b;
+  font: inherit;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.detailsLabel textarea:focus-visible {
+  outline: 2px solid #dc2626;
+  outline-offset: 2px;
+}
+
+.detailsLabel > span {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 400;
+  text-align: right;
+}
+
+.error {
+  margin: 16px 0 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .selectedReason {
   border-color: #ef4444;
   background: #fff1f2;
@@ -124,6 +168,12 @@
   line-height: 1.5;
 }
 
+.actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .cancelButton {
   flex: 0 0 auto;
   padding: 10px 16px;
@@ -137,6 +187,54 @@
   cursor: pointer;
 }
 
+.submitButton {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border: 1px solid #dc2626;
+  border-radius: 12px;
+  background: #dc2626;
+  color: #ffffff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.cancelButton:disabled,
+.submitButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.success {
+  display: grid;
+  gap: 12px;
+  padding-top: 24px;
+  text-align: center;
+}
+
+.success p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.success .successTitle {
+  color: #166534;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.success .submitButton {
+  justify-self: center;
+  margin-top: 8px;
+}
+
 .closeButton:hover,
 .cancelButton:hover {
   background: #f1f5f9;
@@ -144,6 +242,7 @@
 
 .closeButton:focus-visible,
 .cancelButton:focus-visible,
+.submitButton:focus-visible,
 .reason:has(input:focus-visible) {
   outline: 2px solid #dc2626;
   outline-offset: 2px;

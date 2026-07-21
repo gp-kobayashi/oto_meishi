@@ -30,7 +30,7 @@ const Card = ({
   return (
     <div className={`${styles.card} ${themeClass}`}>
       <Background theme={theme} />
-      {showReportMenu ? <ReportMenu /> : null}
+      {showReportMenu ? <ReportMenu profileId={link.id} /> : null}
       <h2 id="profile-title" className={styles.title}>
         {displayName}
       </h2>

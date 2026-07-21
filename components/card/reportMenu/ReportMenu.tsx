@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import styles from "./ReportMenu.module.css";
 import ReportDialog from "./ReportDialog";
 
-export default function ReportMenu() {
+export default function ReportMenu({ profileId }: { profileId: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -73,7 +73,9 @@ export default function ReportMenu() {
           </button>
         </div>
       ) : null}
-      {isDialogOpen ? <ReportDialog onClose={closeDialog} /> : null}
+      {isDialogOpen ? (
+        <ReportDialog profileId={profileId} onClose={closeDialog} />
+      ) : null}
     </div>
   );
 }
