@@ -49,6 +49,7 @@ describe("GET /api/admin/moderation", () => {
           audioStatus: "active",
           updatedAt: new Date("2026-07-17T00:00:00.000Z"),
           sns: [{ status: "active" }, { status: "hidden" }],
+          _count: { reports: 2 },
         },
       ],
       1,
@@ -66,6 +67,7 @@ describe("GET /api/admin/moderation", () => {
       hasAudio: true,
       linkCount: 2,
       hiddenLinkCount: 1,
+      pendingReportCount: 2,
       updatedAt: "2026-07-17T00:00:00.000Z",
     });
     expect(result.items[0].audioUrl).toBeUndefined();
@@ -77,6 +79,19 @@ describe("GET /api/admin/moderation", () => {
     });
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 20, take: 20 }),
+    );
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          AND: expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { reports: { some: { status: "pending" } } },
+              ]),
+            }),
+          ]),
+        }),
+      }),
     );
   });
 

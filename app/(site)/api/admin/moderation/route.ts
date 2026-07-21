@@ -22,6 +22,7 @@ function getFilterWhere(filter: ModerationFilter): Prisma.ProfileWhereInput {
           { status: { not: "active" } },
           { audioStatus: { not: "active" } },
           { sns: { some: { status: "hidden" } } },
+          { reports: { some: { status: "pending" } } },
         ],
       };
     case "active":
@@ -83,6 +84,9 @@ export async function GET(request: Request) {
           audioStatus: true,
           updatedAt: true,
           sns: { select: { status: true } },
+          _count: {
+            select: { reports: { where: { status: "pending" } } },
+          },
         },
       }),
       prisma.profile.count({ where }),
@@ -102,6 +106,7 @@ export async function GET(request: Request) {
           hiddenLinkCount: profile.sns.filter(
             (link) => link.status === "hidden",
           ).length,
+          pendingReportCount: profile._count.reports,
           updatedAt: profile.updatedAt.toISOString(),
         })),
         pagination: {

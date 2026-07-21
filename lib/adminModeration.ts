@@ -18,6 +18,7 @@ export type ModerationListItem = {
   audioStatus: "active" | "hidden" | "removed";
   linkCount: number;
   hiddenLinkCount: number;
+  pendingReportCount: number;
   updatedAt: string;
 };
 

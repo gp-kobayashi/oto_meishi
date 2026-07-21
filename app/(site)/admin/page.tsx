@@ -181,6 +181,18 @@ export default function AdminPage() {
                     </p>
                   </div>
                   <div>
+                    <p className={styles.label}>未確認の通報</p>
+                    <p
+                      className={
+                        item.pendingReportCount > 0
+                          ? styles.reportAttention
+                          : styles.reportSummary
+                      }
+                    >
+                      {item.pendingReportCount}件
+                    </p>
+                  </div>
+                  <div>
                     <p className={styles.label}>最終更新</p>
                     <time dateTime={item.updatedAt}>
                       {new Intl.DateTimeFormat("ja-JP", {
