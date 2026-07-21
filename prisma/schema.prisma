@@ -68,6 +68,21 @@ enum ModerationActionType {
   remove
 }
 
+enum ReportReason {
+  inappropriate_audio
+  harassment
+  unsafe_link
+  impersonation
+  other
+}
+
+enum ReportStatus {
+  pending
+  reviewed
+  resolved
+  dismissed
+}
+
 model AdminUser {
   id                String             @id @default(uuid()) @db.Uuid
   authId            String             @unique
@@ -96,6 +111,20 @@ model ModerationAction {
   @@index([adminUserId, createdAt])
 }
 
+model ContentReport {
+  id        String       @id @default(uuid()) @db.Uuid
+  profile   Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId String
+  reason    ReportReason
+  details   String       @default("") @db.VarChar(500)
+  status    ReportStatus @default(pending)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([status, createdAt])
+  @@index([profileId, createdAt])
+}
+
 model Profile {
   id          String                @id @default(uuid())
   userId      String                @unique
@@ -109,6 +138,7 @@ model Profile {
   audioTitle  String
   audioStatus AudioModerationStatus @default(active)
   sns         SocialLink[]
+  reports     ContentReport[]
   createdAt   DateTime              @default(now())
   updatedAt   DateTime              @updatedAt
 
