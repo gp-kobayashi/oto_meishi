@@ -2,10 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import styles from "./ReportMenu.module.css";
+import ReportDialog from "./ReportDialog";
 
 export default function ReportMenu() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const closeDialog = () => {
+    setIsDialogOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
 
   useEffect(() => {
     if (!isOpen) {
@@ -34,6 +42,7 @@ export default function ReportMenu() {
   return (
     <div className={styles.container} ref={menuRef}>
       <button
+        ref={triggerRef}
         type="button"
         className={styles.trigger}
         aria-label="通報メニューを開く"
@@ -51,11 +60,20 @@ export default function ReportMenu() {
 
       {isOpen ? (
         <div id="profile-report-menu" className={styles.menu} role="menu">
-          <button type="button" className={styles.reportButton} role="menuitem">
+          <button
+            type="button"
+            className={styles.reportButton}
+            role="menuitem"
+            onClick={() => {
+              setIsOpen(false);
+              setIsDialogOpen(true);
+            }}
+          >
             通報する
           </button>
         </div>
       ) : null}
+      {isDialogOpen ? <ReportDialog onClose={closeDialog} /> : null}
     </div>
   );
 }
