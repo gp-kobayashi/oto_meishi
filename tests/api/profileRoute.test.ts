@@ -12,6 +12,7 @@ const { mocks } = vi.hoisted(() => ({
     consumeProfileSaveUserRateLimit: vi.fn(),
     consumeProfileSaveIpRateLimit: vi.fn(),
     consumePublicProfileReadIpRateLimit: vi.fn(),
+    consumePrivateProfileReadUserRateLimit: vi.fn(),
   },
 }));
 
@@ -46,6 +47,8 @@ vi.mock("@/lib/profileSaveRateLimit", () => ({
 vi.mock("@/lib/profileReadRateLimit", () => ({
   consumePublicProfileReadIpRateLimit:
     mocks.consumePublicProfileReadIpRateLimit,
+  consumePrivateProfileReadUserRateLimit:
+    mocks.consumePrivateProfileReadUserRateLimit,
 }));
 
 import { GET, POST } from "@/app/(site)/api/profile/route";
@@ -106,6 +109,13 @@ describe("/api/profile route", () => {
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
+    mocks.consumePrivateProfileReadUserRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 120,
+      remaining: 119,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
   });
 
   it("認証ユーザーに紐づく既存プロフィールを返す", async () => {
@@ -146,6 +156,35 @@ describe("/api/profile route", () => {
     await expect(response.json()).resolves.toEqual({
       error: "profile not found",
     });
+  });
+
+  it("自分のプロフィール取得がユーザー上限に達した場合はDB照会前に429を返す", async () => {
+    mocks.consumePrivateProfileReadUserRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 120,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 120,
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?mine=true", {
+        headers: authHeader,
+      }),
+    );
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("120");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "プロフィール取得の回数が上限に達しました。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumePrivateProfileReadUserRateLimit).toHaveBeenCalledWith(
+      "auth-user-1",
+    );
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
   });
 
   it("プロフィール取得の内部エラーをレスポンスへ公開しない", async () => {

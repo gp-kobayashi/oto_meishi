@@ -10,7 +10,10 @@ import {
   consumeProfileSaveUserRateLimit,
 } from "@/lib/profileSaveRateLimit";
 import { getClientIp } from "@/lib/clientIp";
-import { consumePublicProfileReadIpRateLimit } from "@/lib/profileReadRateLimit";
+import {
+  consumePrivateProfileReadUserRateLimit,
+  consumePublicProfileReadIpRateLimit,
+} from "@/lib/profileReadRateLimit";
 
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -48,6 +51,26 @@ export async function GET(request: Request) {
         return NextResponse.json(
           { error: "Unauthorized: Invalid token" },
           { status: 401 },
+        );
+      }
+
+      const rateLimit = consumePrivateProfileReadUserRateLimit(user.id);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error:
+              "プロフィール取得の回数が上限に達しました。しばらく待ってから再度お試しください。",
+          },
+          {
+            status: 429,
+            headers: {
+              ...PRIVATE_NO_STORE_HEADERS,
+              "Retry-After": String(rateLimit.retryAfterSeconds),
+              "X-RateLimit-Limit": String(rateLimit.limit),
+              "X-RateLimit-Remaining": String(rateLimit.remaining),
+              "X-RateLimit-Reset": String(Math.ceil(rateLimit.resetAt / 1000)),
+            },
+          },
         );
       }
 
