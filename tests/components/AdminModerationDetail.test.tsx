@@ -51,6 +51,9 @@ describe("AdminModerationDetail", () => {
                 reason: "unsafe_link",
                 details: "外部サイトへ誘導されます",
                 status: "pending",
+                reviewerIdentifier: "auth-adm",
+                reviewerRole: "admin",
+                reviewedAt: "2026-07-17T03:00:00.000Z",
                 createdAt: "2026-07-17T02:00:00.000Z",
                 updatedAt: "2026-07-17T02:00:00.000Z",
               },
@@ -92,6 +95,7 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("危険または不正なリンク")).toBeDefined();
     expect(screen.getByText("外部サイトへ誘導されます")).toBeDefined();
     expect(screen.getByText("未確認")).toBeDefined();
+    expect(screen.getByText(/最終変更:.*admin.*auth-adm/)).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "確認済みにする" }));
     await waitFor(() => {

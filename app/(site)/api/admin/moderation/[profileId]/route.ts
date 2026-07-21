@@ -49,6 +49,10 @@ export async function GET(
             reason: true,
             details: true,
             status: true,
+            reviewedAt: true,
+            reviewedByAdminUser: {
+              select: { authId: true, role: true },
+            },
             createdAt: true,
             updatedAt: true,
           },
@@ -96,7 +100,14 @@ export async function GET(
           updatedAt: profile.updatedAt.toISOString(),
           links: profile.sns,
           reports: profile.reports.map((report) => ({
-            ...report,
+            id: report.id,
+            reason: report.reason,
+            details: report.details,
+            status: report.status,
+            reviewerIdentifier:
+              report.reviewedByAdminUser?.authId.slice(0, 8) ?? null,
+            reviewerRole: report.reviewedByAdminUser?.role ?? null,
+            reviewedAt: report.reviewedAt?.toISOString() ?? null,
             createdAt: report.createdAt.toISOString(),
             updatedAt: report.updatedAt.toISOString(),
           })),

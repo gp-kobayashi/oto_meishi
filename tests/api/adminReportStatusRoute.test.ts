@@ -61,7 +61,11 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.update).toHaveBeenCalledWith({
       where: { id: "report-1" },
-      data: { status: "reviewed" },
+      data: {
+        status: "reviewed",
+        reviewedByAdminUserId: "admin-1",
+        reviewedAt: expect.any(Date),
+      },
       select: { id: true },
     });
   });

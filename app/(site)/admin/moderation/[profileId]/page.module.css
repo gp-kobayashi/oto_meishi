@@ -380,6 +380,12 @@
   font-size: 12px;
 }
 
+.reportReviewer {
+  margin: 6px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
 .reportActions {
   display: flex;
   flex-wrap: wrap;

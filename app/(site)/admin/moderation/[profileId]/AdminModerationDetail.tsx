@@ -459,6 +459,11 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                       <time dateTime={report.createdAt}>
                         受付日時: {formatDate(report.createdAt)}
                       </time>
+                      {report.reviewedAt && report.reviewerIdentifier ? (
+                        <p className={styles.reportReviewer}>
+                          最終変更: {formatDate(report.reviewedAt)} / {report.reviewerRole} / {report.reviewerIdentifier}
+                        </p>
+                      ) : null}
                       {report.status === "pending" || report.status === "reviewed" ? (
                         <div className={styles.reportActions}>
                           {report.status === "pending" ? (

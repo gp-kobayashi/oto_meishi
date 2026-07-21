@@ -110,7 +110,11 @@ export async function PATCH(
 
     await prisma.contentReport.update({
       where: { id: report.id },
-      data: { status: body.status },
+      data: {
+        status: body.status,
+        reviewedByAdminUserId: authorization.admin.id,
+        reviewedAt: new Date(),
+      },
       select: { id: true },
     });
 
