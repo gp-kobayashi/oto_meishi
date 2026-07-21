@@ -13,6 +13,7 @@ const { mocks } = vi.hoisted(() => ({
     consumeProfileSaveIpRateLimit: vi.fn(),
     consumePublicProfileReadIpRateLimit: vi.fn(),
     consumePrivateProfileReadUserRateLimit: vi.fn(),
+    consumePrivateProfileReadIpRateLimit: vi.fn(),
   },
 }));
 
@@ -49,6 +50,8 @@ vi.mock("@/lib/profileReadRateLimit", () => ({
     mocks.consumePublicProfileReadIpRateLimit,
   consumePrivateProfileReadUserRateLimit:
     mocks.consumePrivateProfileReadUserRateLimit,
+  consumePrivateProfileReadIpRateLimit:
+    mocks.consumePrivateProfileReadIpRateLimit,
 }));
 
 import { GET, POST } from "@/app/(site)/api/profile/route";
@@ -113,6 +116,13 @@ describe("/api/profile route", () => {
       allowed: true,
       limit: 120,
       remaining: 119,
+      resetAt: Date.now() + 15 * 60 * 1000,
+      retryAfterSeconds: 15 * 60,
+    });
+    mocks.consumePrivateProfileReadIpRateLimit.mockReturnValue({
+      allowed: true,
+      limit: 300,
+      remaining: 299,
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
@@ -185,6 +195,58 @@ describe("/api/profile route", () => {
       "auth-user-1",
     );
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("自分のプロフィール取得がIP上限に達した場合はDB照会前に429を返す", async () => {
+    mocks.consumePrivateProfileReadIpRateLimit.mockReturnValueOnce({
+      allowed: false,
+      limit: 300,
+      remaining: 0,
+      resetAt: 901_000,
+      retryAfterSeconds: 90,
+    });
+    const profileRequest = new Request(
+      "http://localhost/api/profile?mine=true",
+      {
+        headers: {
+          ...authHeader,
+          "CF-Connecting-IP": "203.0.113.10",
+        },
+      },
+    );
+
+    const response = await GET(profileRequest);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(response.headers.get("Retry-After")).toBe("90");
+    expect(response.headers.get("X-RateLimit-Limit")).toBe("300");
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "この接続元からのプロフィール取得が集中しています。しばらく待ってから再度お試しください。",
+    });
+    expect(mocks.consumePrivateProfileReadIpRateLimit).toHaveBeenCalledWith(
+      "203.0.113.10",
+    );
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+  });
+
+  it("自分のプロフィール取得でIPを取得できない場合はIP制限をスキップする", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      sns: [],
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?mine=true", {
+        headers: authHeader,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.consumePrivateProfileReadIpRateLimit).not.toHaveBeenCalled();
   });
 
   it("プロフィール取得の内部エラーをレスポンスへ公開しない", async () => {
