@@ -1,8 +1,8 @@
 -- Create Theme enum
-create type if not exists "Theme" as enum ('normal', 'dark', 'light', 'colorful');
+create type "Theme" as enum ('normal', 'dark', 'light', 'colorful');
 
 -- Create SocialService enum
-create type if not exists "SocialService" as enum (
+create type "SocialService" as enum (
   'x', 'instagram', 'youtube', 'tiktok', 'github', 
   'discord', 'facebook', 'linkedin', 'bluesky', 'threads', 'note', 'website', 'other'
 );
