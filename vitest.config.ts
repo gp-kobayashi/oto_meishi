@@ -6,8 +6,7 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
-    // 実DBを使う統合テストと同じモジュールをモックする単体テストの干渉を防ぐ
-    fileParallelism: false,
+    exclude: ['**/*.integration.test.ts', '**/node_modules/**'],
   },
   resolve: {
     alias: {
