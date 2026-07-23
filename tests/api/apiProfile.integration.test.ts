@@ -2,19 +2,9 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { POST } from "@/app/(site)/api/profile/route";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
-import dotenv from "dotenv";
-import path from "path";
 
-// .env.docker からローカル開発環境用の環境変数をロード
-dotenv.config({ path: path.resolve(process.cwd(), ".env.docker") });
-
-// PrismaでローカルDBにアクセスするための環境変数を設定
-if (process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.DATABASE_URL;
-}
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "http://127.0.0.1:54321";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 describe("API Profile 認証統合テスト", () => {
@@ -25,10 +15,6 @@ describe("API Profile 認証統合テスト", () => {
   const testUserId2 = `user2-${Date.now()}`;
 
   beforeAll(async () => {
-    if (!supabaseAnonKey) {
-      throw new Error("Supabase ANON KEY is not set in .env.docker");
-    }
-
     const email1 = `test1-${Date.now()}@example.com`;
     const password = "password123";
 
