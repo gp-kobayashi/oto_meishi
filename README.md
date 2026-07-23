@@ -192,9 +192,64 @@ npm run dev         # 開発サーバー
 npm run build       # 本番ビルド
 npm run start       # ビルド済みアプリを起動
 npm run lint        # ESLint
-npm test            # Vitestを1回実行
+npm test            # 外部サービスへ接続しない通常テスト
+npm run test:integration # ローカル環境を使用する統合テスト
 npm run test:watch  # Vitestのwatchモード
 ```
+
+## テスト
+
+### 通常テスト
+
+```bash
+npm test
+```
+
+通常テストでは、モックを使用するテストと外部サービスへ接続しないテストだけを実行します。`*.integration.test.ts`は実行対象に含まれず、`.env.docker`や`.env.integration.local`も読み込みません。
+
+### 統合テスト
+
+統合テストはSupabase Auth、Postgres、FFmpegなどを実際に使用します。本番や共有環境ではなく、Supabase CLIで起動したローカル環境を使用してください。
+
+```bash
+npx supabase start
+```
+
+`.env.integration.example`をコピーして`.env.integration.local`を作成し、ローカルSupabaseの値を設定します。
+
+```powershell
+Copy-Item .env.integration.example .env.integration.local
+```
+
+macOS / Linuxの場合:
+
+```bash
+cp .env.integration.example .env.integration.local
+```
+
+| 変数 | 用途 |
+| --- | --- |
+| `INTEGRATION_SUPABASE_URL` | ローカルSupabase APIのURL |
+| `INTEGRATION_SUPABASE_ANON_KEY` | ローカルSupabaseのanon key |
+| `INTEGRATION_DATABASE_URL` | ローカルPostgresの接続文字列 |
+| `INTEGRATION_SUPABASE_SERVICE_ROLE_KEY` | テスト用Authユーザーを削除するためのローカルservice role key |
+
+設定後、専用コマンドで実行します。
+
+```bash
+npm run test:integration
+```
+
+`.env.integration.local`はGitの管理対象外です。統合テストは環境変数をアプリ用の変数へ設定する前にURLを解析し、接続先ホストとプロトコルを検証します。現在許可しているホストは次のとおりです。
+
+- `localhost`
+- `127.0.0.1`
+- `::1`
+- `host.docker.internal`
+
+Supabaseには`http:`または`https:`、Postgresには`postgres:`または`postgresql:`だけを許可します。環境変数の未設定、形式不正、許可されていない接続先は、通信やDB接続を始める前にエラーになります。CIで別のテスト用サービス名を使用する場合は、接続先検証の許可リストとテストを明示的に変更してください。
+
+プロフィール統合テストが作成するプロフィール、メールアドレス、Authユーザーには実行ごとのUUIDを使用します。テスト終了時には、その実行で記録したプロフィール、SNSリンク、Authユーザーだけを削除します。既存データや他の実行が作成したデータを名前の部分一致などで削除しない方針です。
 
 ## セキュリティ上の主な対策
 
