@@ -7,6 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "supabase:test:start": "supabase start -x analytics,edge-runtime,functions,imgproxy,inbucket,meta,realtime,rest,storage,studio,vector",
+    "supabase:test:status": "supabase status",
+    "supabase:test:reset": "supabase db reset --local",
+    "supabase:test:stop": "supabase stop",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest"
