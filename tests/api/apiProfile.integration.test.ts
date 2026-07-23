@@ -2,50 +2,90 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { POST } from "@/app/(site)/api/profile/route";
 import { createClient } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
+import { createServerSupabaseClient } from "@/lib/supabaseClient";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+    detectSessionInUrl: false,
+  },
+});
+const supabaseAdmin = createServerSupabaseClient();
 
 describe("API Profile 認証統合テスト", () => {
   let token1: string;
   let user1Id: string;
   let token2: string;
-  const testUserId1 = `user1-${Date.now()}`;
-  const testUserId2 = `user2-${Date.now()}`;
+  const createdAuthUserIds = new Set<string>();
+  const testRunId = crypto.randomUUID();
+  const testUserId1 = `integration-${testRunId}-user-1`;
+  const testUserId2 = `integration-${testRunId}-user-2`;
 
   beforeAll(async () => {
-    const email1 = `test1-${Date.now()}@example.com`;
+    const email1 = `oto-meishi-integration-${testRunId}-1@example.com`;
     const password = "password123";
 
     // テストユーザー1の作成とログイン
     const signUpRes1 = await supabase.auth.signUp({ email: email1, password });
     if (signUpRes1.error) throw signUpRes1.error;
+    if (signUpRes1.data.user?.id) {
+      createdAuthUserIds.add(signUpRes1.data.user.id);
+    }
     token1 = signUpRes1.data.session?.access_token || "";
     user1Id = signUpRes1.data.user?.id || "";
 
     // テストユーザー2の作成とログイン
-    const email2 = `test2-${Date.now()}@example.com`;
+    const email2 = `oto-meishi-integration-${testRunId}-2@example.com`;
     const signUpRes2 = await supabase.auth.signUp({ email: email2, password });
     if (signUpRes2.error) throw signUpRes2.error;
+    if (signUpRes2.data.user?.id) {
+      createdAuthUserIds.add(signUpRes2.data.user.id);
+    }
     token2 = signUpRes2.data.session?.access_token || "";
   });
 
   afterAll(async () => {
-    // DB内のテストデータの削除
-    await prisma.socialLink.deleteMany({
-      where: {
-        profile: {
+    const cleanupErrors: Error[] = [];
+
+    try {
+      await prisma.socialLink.deleteMany({
+        where: {
+          profile: {
+            userId: { in: [testUserId1, testUserId2] },
+          },
+        },
+      });
+      await prisma.profile.deleteMany({
+        where: {
           userId: { in: [testUserId1, testUserId2] },
         },
-      },
-    });
-    await prisma.profile.deleteMany({
-      where: {
-        userId: { in: [testUserId1, testUserId2] },
-      },
-    });
-  });
+      });
+    } catch (error) {
+      cleanupErrors.push(
+        error instanceof Error ? error : new Error(String(error)),
+      );
+    }
+
+    for (const authUserId of createdAuthUserIds) {
+      const { error } = await supabaseAdmin.auth.admin.deleteUser(authUserId);
+
+      if (error) {
+        cleanupErrors.push(error);
+      }
+    }
+
+    await prisma.$disconnect();
+
+    if (cleanupErrors.length > 0) {
+      throw new AggregateError(
+        cleanupErrors,
+        `Failed to clean up integration test data for run ${testRunId}.`,
+      );
+    }
+  }, 15_000);
 
   it("トークン無しの場合は401を返すこと", async () => {
     const req = new Request("http://localhost/api/profile", {
