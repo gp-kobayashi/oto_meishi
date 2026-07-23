@@ -71,11 +71,12 @@ docs/                 補足ドキュメント
 
 - Node.js 22
 - npm
+- Docker DesktopなどのDocker実行環境
 - Supabaseプロジェクト
 - 非公開のCloudflare R2バケット
-- Supabase CLI（`npx supabase ...`でも実行可能）
 
 FFmpegとFFprobeの実行ファイルはnpmパッケージに含まれるため、通常はOSへ別途インストールする必要はありません。
+Supabase CLIは開発依存関係としてバージョンを固定しているため、`npm ci`でインストールされます。
 
 ### 1. 依存関係をインストール
 
@@ -192,9 +193,13 @@ npm run dev         # 開発サーバー
 npm run build       # 本番ビルド
 npm run start       # ビルド済みアプリを起動
 npm run lint        # ESLint
-npm test            # 外部サービスへ接続しない通常テスト
-npm run test:integration # ローカル環境を使用する統合テスト
-npm run test:watch  # Vitestのwatchモード
+npm test                     # 外部サービスへ接続しない通常テスト
+npm run test:integration     # ローカル環境を使用する統合テスト
+npm run supabase:test:start  # テスト用Supabaseを最小構成で起動
+npm run supabase:test:status # ローカル接続情報を表示
+npm run supabase:test:reset  # ローカルDBを再作成
+npm run supabase:test:stop   # テスト用Supabaseを停止
+npm run test:watch           # Vitestのwatchモード
 ```
 
 ## テスト
@@ -209,13 +214,25 @@ npm test
 
 ### 統合テスト
 
-統合テストはSupabase Auth、Postgres、FFmpegなどを実際に使用します。本番や共有環境ではなく、Supabase CLIで起動したローカル環境を使用してください。
+統合テストはSupabase Auth、Postgres、FFmpegなどを実際に使用します。本番や共有環境ではなく、Supabase CLIで起動したローカル環境だけを使用してください。事前にDockerを起動します。
+
+#### 1. ローカルSupabaseを起動
 
 ```bash
-npx supabase start
+npm run supabase:test:start
 ```
 
-`.env.integration.example`をコピーして`.env.integration.local`を作成し、ローカルSupabaseの値を設定します。
+このコマンドではDB、Auth、APIゲートウェイなど統合テストに必要なサービスを残し、Studio、Storage、Realtimeなどは起動しません。初回はDockerイメージの取得に時間がかかる場合があります。
+
+#### 2. 専用環境変数を設定
+
+起動後、ローカルSupabaseのURLとキーを確認します。
+
+```bash
+npm run supabase:test:status
+```
+
+`.env.integration.example`をコピーして`.env.integration.local`を作成し、表示されたローカル環境の値を設定します。
 
 ```powershell
 Copy-Item .env.integration.example .env.integration.local
@@ -234,13 +251,25 @@ cp .env.integration.example .env.integration.local
 | `INTEGRATION_DATABASE_URL` | ローカルPostgresの接続文字列 |
 | `INTEGRATION_SUPABASE_SERVICE_ROLE_KEY` | テスト用Authユーザーを削除するためのローカルservice role key |
 
-設定後、専用コマンドで実行します。
+ホストされたSupabaseプロジェクトのURLやキーは設定しないでください。`.env.integration.local`はGitの管理対象外です。
+
+#### 3. ローカルDBを再作成
+
+新規DB相当の状態やマイグレーション追加後の状態を確認するときは、ローカルDBをリセットします。
+
+```bash
+npm run supabase:test:reset
+```
+
+このコマンドは`--local`を明示しており、ローカルDBのデータを削除した後、`supabase/migrations/`を順番に適用します。開発中のローカルデータも消えるため、必要な場合だけ実行してください。リンク済みのSupabaseプロジェクトには適用しません。
+
+#### 4. 統合テストを実行
 
 ```bash
 npm run test:integration
 ```
 
-`.env.integration.local`はGitの管理対象外です。統合テストは環境変数をアプリ用の変数へ設定する前にURLを解析し、接続先ホストとプロトコルを検証します。現在許可しているホストは次のとおりです。
+統合テストは環境変数をアプリ用の変数へ設定する前にURLを解析し、接続先ホストとプロトコルを検証します。現在許可しているホストは次のとおりです。
 
 - `localhost`
 - `127.0.0.1`
@@ -249,7 +278,15 @@ npm run test:integration
 
 Supabaseには`http:`または`https:`、Postgresには`postgres:`または`postgresql:`だけを許可します。環境変数の未設定、形式不正、許可されていない接続先は、通信やDB接続を始める前にエラーになります。CIで別のテスト用サービス名を使用する場合は、接続先検証の許可リストとテストを明示的に変更してください。
 
-プロフィール統合テストが作成するプロフィール、メールアドレス、Authユーザーには実行ごとのUUIDを使用します。テスト終了時には、その実行で記録したプロフィール、SNSリンク、Authユーザーだけを削除します。既存データや他の実行が作成したデータを名前の部分一致などで削除しない方針です。
+通常の繰り返し実行では、テスト単位のクリーンアップを使用します。プロフィール統合テストが作成するプロフィール、メールアドレス、Authユーザーには実行ごとのUUIDを使用し、終了時にその実行で記録したプロフィール、SNSリンク、Authユーザーだけを削除します。既存データや他の実行が作成したデータを名前の部分一致などで削除しない方針です。
+
+DBリセットは、全マイグレーションを新規DB相当で検証するときや、テストが強制終了してデータが残った場合に使用します。
+
+#### 5. ローカルSupabaseを停止
+
+```bash
+npm run supabase:test:stop
+```
 
 ## セキュリティ上の主な対策
 
