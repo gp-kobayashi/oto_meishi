@@ -157,7 +157,7 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
             パスワード
           </label>
           {!isSignup && (
-            <Link href="#" className={styles.forgotPassword}>
+            <Link href="/forgot-password" className={styles.forgotPassword}>
               パスワードをお忘れですか？
             </Link>
           )}
@@ -193,8 +193,8 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
       {/* Terms of Service (Signup Only) */}
       {isSignup && (
         <p className={styles.terms}>
-          登録することで、<Link href="#">利用規約</Link>と
-          <Link href="#">プライバシーポリシー</Link>に同意したことになります。
+          登録することで、<Link href="/terms">利用規約</Link>と
+          <Link href="/privacy">プライバシーポリシー</Link>に同意したことになります。
         </p>
       )}
 

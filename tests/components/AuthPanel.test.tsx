@@ -41,6 +41,11 @@ describe("AuthPanel", () => {
     expect(screen.getByLabelText("メールアドレス")).toBeDefined();
     expect(screen.getByLabelText("パスワード")).toBeDefined();
     expect(screen.getByRole("button", { name: "メールアドレスでログイン" })).toBeDefined();
+    expect(
+      screen
+        .getByRole("link", { name: "パスワードをお忘れですか？" })
+        .getAttribute("href"),
+    ).toBe("/forgot-password");
   });
 
   it("メールアドレスとパスワードによるログインが成功すること", async () => {
@@ -193,6 +198,14 @@ describe("AuthPanel", () => {
     render(<AuthPanel mode="signup" />);
 
     expect(screen.getByRole("button", { name: "メールアドレスで登録" })).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "利用規約" }).getAttribute("href"),
+    ).toBe("/terms");
+    expect(
+      screen
+        .getByRole("link", { name: "プライバシーポリシー" })
+        .getAttribute("href"),
+    ).toBe("/privacy");
 
     fireEvent.change(screen.getByLabelText("メールアドレス"), { target: { value: "new@example.com" } });
     fireEvent.change(screen.getByLabelText("パスワード"), { target: { value: "securepass" } });
