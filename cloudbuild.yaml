@@ -4,6 +4,7 @@ substitutions:
   _SERVICE_NAME: oto-meishi
   _NEXT_PUBLIC_SUPABASE_URL: ""
   _NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
+  _NEXT_PUBLIC_SITE_URL: https://oto-meishi.com
   _R2_BUCKET: ""
 
 steps:
@@ -17,6 +18,8 @@ steps:
       - NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL}
       - --build-arg
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - --build-arg
+      - NEXT_PUBLIC_SITE_URL=${_NEXT_PUBLIC_SITE_URL}
       - .
 
   - id: push
@@ -46,7 +49,7 @@ steps:
       - --timeout=120s
       - --cpu-throttling
       - --no-cpu-boost
-      - --set-env-vars=NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY},R2_BUCKET=${_R2_BUCKET},R2_REGION=auto
+      - --set-env-vars=NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY},NEXT_PUBLIC_SITE_URL=${_NEXT_PUBLIC_SITE_URL},R2_BUCKET=${_R2_BUCKET},R2_REGION=auto
       - --set-secrets=DATABASE_URL=oto-meishi-database-url:1,SUPABASE_SERVICE_ROLE_KEY=oto-meishi-supabase-service-role-key:1,R2_ACCOUNT_ID=oto-meishi-r2-account-id:1,R2_ACCESS_KEY_ID=oto-meishi-r2-access-key-id:1,R2_SECRET_ACCESS_KEY=oto-meishi-r2-secret-access-key:1
 
 images:

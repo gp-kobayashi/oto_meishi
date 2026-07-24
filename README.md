@@ -115,6 +115,7 @@ cp .env.example .env.local
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL` | ブラウザへ公開 | 必須 | SupabaseプロジェクトURL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ブラウザへ公開 | 必須 | Supabaseのanon key。RLSと組み合わせて使用 |
+| `NEXT_PUBLIC_SITE_URL` | ブラウザへ公開 | 必須 | 公開プロフィール、QRコード、画面上のURL表示に使用するサイトのオリジン |
 | `DATABASE_URL` | サーバーのみ | 必須 | Prismaが利用するPostgres接続文字列 |
 | `SUPABASE_SERVICE_ROLE_KEY` | サーバーのみ | 必須 | サーバー側でユーザーを検証するservice role key |
 | `R2_ACCOUNT_ID` | サーバーのみ | 必須 | CloudflareアカウントID |
@@ -129,6 +130,7 @@ cp .env.example .env.local
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 DATABASE_URL=postgresql://user:password@host:5432/postgres
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
@@ -142,6 +144,14 @@ R2_PUBLIC_URL=
 ```
 
 `.env.local`は`.gitignore`の対象です。`DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2の認証情報をGitへコミットしたり、`NEXT_PUBLIC_`を付けたりしないでください。`NEXT_PUBLIC_`付きの値はブラウザへ含まれるため、秘密情報には使用できません。
+
+`NEXT_PUBLIC_SITE_URL`はパスや末尾スラッシュを含まないオリジンを設定します。ローカル開発では`http://localhost:3000`、本番環境では次の値を使用します。
+
+```env
+NEXT_PUBLIC_SITE_URL=https://oto-meishi.com
+```
+
+将来ドメインを変更する場合は、この環境変数を新しいHTTPSオリジンへ変更して再ビルドしてください。`NEXT_PUBLIC_`で始まる環境変数はNext.jsのビルド時にブラウザ用コードへ埋め込まれるため、Cloud Runの実行時設定だけを変更しても反映されません。
 
 ### 3. Supabaseを設定
 
@@ -354,7 +364,7 @@ GitHub
 
 本番環境では、公開値と秘密値を分けて設定してください。
 
-- Dockerビルド時と実行時の公開値: `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- Dockerビルド時と実行時の公開値: `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXT_PUBLIC_SITE_URL`
 - Secret Manager: `DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2認証情報
 - Cloud Runの通常環境変数: `R2_BUCKET`、`R2_REGION`
 

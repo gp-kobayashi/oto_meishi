@@ -92,13 +92,16 @@ Google Cloudプロジェクトの作成時期によって、デフォルトのCl
 
 - `YOUR_SUPABASE_URL`: Supabase Project URL
 - `YOUR_SUPABASE_ANON_KEY`: Supabase anon key
+- `YOUR_SITE_URL`: 公開サイトのオリジン（現在は`https://oto-meishi.com`）
 - `YOUR_R2_BUCKET`: 非公開R2バケット名
 
 これらはブラウザまたは構成上公開される値です。service role keyやR2 Secret Access Keyを`--substitutions`へ指定しないでください。
 
 ```powershell
-gcloud builds submit --config=cloudbuild.yaml --substitutions="_NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL,_NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY,_R2_BUCKET=YOUR_R2_BUCKET"
+gcloud builds submit --config=cloudbuild.yaml --substitutions="_NEXT_PUBLIC_SUPABASE_URL=YOUR_SUPABASE_URL,_NEXT_PUBLIC_SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY,_NEXT_PUBLIC_SITE_URL=YOUR_SITE_URL,_R2_BUCKET=YOUR_R2_BUCKET"
 ```
+
+`NEXT_PUBLIC_SITE_URL`はDockerイメージのビルド時にブラウザ用コードへ埋め込まれます。ドメインを変更した場合は、`_NEXT_PUBLIC_SITE_URL`を変更して新しいイメージをビルド・デプロイしてください。
 
 この処理は次の順序で実行されます。
 
@@ -141,10 +144,11 @@ gcloud run services logs read oto-meishi --region=asia-northeast1 --limit=100
 
 ## 9. SupabaseのリダイレクトURLを更新する
 
-Supabase DashboardのAuthentication URL Configurationで、Cloud RunのサービスURLを設定します。
+独自ドメインの割り当て後、Supabase DashboardのAuthentication URL Configurationで公開URLを設定します。
 
-- Site URL: `https://YOUR_CLOUD_RUN_HOST`
-- Redirect URL: `https://YOUR_CLOUD_RUN_HOST/profile`
+- Site URL: `https://oto-meishi.com`
+- Redirect URL: `https://oto-meishi.com/profile`
+- Redirect URL: `https://oto-meishi.com/reset-password`
 
 Google・Facebook側のOAuth設定にも、Supabase Dashboardに表示されるコールバックURLを登録してください。
 
