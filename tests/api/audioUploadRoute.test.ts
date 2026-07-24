@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
 
-const TEMP_DIR = "C:\\project\\.tmp\\upload-123";
+const TEMP_DIR = path.join(process.cwd(), ".tmp", "upload-123");
 const INPUT_PATH = path.join(TEMP_DIR, "input.bin");
 const OUTPUT_PATH = path.join(TEMP_DIR, "output.m4a");
 
