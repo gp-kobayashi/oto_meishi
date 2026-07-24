@@ -3,6 +3,16 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import AuthPanel from "@/components/auth/AuthPanel";
 import React from "react";
 
+const { replaceMock } = vi.hoisted(() => ({
+  replaceMock: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    replace: replaceMock,
+  }),
+}));
+
 // supabaseClientのモック
 vi.mock("@/lib/supabaseClient", () => {
   return {
@@ -51,7 +61,7 @@ describe("AuthPanel", () => {
         email: "test@example.com",
         password: "password123",
       });
-      expect(screen.getByText("ログインしました。")).toBeDefined();
+      expect(replaceMock).toHaveBeenCalledWith("/profile");
     });
   });
 
@@ -70,6 +80,7 @@ describe("AuthPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Invalid credentials")).toBeDefined();
+      expect(replaceMock).not.toHaveBeenCalled();
     });
   });
 

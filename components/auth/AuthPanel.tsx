@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./AuthPanel.module.css";
@@ -11,6 +12,7 @@ interface AuthPanelProps {
 
 export default function AuthPanel({ mode }: AuthPanelProps) {
   const isSignup = mode === "signup";
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -57,7 +59,7 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
           throw error;
         }
 
-        setMessage("ログインしました。");
+        router.replace("/profile");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "認証に失敗しました。");
