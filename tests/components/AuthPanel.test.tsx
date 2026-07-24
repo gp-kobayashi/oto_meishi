@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import AuthPanel from "@/components/auth/AuthPanel";
 import React from "react";
 
@@ -84,6 +84,53 @@ describe("AuthPanel", () => {
     });
   });
 
+  it("メールログイン処理中は送信ボタンを無効にして多重送信を防ぐこと", async () => {
+    const mockSignIn = vi.mocked(supabase!.auth.signInWithPassword);
+    let resolveSignIn!: (
+      value: Awaited<ReturnType<typeof mockSignIn>>,
+    ) => void;
+    mockSignIn.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveSignIn = resolve;
+        }),
+    );
+
+    render(<AuthPanel mode="login" />);
+
+    fireEvent.change(screen.getByLabelText("メールアドレス"), {
+      target: { value: "test@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("パスワード"), {
+      target: { value: "password123" },
+    });
+    const submitButton = screen.getByRole<HTMLButtonElement>("button", {
+      name: "メールアドレスでログイン",
+    });
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole<HTMLButtonElement>("button", { name: "処理中..." })
+          .disabled,
+      ).toBe(true);
+    });
+
+    fireEvent.click(
+      screen.getByRole<HTMLButtonElement>("button", { name: "処理中..." }),
+    );
+    expect(mockSignIn).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveSignIn({
+        data: { user: {} },
+        error: null,
+      } as Awaited<ReturnType<typeof mockSignIn>>);
+    });
+
+    expect(replaceMock).toHaveBeenCalledWith("/profile");
+  });
+
   it("Googleログイン時にアカウント選択画面を要求すること", async () => {
     const mockSignInWithOAuth = vi.mocked(
       supabase!.auth.signInWithOAuth,
@@ -106,6 +153,33 @@ describe("AuthPanel", () => {
           queryParams: { prompt: "select_account" },
         },
       });
+      expect(replaceMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it("Facebookログイン時にプロフィール画面をコールバック先にすること", async () => {
+    const mockSignInWithOAuth = vi.mocked(
+      supabase!.auth.signInWithOAuth,
+    );
+    mockSignInWithOAuth.mockResolvedValueOnce({
+      data: { provider: "facebook", url: null },
+      error: null,
+    } as unknown as Awaited<ReturnType<typeof mockSignInWithOAuth>>);
+
+    render(<AuthPanel mode="login" />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Facebookアカウントでログイン" }),
+    );
+
+    await waitFor(() => {
+      expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+        provider: "facebook",
+        options: {
+          redirectTo: `${window.location.origin}/profile`,
+          queryParams: undefined,
+        },
+      });
+      expect(replaceMock).not.toHaveBeenCalled();
     });
   });
 
