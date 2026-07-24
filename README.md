@@ -49,6 +49,7 @@
 | オブジェクトストレージ | Cloudflare R2、AWS SDK for JavaScript |
 | 音声処理 | FFmpeg、FFprobe |
 | テスト | Vitest、Testing Library、jsdom |
+| CI | GitHub Actions |
 | スタイル | CSS Modules、Tailwind CSS 4 |
 | コンテナ | Docker、Next.js standalone output |
 
@@ -69,7 +70,7 @@ docs/                 補足ドキュメント
 
 ### 前提環境
 
-- Node.js 22
+- Node.js 24.x
 - npm
 - Docker DesktopなどのDocker実行環境
 - Supabaseプロジェクト
@@ -77,6 +78,16 @@ docs/                 補足ドキュメント
 
 FFmpegとFFprobeの実行ファイルはnpmパッケージに含まれるため、通常はOSへ別途インストールする必要はありません。
 Supabase CLIは開発依存関係としてバージョンを固定しているため、`npm ci`でインストールされます。
+
+### Node.jsのサポート方針
+
+公開時の正式サポート対象はNode.js 24.xです。ローカル開発は`.nvmrc`と`package.json`、Dockerは各Dockerfile、CIはGitHub Actionsで同じメジャーバージョンを使用します。
+
+- Node.js 22は新規環境のサポート対象外です。公式EOLは2027年4月30日の予定です。
+- Node.js 26は正式サポートの対象外です。2026年10月28日のLTS移行後に、localStorage関連テストを含む全テストと本番ビルドを再検証します。
+- Node.js 24の公式EOLは2028年4月30日の予定です。遅くとも2027年10月末までに後継LTSへの移行計画を見直し、EOLまでに移行します。
+
+日程は[Node.js公式リリース予定](https://github.com/nodejs/release#release-schedule)を基準とし、変更があった場合はこの方針も更新します。
 
 ### 1. 依存関係をインストール
 
