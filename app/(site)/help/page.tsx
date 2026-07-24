@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { buildSiteUrl } from "@/lib/siteUrl";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = {
@@ -18,6 +19,8 @@ const editSections = [
 ] as const;
 
 export default function HelpPage() {
+  const exampleProfileUrl = buildSiteUrl("/user_id1234");
+
   return (
     <div className={styles.main}>
       <div className={styles.backgroundAura} aria-hidden="true">
@@ -87,7 +90,7 @@ export default function HelpPage() {
                 </p>
                 <div className={styles.example}>
                   <span>URLの例</span>
-                  <code>https://www.oto_meishi.com/user_id1234</code>
+                  <code>{exampleProfileUrl}</code>
                 </div>
                 <p className={styles.warning}>
                   ユーザーIDは登録後に変更できません。内容をよく確認してから登録してください。

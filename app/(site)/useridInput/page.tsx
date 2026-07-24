@@ -4,10 +4,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
+import { getSiteUrl } from "@/lib/siteUrl";
 import styles from "./page.module.css";
 
 export default function UserIdInputPage() {
   const router = useRouter();
+  const profileUrlPrefix = `${getSiteUrl()}/`;
   const [userId, setUserId] = useState(() => {
     if (typeof window === "undefined") {
       return "";
@@ -98,7 +100,7 @@ export default function UserIdInputPage() {
             ユーザーID
           </label>
           <div className={styles.inputGroup}>
-            <span className={styles.prefix}>oto_meishi.com/</span>
+            <span className={styles.prefix}>{profileUrlPrefix}</span>
             <input
               id="userId"
               className={styles.input}

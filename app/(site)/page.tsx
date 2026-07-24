@@ -1,8 +1,11 @@
 import styles from "./page.module.css";
 import Image from "next/image";
 import Link from "next/link";
+import { buildSiteUrl } from "@/lib/siteUrl";
 
 export default function Home() {
+  const creatorUrl = buildSiteUrl("/seisakusya");
+
   return (
     <section className={styles.main}>
       <section className={styles.hero} aria-label="oto_meishi introduction">
@@ -56,9 +59,7 @@ export default function Home() {
 
         <div className={styles.referenceBox}>
           <span>参考用にこのサイトの製作者の名刺をどうぞ</span>
-          <a href="https://www.oto_meishi/seisakusya">
-            https://www.oto_meishi/seisakusya
-          </a>
+          <a href={creatorUrl}>{creatorUrl}</a>
         </div>
 
         <p className={styles.startText}>まずは登録から</p>

@@ -23,4 +23,12 @@ describe("HelpPage", () => {
       screen.getByRole("link", { name: "マイページへ" }).getAttribute("href"),
     ).toBe("/profile");
   });
+
+  it("共通設定の公開URLを例として表示する", () => {
+    render(<HelpPage />);
+
+    expect(
+      screen.getByText("https://oto-meishi.com/user_id1234"),
+    ).toBeDefined();
+  });
 });
