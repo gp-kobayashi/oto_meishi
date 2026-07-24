@@ -49,7 +49,7 @@ export default function Home() {
             aria-label="profile card preview"
           >
             <Image
-              src="/meishi_sample.png"
+              src="/oto-meishi_sample.png"
               alt="profile card preview"
               width={546}
               height={896}
