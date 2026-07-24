@@ -16,6 +16,7 @@ ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npm run prisma:generate
 
 # Prisma is initialized while Next.js collects route metadata. Use a non-secret,
 # unreachable URL for the build only; Cloud Run supplies the real URL at runtime.

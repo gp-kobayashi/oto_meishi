@@ -8,6 +8,7 @@ RUN npm install
 
 # Copy application files
 COPY . .
+RUN npm run prisma:generate
 
 # Create tmp directory for audio conversion
 RUN mkdir -p .tmp
