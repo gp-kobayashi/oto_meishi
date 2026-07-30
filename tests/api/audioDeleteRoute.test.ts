@@ -3,8 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     getUser: vi.fn(),
+    transaction: vi.fn(),
     findUnique: vi.fn(),
     updateMany: vi.fn(),
+    moderationCaseFindFirst: vi.fn(),
+    moderationCaseCreate: vi.fn(),
+    moderationCaseUpdate: vi.fn(),
+    moderationSnapshotFindFirst: vi.fn(),
+    moderationSnapshotCreate: vi.fn(),
+    moderationCaseEventCreate: vi.fn(),
     extractKeyFromUrl: vi.fn(),
     deleteFromR2: vi.fn(),
   },
@@ -15,6 +22,7 @@ vi.mock("@/lib/supabaseClient", () => ({
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    $transaction: mocks.transaction,
     profile: {
       findUnique: mocks.findUnique,
       updateMany: mocks.updateMany,
@@ -42,10 +50,35 @@ describe("DELETE /api/audio", () => {
       error: null,
     });
     mocks.findUnique.mockResolvedValue({
+      id: "profile-1",
       audioUrl: "https://r2.example/audio/test/old.m4a",
       audioKey: "audio/test/old.m4a",
+      audioTitle: "古い音声",
       audioStatus: "active",
     });
+    mocks.transaction.mockImplementation(async (callback) =>
+      callback({
+        profile: { updateMany: mocks.updateMany },
+        moderationCase: {
+          findFirst: mocks.moderationCaseFindFirst,
+          create: mocks.moderationCaseCreate,
+          update: mocks.moderationCaseUpdate,
+        },
+        moderationSnapshot: {
+          findFirst: mocks.moderationSnapshotFindFirst,
+          create: mocks.moderationSnapshotCreate,
+        },
+        moderationCaseEvent: {
+          create: mocks.moderationCaseEventCreate,
+        },
+      }),
+    );
+    mocks.moderationCaseFindFirst.mockResolvedValue(null);
+    mocks.moderationCaseCreate.mockResolvedValue({ id: "case-1" });
+    mocks.moderationCaseUpdate.mockResolvedValue({ id: "case-1" });
+    mocks.moderationSnapshotFindFirst.mockResolvedValue(null);
+    mocks.moderationSnapshotCreate.mockResolvedValue({ id: "snapshot-1" });
+    mocks.moderationCaseEventCreate.mockResolvedValue({ id: "event-1" });
     mocks.extractKeyFromUrl.mockReturnValue("audio/test/old.m4a");
     mocks.deleteFromR2.mockResolvedValue(undefined);
     mocks.updateMany.mockResolvedValue({ count: 1 });
@@ -58,7 +91,13 @@ describe("DELETE /api/audio", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.findUnique).toHaveBeenCalledWith({
       where: { authId: "auth-user-1" },
-      select: { audioUrl: true, audioKey: true, audioStatus: true },
+      select: {
+        id: true,
+        audioUrl: true,
+        audioKey: true,
+        audioTitle: true,
+        audioStatus: true,
+      },
     });
     expect(mocks.updateMany).toHaveBeenCalledWith({
       where: {
@@ -84,6 +123,8 @@ describe("DELETE /api/audio", () => {
     mocks.findUnique.mockResolvedValueOnce({
       audioUrl: "",
       audioKey: "",
+      id: "profile-1",
+      audioTitle: "",
       audioStatus: "active",
     });
 
@@ -99,6 +140,8 @@ describe("DELETE /api/audio", () => {
     mocks.findUnique.mockResolvedValueOnce({
       audioUrl: "https://r2.example/audio/test/hidden.m4a",
       audioKey: "audio/test/hidden.m4a",
+      id: "profile-1",
+      audioTitle: "非公開音声",
       audioStatus: "hidden",
     });
 
@@ -123,12 +166,41 @@ describe("DELETE /api/audio", () => {
       success: true,
       audioStatus: "removed",
     });
+    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+    expect(mocks.moderationCaseCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        profileId: "profile-1",
+        targetType: "audio",
+        targetId: "profile-1",
+        reviewMode: "postReview",
+        status: "postReviewPending",
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        kind: "reported",
+        storageObjectKey: "audio/test/hidden.m4a",
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        eventType: "contentDeleted",
+        actorType: "user",
+        actorId: "auth-user-1",
+        newStatus: "postReviewPending",
+      }),
+    });
   });
 
   it("音声なしで非公開状態だけが残ったプロフィールを削除済みに修復する", async () => {
     mocks.findUnique.mockResolvedValueOnce({
       audioUrl: "",
       audioKey: "",
+      id: "profile-1",
+      audioTitle: "",
       audioStatus: "hidden",
     });
 
