@@ -29,7 +29,7 @@ export async function DELETE(request: Request) {
 
   const profile = await prisma.profile.findUnique({
     where: { authId: user.id },
-    select: { audioUrl: true, audioKey: true },
+    select: { audioUrl: true, audioKey: true, audioStatus: true },
   });
 
   if (!profile) {
@@ -37,8 +37,33 @@ export async function DELETE(request: Request) {
   }
 
   if (!profile.audioKey && !profile.audioUrl) {
+    if (profile.audioStatus === "hidden") {
+      const recoveryResult = await prisma.profile.updateMany({
+        where: {
+          authId: user.id,
+          audioUrl: "",
+          audioKey: "",
+          audioStatus: "hidden",
+        },
+        data: { audioStatus: "removed" },
+      });
+
+      if (recoveryResult.count !== 1) {
+        return NextResponse.json(
+          { error: "音源の状態が更新されているため削除を中止しました。" },
+          { status: 409 },
+        );
+      }
+    }
+
     return NextResponse.json(
-      { success: true, audioUrl: "", audioTitle: "" },
+      {
+        success: true,
+        audioUrl: "",
+        audioTitle: "",
+        audioStatus:
+          profile.audioStatus === "hidden" ? "removed" : profile.audioStatus,
+      },
       { headers: PRIVATE_NO_STORE_HEADERS },
     );
   }
@@ -58,8 +83,15 @@ export async function DELETE(request: Request) {
         authId: user.id,
         audioUrl: profile.audioUrl,
         audioKey: profile.audioKey,
+        audioStatus: profile.audioStatus,
       },
-      data: { audioUrl: "", audioKey: "", audioTitle: "" },
+      data: {
+        audioUrl: "",
+        audioKey: "",
+        audioTitle: "",
+        audioStatus:
+          profile.audioStatus === "hidden" ? "removed" : profile.audioStatus,
+      },
     });
   } catch (error) {
     console.error("Failed to clear profile audio:", error);
@@ -87,6 +119,8 @@ export async function DELETE(request: Request) {
       success: true,
       audioUrl: "",
       audioTitle: "",
+      audioStatus:
+        profile.audioStatus === "hidden" ? "removed" : profile.audioStatus,
     },
     { headers: PRIVATE_NO_STORE_HEADERS },
   );

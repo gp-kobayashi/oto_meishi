@@ -44,6 +44,7 @@ describe("DELETE /api/audio", () => {
     mocks.findUnique.mockResolvedValue({
       audioUrl: "https://r2.example/audio/test/old.m4a",
       audioKey: "audio/test/old.m4a",
+      audioStatus: "active",
     });
     mocks.extractKeyFromUrl.mockReturnValue("audio/test/old.m4a");
     mocks.deleteFromR2.mockResolvedValue(undefined);
@@ -57,15 +58,21 @@ describe("DELETE /api/audio", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.findUnique).toHaveBeenCalledWith({
       where: { authId: "auth-user-1" },
-      select: { audioUrl: true, audioKey: true },
+      select: { audioUrl: true, audioKey: true, audioStatus: true },
     });
     expect(mocks.updateMany).toHaveBeenCalledWith({
       where: {
         authId: "auth-user-1",
         audioUrl: "https://r2.example/audio/test/old.m4a",
         audioKey: "audio/test/old.m4a",
+        audioStatus: "active",
       },
-      data: { audioUrl: "", audioKey: "", audioTitle: "" },
+      data: {
+        audioUrl: "",
+        audioKey: "",
+        audioTitle: "",
+        audioStatus: "active",
+      },
     });
     expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/test/old.m4a");
     expect(mocks.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
@@ -74,7 +81,11 @@ describe("DELETE /api/audio", () => {
   });
 
   it("音声が未登録の場合も成功レスポンスをキャッシュしない", async () => {
-    mocks.findUnique.mockResolvedValueOnce({ audioUrl: "", audioKey: "" });
+    mocks.findUnique.mockResolvedValueOnce({
+      audioUrl: "",
+      audioKey: "",
+      audioStatus: "active",
+    });
 
     const response = await DELETE(request());
 
@@ -82,6 +93,62 @@ describe("DELETE /api/audio", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.updateMany).not.toHaveBeenCalled();
     expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+  });
+
+  it("非公開音声を削除して削除済み状態へ遷移する", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      audioUrl: "https://r2.example/audio/test/hidden.m4a",
+      audioKey: "audio/test/hidden.m4a",
+      audioStatus: "hidden",
+    });
+
+    const response = await DELETE(request());
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateMany).toHaveBeenCalledWith({
+      where: {
+        authId: "auth-user-1",
+        audioUrl: "https://r2.example/audio/test/hidden.m4a",
+        audioKey: "audio/test/hidden.m4a",
+        audioStatus: "hidden",
+      },
+      data: {
+        audioUrl: "",
+        audioKey: "",
+        audioTitle: "",
+        audioStatus: "removed",
+      },
+    });
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      audioStatus: "removed",
+    });
+  });
+
+  it("音声なしで非公開状態だけが残ったプロフィールを削除済みに修復する", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      audioUrl: "",
+      audioKey: "",
+      audioStatus: "hidden",
+    });
+
+    const response = await DELETE(request());
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateMany).toHaveBeenCalledWith({
+      where: {
+        authId: "auth-user-1",
+        audioUrl: "",
+        audioKey: "",
+        audioStatus: "hidden",
+      },
+      data: { audioStatus: "removed" },
+    });
+    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      success: true,
+      audioStatus: "removed",
+    });
   });
 
   it("R2削除に失敗してもプロフィールの参照解除は成功として返す", async () => {
