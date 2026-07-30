@@ -96,6 +96,31 @@ enum ModerationCaseStatus {
   confirmed
 }
 
+enum ModerationSnapshotKind {
+  reported
+  corrected
+}
+
+enum ModerationActorType {
+  admin
+  user
+  system
+}
+
+enum ModerationCaseEventType {
+  created
+  contentChanged
+  contentDeleted
+  statusChanged
+  reviewApproved
+  reviewRejected
+  accountSuspended
+  appealSubmitted
+  accountRestored
+  deletionScheduled
+  autoConfirmed
+}
+
 enum ReportReason {
   inappropriate_audio
   harassment
@@ -142,25 +167,58 @@ model ModerationAction {
 }
 
 model ModerationCase {
-  id                 String               @id @default(uuid()) @db.Uuid
-  profile            Profile              @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id                 String                @id @default(uuid()) @db.Uuid
+  profile            Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId          String
   targetType         ModerationTargetType
   targetId           String
   reasonCode         ModerationReasonCode
   reviewMode         ModerationReviewMode
-  status             ModerationCaseStatus @default(correctionRequired)
-  userMessage        String               @db.VarChar(500)
-  reviewDueAt        DateTime             @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
-  retentionExpiresAt DateTime             @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
+  status             ModerationCaseStatus  @default(correctionRequired)
+  userMessage        String                @db.VarChar(500)
+  reviewDueAt        DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
+  retentionExpiresAt DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
   resolvedAt         DateTime?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  snapshots          ModerationSnapshot[]
+  events             ModerationCaseEvent[]
 
   @@index([profileId, status, createdAt])
   @@index([status, reviewDueAt])
   @@index([retentionExpiresAt])
   @@index([targetType, targetId, createdAt])
+}
+
+model ModerationSnapshot {
+  id               String                 @id @default(uuid()) @db.Uuid
+  moderationCase   ModerationCase         @relation(fields: [moderationCaseId], references: [id], onDelete: Cascade)
+  moderationCaseId String                 @db.Uuid
+  kind             ModerationSnapshotKind
+  content          Json
+  contentHash      String?                @db.VarChar(128)
+  storageObjectKey String?                @db.VarChar(1024)
+  expiresAt        DateTime
+  createdAt        DateTime               @default(now())
+
+  @@index([moderationCaseId, kind, createdAt])
+  @@index([expiresAt])
+}
+
+model ModerationCaseEvent {
+  id               String                  @id @default(uuid()) @db.Uuid
+  moderationCase   ModerationCase          @relation(fields: [moderationCaseId], references: [id], onDelete: Cascade)
+  moderationCaseId String                  @db.Uuid
+  eventType        ModerationCaseEventType
+  actorType        ModerationActorType
+  actorId          String?                 @db.VarChar(128)
+  previousStatus   ModerationCaseStatus?
+  newStatus        ModerationCaseStatus?
+  details          Json?
+  createdAt        DateTime                @default(now())
+
+  @@index([moderationCaseId, createdAt])
+  @@index([eventType, createdAt])
 }
 
 model ContentReport {
