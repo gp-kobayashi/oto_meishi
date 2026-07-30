@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const TEMP_DIR = path.join(process.cwd(), ".tmp", "upload-123");
 const INPUT_PATH = path.join(TEMP_DIR, "input.bin");
@@ -11,6 +12,7 @@ const { mocks } = vi.hoisted(() => ({
     mkdir: vi.fn(),
     mkdtemp: vi.fn(),
     writeFile: vi.fn(),
+    readFile: vi.fn(),
     rm: vi.fn(),
     stat: vi.fn(),
     convertToAac: vi.fn(),
@@ -21,6 +23,11 @@ const { mocks } = vi.hoisted(() => ({
     consumeAudioUploadUserRateLimit: vi.fn(),
     consumeAudioUploadIpRateLimit: vi.fn(),
     updateProfile: vi.fn(),
+    transaction: vi.fn(),
+    moderationCaseUpdate: vi.fn(),
+    moderationCaseCreate: vi.fn(),
+    moderationSnapshotCreate: vi.fn(),
+    moderationCaseEventCreate: vi.fn(),
     deleteFromR2: vi.fn(),
     extractKeyFromUrl: vi.fn(),
   },
@@ -36,6 +43,7 @@ vi.mock("@/lib/supabaseClient", () => ({
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    $transaction: mocks.transaction,
     profile: {
       findUnique: mocks.findUniqueProfile,
       update: mocks.updateProfile,
@@ -52,6 +60,7 @@ vi.mock("fs/promises", () => ({
     mkdir: mocks.mkdir,
     mkdtemp: mocks.mkdtemp,
     writeFile: mocks.writeFile,
+    readFile: mocks.readFile,
     rm: mocks.rm,
     stat: mocks.stat,
   },
@@ -142,11 +151,13 @@ describe("/api/audio/upload route", () => {
       error: null,
     });
     mocks.findUniqueProfile.mockResolvedValue({
+      id: "profile-1",
       authId: "auth-user-1",
       status: "active",
       audioStatus: "active",
       audioKey: "",
       audioUrl: "",
+      moderationCases: [],
     });
     mocks.inspectAudioFile.mockImplementation(async (filePath: string) =>
       filePath.endsWith("output.m4a")
@@ -156,12 +167,28 @@ describe("/api/audio/upload route", () => {
     mocks.mkdir.mockResolvedValue(undefined);
     mocks.mkdtemp.mockResolvedValue(TEMP_DIR);
     mocks.writeFile.mockResolvedValue(undefined);
+    mocks.readFile.mockResolvedValue(Buffer.from("converted audio"));
     mocks.rm.mockResolvedValue(undefined);
     mocks.stat.mockResolvedValue({ size: 2 * 1024 * 1024 });
     mocks.convertToAac.mockResolvedValue(OUTPUT_PATH);
     mocks.generateAudioKey.mockReturnValue("audio/testuser/voice-123.m4a");
     mocks.uploadToR2.mockResolvedValue(undefined);
     mocks.updateProfile.mockResolvedValue(undefined);
+    mocks.transaction.mockImplementation(async (callback) =>
+      callback({
+        profile: { update: mocks.updateProfile },
+        moderationCase: {
+          update: mocks.moderationCaseUpdate,
+          create: mocks.moderationCaseCreate,
+        },
+        moderationSnapshot: { create: mocks.moderationSnapshotCreate },
+        moderationCaseEvent: { create: mocks.moderationCaseEventCreate },
+      }),
+    );
+    mocks.moderationCaseUpdate.mockResolvedValue({ id: "case-1" });
+    mocks.moderationCaseCreate.mockResolvedValue({ id: "case-1" });
+    mocks.moderationSnapshotCreate.mockResolvedValue({ id: "snapshot-1" });
+    mocks.moderationCaseEventCreate.mockResolvedValue({ id: "event-1" });
     mocks.deleteFromR2.mockResolvedValue(undefined);
     mocks.extractKeyFromUrl.mockReturnValue("audio/testuser/legacy.m4a");
     mocks.consumeAudioUploadUserRateLimit.mockReturnValue({
@@ -398,11 +425,36 @@ describe("/api/audio/upload route", () => {
     expect(mocks.findUniqueProfile).toHaveBeenCalledWith({
       where: { userId: "testuser" },
       select: {
+        id: true,
         authId: true,
         status: true,
         audioStatus: true,
         audioKey: true,
         audioUrl: true,
+        moderationCases: {
+          where: {
+            targetType: "audio",
+            status: {
+              in: [
+                "correctionRequired",
+                "postReviewPending",
+                "preReviewPending",
+              ],
+            },
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            snapshots: {
+              where: { kind: "reported" },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 1,
+              select: { contentHash: true },
+            },
+          },
+        },
       },
     });
     expect(mocks.writeFile).not.toHaveBeenCalled();
@@ -574,12 +626,103 @@ describe("/api/audio/upload route", () => {
       data: {
         audioKey: "audio/testuser/voice-123.m4a",
         audioUrl: "",
+        audioStatus: "active",
       },
     });
     expect(mocks.rm).toHaveBeenCalledWith(TEMP_DIR, {
       recursive: true,
       force: true,
     });
+  });
+
+  it("削除済み音声を再登録して事後確認待ちへ更新する", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "active",
+      audioStatus: "removed",
+      audioKey: "",
+      audioUrl: "",
+      moderationCases: [
+        {
+          id: "case-1",
+          status: "postReviewPending",
+          snapshots: [{ contentHash: null }],
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateProfile).toHaveBeenCalledWith({
+      where: {
+        userId: "testuser",
+        authId: "auth-user-1",
+        status: "active",
+        audioStatus: "removed",
+      },
+      data: {
+        audioKey: "audio/testuser/voice-123.m4a",
+        audioUrl: "",
+        audioStatus: "active",
+      },
+    });
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: expect.objectContaining({
+        reviewMode: "postReview",
+        status: "postReviewPending",
+        resolvedAt: null,
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        kind: "corrected",
+        contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        eventType: "contentChanged",
+        actorType: "user",
+        actorId: "auth-user-1",
+        newStatus: "postReviewPending",
+      }),
+    });
+  });
+
+  it("削除前と同じ音声は再登録しない", async () => {
+    const previousHash = createHash("sha256")
+      .update("converted audio")
+      .digest("hex");
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "active",
+      audioStatus: "removed",
+      audioKey: "",
+      audioUrl: "",
+      moderationCases: [
+        {
+          id: "case-1",
+          status: "postReviewPending",
+          snapshots: [{ contentHash: previousHash }],
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "削除前と同じ音声です。別の音声へ変更してください。",
+    });
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
   });
 
   it("DBへの紐付け失敗時は新しいR2音声を削除する", async () => {
@@ -600,11 +743,13 @@ describe("/api/audio/upload route", () => {
 
   it("DBへの紐付け後に置き換え前のR2音声を削除する", async () => {
     mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
       authId: "auth-user-1",
       status: "active",
       audioStatus: "active",
       audioKey: "audio/testuser/old.m4a",
       audioUrl: "",
+      moderationCases: [],
     });
 
     const response = await POST(uploadRequest(formDataWithFile()));
@@ -621,11 +766,13 @@ describe("/api/audio/upload route", () => {
   it("置き換え前のR2音声を削除できなくてもアップロードは成功する", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
       authId: "auth-user-1",
       status: "active",
       audioStatus: "active",
       audioKey: "audio/testuser/old.m4a",
       audioUrl: "",
+      moderationCases: [],
     });
     mocks.deleteFromR2.mockRejectedValueOnce(new Error("delete failed"));
 

@@ -128,7 +128,7 @@ export async function GET(
           audioTitle: profile.audioTitle,
           audioStatus: profile.audioStatus,
           deletedAudio:
-            profile.audioStatus === "removed" && deletedAudioCase
+            deletedAudioCase && deletedAudioEvent
               ? {
                   moderationCaseId: deletedAudioCase.id,
                   status: deletedAudioCase.status,

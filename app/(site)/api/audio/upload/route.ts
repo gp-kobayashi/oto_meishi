@@ -26,6 +26,11 @@ import {
 } from "@/lib/audioUploadRateLimit";
 import { getClientIp } from "@/lib/clientIp";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
+import {
+  compareModeratedContentHashes,
+  createModerationContentHash,
+  getModerationDeadline,
+} from "@/lib/moderationRemediation";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -153,11 +158,36 @@ export async function POST(request: NextRequest) {
     const profile = await prisma.profile.findUnique({
       where: { userId },
       select: {
+        id: true,
         authId: true,
         status: true,
         audioStatus: true,
         audioKey: true,
         audioUrl: true,
+        moderationCases: {
+          where: {
+            targetType: "audio",
+            status: {
+              in: [
+                "correctionRequired",
+                "postReviewPending",
+                "preReviewPending",
+              ],
+            },
+          },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            snapshots: {
+              where: { kind: "reported" },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 1,
+              select: { contentHash: true },
+            },
+          },
+        },
       },
     });
 
@@ -174,7 +204,7 @@ export async function POST(request: NextRequest) {
 
     if (
       (profile.status ?? "active") !== "active" ||
-      (profile.audioStatus ?? "active") !== "active"
+      !["active", "removed"].includes(profile.audioStatus ?? "active")
     ) {
       return NextResponse.json(
         { error: "管理対応中のため、音声をアップロードできません。" },
@@ -245,19 +275,100 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      const convertedAudio = await fs.readFile(convertedPath);
+      const contentHash = await createModerationContentHash(convertedAudio);
+      const previousContentHash =
+        profile.moderationCases[0]?.snapshots[0]?.contentHash;
+      if (
+        profile.audioStatus === "removed" &&
+        previousContentHash &&
+        compareModeratedContentHashes(previousContentHash, contentHash) ===
+          "same"
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "削除前と同じ音声です。別の音声へ変更してください。",
+          },
+          { status: 409 },
+        );
+      }
+
       // R2ストレージにアップロード
       const audioKey = generateAudioKey(userId);
       await uploadToR2(convertedPath, audioKey, "audio/mp4");
 
       try {
-        await prisma.profile.update({
-          where: {
-            userId,
-            authId: authenticatedUserId,
-            status: "active",
-            audioStatus: "active",
-          },
-          data: { audioKey, audioUrl: "" },
+        const deadline = getModerationDeadline();
+        await prisma.$transaction(async (tx) => {
+          await tx.profile.update({
+            where: {
+              userId,
+              authId: authenticatedUserId,
+              status: "active",
+              audioStatus: profile.audioStatus,
+            },
+            data: {
+              audioKey,
+              audioUrl: "",
+              audioStatus: "active",
+            },
+          });
+
+          if (profile.audioStatus !== "removed") return;
+
+          const existingCase = profile.moderationCases[0];
+          const moderationCase = existingCase
+            ? await tx.moderationCase.update({
+                where: { id: existingCase.id },
+                data: {
+                  reviewMode: "postReview",
+                  status: "postReviewPending",
+                  reviewDueAt: deadline,
+                  retentionExpiresAt: deadline,
+                  resolvedAt: null,
+                },
+                select: { id: true },
+              })
+            : await tx.moderationCase.create({
+                data: {
+                  profileId: profile.id,
+                  targetType: "audio",
+                  targetId: profile.id,
+                  reasonCode: "other",
+                  reviewMode: "postReview",
+                  status: "postReviewPending",
+                  userMessage: "削除後に新しい音声が登録されました。",
+                  reviewDueAt: deadline,
+                  retentionExpiresAt: deadline,
+                },
+                select: { id: true },
+              });
+
+          await tx.moderationSnapshot.create({
+            data: {
+              moderationCaseId: moderationCase.id,
+              kind: "corrected",
+              content: {
+                audioKey,
+                replacedDeletedAudio: true,
+              },
+              contentHash,
+              expiresAt: deadline,
+            },
+          });
+
+          await tx.moderationCaseEvent.create({
+            data: {
+              moderationCaseId: moderationCase.id,
+              eventType: "contentChanged",
+              actorType: "user",
+              actorId: authenticatedUserId,
+              previousStatus: existingCase?.status ?? "correctionRequired",
+              newStatus: "postReviewPending",
+              details: { targetType: "audio" },
+            },
+          });
         });
       } catch (databaseError) {
         try {
