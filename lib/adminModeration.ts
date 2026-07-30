@@ -43,6 +43,21 @@ export type ModerationDetailResponse = {
     hasAudio: boolean;
     audioTitle: string;
     audioStatus: "active" | "hidden" | "removed";
+    deletedAudio: {
+      moderationCaseId: string;
+      status:
+        | "correctionRequired"
+        | "postReviewPending"
+        | "preReviewPending"
+        | "confirmed";
+      reviewMode: "postReview" | "preReview";
+      reviewDueAt: string;
+      previousTitle: string | null;
+      previousStatus: string | null;
+      deletedAt: string | null;
+      deletedByType: "admin" | "user" | "system" | null;
+      deletedByIdentifier: string | null;
+    } | null;
     createdAt: string;
     updatedAt: string;
     links: {

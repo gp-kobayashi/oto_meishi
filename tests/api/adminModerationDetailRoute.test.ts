@@ -44,10 +44,10 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       bio: "自己紹介",
       theme: "normal",
       status: "active",
-      audioKey: "audio/sample-user/audio.m4a",
-      audioUrl: "https://example.com/audio.m4a",
-      audioTitle: "音声",
-      audioStatus: "active",
+      audioKey: "",
+      audioUrl: "",
+      audioTitle: "",
+      audioStatus: "removed",
       createdAt: new Date("2026-07-16T00:00:00.000Z"),
       updatedAt: new Date("2026-07-17T00:00:00.000Z"),
       sns: [
@@ -71,6 +71,29 @@ describe("GET /api/admin/moderation/[profileId]", () => {
           reviewedByAdminUser: null,
           createdAt: new Date("2026-07-17T02:00:00.000Z"),
           updatedAt: new Date("2026-07-17T02:00:00.000Z"),
+        },
+      ],
+      moderationCases: [
+        {
+          id: "case-1",
+          status: "postReviewPending",
+          reviewMode: "postReview",
+          reviewDueAt: new Date("2026-09-15T00:00:00.000Z"),
+          snapshots: [
+            {
+              content: {
+                audioTitle: "削除前の音声",
+                audioStatus: "hidden",
+              },
+            },
+          ],
+          events: [
+            {
+              actorType: "user",
+              actorId: "auth-user-123456",
+              createdAt: new Date("2026-07-17T04:00:00.000Z"),
+            },
+          ],
         },
       ],
     });
@@ -98,7 +121,19 @@ describe("GET /api/admin/moderation/[profileId]", () => {
     expect(result.profile).toMatchObject({
       id: "profile-1",
       userId: "sample-user",
-      hasAudio: true,
+      hasAudio: false,
+      audioStatus: "removed",
+      deletedAudio: {
+        moderationCaseId: "case-1",
+        status: "postReviewPending",
+        reviewMode: "postReview",
+        reviewDueAt: "2026-09-15T00:00:00.000Z",
+        previousTitle: "削除前の音声",
+        previousStatus: "hidden",
+        deletedAt: "2026-07-17T04:00:00.000Z",
+        deletedByType: "user",
+        deletedByIdentifier: "auth-use",
+      },
       createdAt: "2026-07-16T00:00:00.000Z",
       links: [{ id: "link-1", status: "hidden" }],
       reports: [

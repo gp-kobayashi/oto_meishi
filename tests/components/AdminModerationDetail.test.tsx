@@ -30,9 +30,20 @@ describe("AdminModerationDetail", () => {
             bio: "自己紹介です",
             theme: "normal",
             status: "active",
-            hasAudio: true,
-            audioTitle: "自己紹介音声",
-            audioStatus: "active",
+            hasAudio: false,
+            audioTitle: "",
+            audioStatus: "removed",
+            deletedAudio: {
+              moderationCaseId: "case-1",
+              status: "postReviewPending",
+              reviewMode: "postReview",
+              reviewDueAt: "2026-09-15T00:00:00.000Z",
+              previousTitle: "自己紹介音声",
+              previousStatus: "hidden",
+              deletedAt: "2026-07-17T04:00:00.000Z",
+              deletedByType: "user",
+              deletedByIdentifier: "auth-use",
+            },
             createdAt: "2026-07-16T00:00:00.000Z",
             updatedAt: "2026-07-17T00:00:00.000Z",
             links: [
@@ -88,6 +99,15 @@ describe("AdminModerationDetail", () => {
 
     expect(await screen.findByRole("heading", { name: "サンプル" })).toBeDefined();
     expect(screen.getByText("自己紹介音声")).toBeDefined();
+    expect(screen.getByText("削除済み音声の対応状況")).toBeDefined();
+    expect(screen.getByText("事後確認待ち（公開中）")).toBeDefined();
+    expect(screen.getByText("hidden")).toBeDefined();
+    expect(screen.getByText("user / auth-use")).toBeDefined();
+    expect(
+      screen.getByText(
+        "削除前の音声は確認期限まで管理者確認用として保持されます。",
+      ),
+    ).toBeDefined();
     expect(screen.getByRole("link", { name: "リンク先を別タブで開く" }).getAttribute("href"))
       .toBe("https://youtube.com/example");
     expect(screen.getByRole("heading", { name: "管理操作履歴" })).toBeDefined();

@@ -19,6 +19,13 @@ const audioStatusLabels = {
   removed: "削除済み",
 };
 
+const moderationCaseStatusLabels = {
+  correctionRequired: "修正待ち",
+  postReviewPending: "事後確認待ち（公開中）",
+  preReviewPending: "管理者確認待ち（非公開）",
+  confirmed: "確認済み",
+};
+
 const linkStatusLabels = {
   active: "公開中",
   hidden: "非公開",
@@ -364,6 +371,62 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
               <p className={styles.audioTitle}>
                 {data.profile.audioTitle || "音声は登録されていません。"}
               </p>
+              {data.profile.deletedAudio ? (
+                <div className={styles.deletedAudioNotice}>
+                  <div className={styles.deletedAudioHeading}>
+                    <strong>削除済み音声の対応状況</strong>
+                    <span className={styles.reviewStatus}>
+                      {
+                        moderationCaseStatusLabels[
+                          data.profile.deletedAudio.status
+                        ]
+                      }
+                    </span>
+                  </div>
+                  <dl className={styles.deletedAudioDetails}>
+                    <div>
+                      <dt>削除前のタイトル</dt>
+                      <dd>
+                        {data.profile.deletedAudio.previousTitle ||
+                          "タイトルなし"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>削除前の状態</dt>
+                      <dd>
+                        {data.profile.deletedAudio.previousStatus ||
+                          "確認できません"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>削除日時</dt>
+                      <dd>
+                        {data.profile.deletedAudio.deletedAt
+                          ? formatDate(data.profile.deletedAudio.deletedAt)
+                          : "確認できません"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>実行者</dt>
+                      <dd>
+                        {data.profile.deletedAudio.deletedByType &&
+                        data.profile.deletedAudio.deletedByIdentifier
+                          ? `${data.profile.deletedAudio.deletedByType} / ${data.profile.deletedAudio.deletedByIdentifier}`
+                          : "確認できません"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>確認期限</dt>
+                      <dd>
+                        {formatDate(data.profile.deletedAudio.reviewDueAt)}
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className={styles.deletedAudioNote}>
+                    削除前の音声は確認期限まで管理者確認用として保持されます。
+                  </p>
+                </div>
+              ) : null}
               {data.profile.hasAudio ? (
                 <AdminAudioPlayer profileId={data.profile.id} />
               ) : null}

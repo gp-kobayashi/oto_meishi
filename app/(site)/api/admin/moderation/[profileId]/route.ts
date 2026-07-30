@@ -58,6 +58,33 @@ export async function GET(
             updatedAt: true,
           },
         },
+        moderationCases: {
+          where: { targetType: "audio" },
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            reviewMode: true,
+            reviewDueAt: true,
+            snapshots: {
+              where: { kind: "reported" },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 1,
+              select: { content: true },
+            },
+            events: {
+              where: { eventType: "contentDeleted" },
+              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+              take: 1,
+              select: {
+                actorType: true,
+                actorId: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -84,6 +111,9 @@ export async function GET(
         adminUser: { select: { authId: true, role: true } },
       },
     });
+    const deletedAudioCase = profile.moderationCases[0];
+    const deletedAudioEvent = deletedAudioCase?.events[0];
+    const reportedAudio = deletedAudioCase?.snapshots[0]?.content;
 
     return Response.json(
       {
@@ -97,6 +127,27 @@ export async function GET(
           hasAudio: Boolean(profile.audioKey || profile.audioUrl),
           audioTitle: profile.audioTitle,
           audioStatus: profile.audioStatus,
+          deletedAudio:
+            profile.audioStatus === "removed" && deletedAudioCase
+              ? {
+                  moderationCaseId: deletedAudioCase.id,
+                  status: deletedAudioCase.status,
+                  reviewMode: deletedAudioCase.reviewMode,
+                  reviewDueAt: deletedAudioCase.reviewDueAt.toISOString(),
+                  previousTitle: getSnapshotString(
+                    reportedAudio,
+                    "audioTitle",
+                  ),
+                  previousStatus: getSnapshotString(
+                    reportedAudio,
+                    "audioStatus",
+                  ),
+                  deletedAt: deletedAudioEvent?.createdAt.toISOString() ?? null,
+                  deletedByType: deletedAudioEvent?.actorType ?? null,
+                  deletedByIdentifier:
+                    deletedAudioEvent?.actorId?.slice(0, 8) ?? null,
+                }
+              : null,
           createdAt: profile.createdAt.toISOString(),
           updatedAt: profile.updatedAt.toISOString(),
           links: profile.sns,
@@ -136,4 +187,20 @@ export async function GET(
       { status: 500 },
     );
   }
+}
+
+function getSnapshotString(
+  content: unknown,
+  key: string,
+): string | null {
+  if (
+    typeof content !== "object" ||
+    content === null ||
+    Array.isArray(content)
+  ) {
+    return null;
+  }
+
+  const value = (content as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
 }
