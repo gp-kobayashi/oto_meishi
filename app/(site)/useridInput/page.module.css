@@ -1,5 +1,6 @@
 .main {
   min-height: 100vh;
+  box-sizing: border-box;
   padding: 40px 24px;
   display: grid;
   place-items: center;
@@ -8,6 +9,8 @@
 
 .card {
   width: min(560px, 100%);
+  min-width: 0;
+  box-sizing: border-box;
   padding: 36px;
   border-radius: 32px;
   background: #ffffff;
@@ -31,6 +34,7 @@
 .form {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .label {
@@ -86,6 +90,7 @@
 
 .submitButton {
   width: 100%;
+  box-sizing: border-box;
   padding: 14px 16px;
   border: none;
   border-radius: 16px;
@@ -103,10 +108,26 @@
 
 @media (max-width: 520px) {
   .card {
-    padding: 28px;
+    padding: 28px 20px;
   }
 
   .title {
     font-size: 1.9rem;
+  }
+
+  .inputGroup {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .prefix {
+    padding: 10px 14px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .input {
+    width: 100%;
+    box-sizing: border-box;
   }
 }

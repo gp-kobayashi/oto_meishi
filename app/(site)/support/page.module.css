@@ -3,8 +3,8 @@
 .eyebrow { margin: 0; color: #2563eb; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
 .hero h1 { margin: 8px 0 14px; font-size: clamp(32px, 6vw, 48px); }
 .hero > p:last-child, .panel > p { color: #475569; line-height: 1.8; }
-.content { display: grid; gap: 20px; }
-.panel { padding: 26px; border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; box-shadow: 0 16px 44px rgba(15, 23, 42, .07); }
+.content { display: grid; min-width: 0; gap: 20px; }
+.panel { min-width: 0; box-sizing: border-box; padding: 26px; border: 1px solid #e2e8f0; border-radius: 18px; background: #fff; box-shadow: 0 16px 44px rgba(15, 23, 42, .07); }
 .panel h2 { margin: 0 0 14px; font-size: 21px; }
 .panel a { color: #1d4ed8; font-weight: 700; }
 .deadline, .pendingNotice { padding: 12px 14px; border-radius: 10px; background: #fff7ed; color: #9a3412 !important; font-weight: 700; }
@@ -26,7 +26,7 @@
 .pending { background: #fef3c7; color: #92400e; }
 .resolved { background: #dcfce7; color: #166534; }
 .rejected { background: #fee2e2; color: #991b1b; }
-.history p { color: #475569; line-height: 1.7; white-space: pre-wrap; }
+.history p { color: #475569; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
 .history time { color: #64748b; font-size: 12px; }
 .response { margin-top: 14px; padding: 13px; border-radius: 10px; background: #eff6ff; }
 .response strong { color: #1d4ed8; font-size: 12px; }
