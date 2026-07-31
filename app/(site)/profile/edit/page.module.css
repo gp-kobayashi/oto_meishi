@@ -38,6 +38,7 @@
   --editor-error: #dc2626;
   width: 90%;
   max-width: 980px;
+  min-width: 0;
   box-sizing: border-box;
   margin: 0 auto;
   display: grid;
@@ -115,6 +116,7 @@
 .fieldRow {
   display: grid;
   gap: 8px;
+  min-width: 0;
 }
 
 .labelWithValidation {
@@ -129,13 +131,14 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .validationError {
   color: var(--editor-error);
   font-size: 0.75rem;
   font-weight: 600;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .label {
@@ -155,6 +158,7 @@
   border: 1px solid var(--editor-input-border);
   background: var(--editor-input-bg);
   padding: 14px 16px;
+  box-sizing: border-box;
   color: var(--editor-input-text);
   font-size: 0.95rem;
   transition:
@@ -322,7 +326,9 @@
 
 .fixedSaveControls .saveMessage {
   order: 1;
+  min-width: 0;
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .saveButton {
