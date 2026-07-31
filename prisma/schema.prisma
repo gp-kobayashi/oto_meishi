@@ -107,6 +107,17 @@ enum ModerationActorType {
   system
 }
 
+enum ModerationRequestKind {
+  inquiry
+  accountAppeal
+}
+
+enum ModerationRequestStatus {
+  pending
+  resolved
+  rejected
+}
+
 enum ModerationCaseEventType {
   created
   contentChanged
@@ -259,6 +270,7 @@ model Profile {
   reports                 ContentReport[]
   notifications           UserNotification[]
   moderationCases         ModerationCase[]
+  moderationRequests      ModerationRequest[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 
@@ -266,6 +278,22 @@ model Profile {
   @@index([audioStatus])
   @@index([accountModerationStatus, suspensionAppealDueAt])
   @@index([deletionScheduledAt])
+}
+
+model ModerationRequest {
+  id              String                  @id @default(uuid()) @db.Uuid
+  profile         Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId       String
+  kind            ModerationRequestKind
+  status          ModerationRequestStatus @default(pending)
+  message         String                  @db.VarChar(500)
+  responseMessage String                  @default("") @db.VarChar(500)
+  resolvedAt      DateTime?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
 }
 
 model UserNotification {
