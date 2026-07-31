@@ -30,6 +30,7 @@
 .nav {
   display: flex;
   flex-wrap: wrap;
+  min-width: 0;
   gap: 8px;
   align-items: center;
   justify-content: flex-end;
@@ -81,5 +82,9 @@
 
   .nav a {
     padding: 8px 10px;
+  }
+
+  .nav {
+    gap: 4px;
   }
 }
