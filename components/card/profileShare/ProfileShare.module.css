@@ -24,9 +24,18 @@
   text-underline-offset: 3px;
 }
 
-.copyButton {
-  min-height: 42px;
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  max-width: 100%;
   margin-top: 14px;
+}
+
+.copyButton,
+.shareButton {
+  min-height: 42px;
   padding: 9px 18px;
   border: 1px solid currentColor;
   border-radius: 999px;
@@ -37,11 +46,13 @@
   font-weight: 700;
 }
 
-.copyButton:hover {
+.copyButton:hover,
+.shareButton:hover {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 
-.copyButton:focus-visible {
+.copyButton:focus-visible,
+.shareButton:focus-visible {
   outline: 3px solid color-mix(in srgb, currentColor 28%, transparent);
   outline-offset: 3px;
 }

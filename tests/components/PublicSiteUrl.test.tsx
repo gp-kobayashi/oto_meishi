@@ -92,4 +92,52 @@ describe("公開URLを使用する画面", () => {
       "URLをコピーできませんでした。",
     );
   });
+
+  it("Web Share API対応端末では公開プロフィールを共有する", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: share,
+    });
+    render(<ProfileShare username="sample-user" />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "端末で共有" }),
+    );
+
+    expect((await screen.findByRole("status")).textContent).toBe(
+      "プロフィールを共有しました。",
+    );
+    expect(share).toHaveBeenCalledWith({
+      title: "oto_meishi",
+      text: "oto_meishiのプロフィールを共有します。",
+      url: "https://oto-meishi.com/sample-user",
+    });
+  });
+
+  it("端末共有に失敗した場合はエラーを表示する", async () => {
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: vi.fn().mockRejectedValue(new Error("share failed")),
+    });
+    render(<ProfileShare username="sample-user" />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "端末で共有" }),
+    );
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "プロフィールを共有できませんでした。",
+    );
+  });
+
+  it("Web Share API未対応の場合は端末共有ボタンを表示しない", () => {
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: undefined,
+    });
+    render(<ProfileShare username="sample-user" />);
+
+    expect(screen.queryByRole("button", { name: "端末で共有" })).toBeNull();
+  });
 });
