@@ -10,6 +10,25 @@ describe("AudioPlayer", () => {
     vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
   });
 
+  it("プレビュー音声URLがある場合はAPIを呼ばずに再生する", async () => {
+    const fetchMock = vi.spyOn(global, "fetch");
+    const playMock = vi
+      .spyOn(HTMLMediaElement.prototype, "play")
+      .mockResolvedValue();
+
+    render(
+      <AudioPlayer
+        userId="sample-user"
+        audioTitle="保存前の音声"
+        previewAudioUrl="blob:http://localhost/preview-audio"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "再生" }));
+
+    await waitFor(() => expect(playMock).toHaveBeenCalled());
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("再生ボタンを押した時にだけ署名URLを取得して再生する", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify({ audioUrl: "https://signed.example/audio" }), {

@@ -14,9 +14,11 @@ function formatTime(seconds: number): string {
 const AudioPlayer = ({
   userId,
   audioTitle,
+  previewAudioUrl = "",
 }: {
   userId: string;
   audioTitle: string;
+  previewAudioUrl?: string;
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -110,7 +112,11 @@ const AudioPlayer = ({
   return (
     <div className={styles.audioContainer}>
       {/* 非表示の audio 要素 */}
-      <audio ref={audioRef} preload="none" />
+      <audio
+        ref={audioRef}
+        preload={previewAudioUrl ? "metadata" : "none"}
+        src={previewAudioUrl || undefined}
+      />
 
       {/* 上段: 再生ボタン ＋ プログレスバー + 時間*/}
       <div className={styles.controls}>

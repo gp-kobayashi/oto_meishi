@@ -10,9 +10,11 @@ import ReportMenu from "./reportMenu/ReportMenu";
 const Card = ({
   link,
   showReportMenu = false,
+  previewAudioUrl = "",
 }: {
   link: ProfileData;
   showReportMenu?: boolean;
+  previewAudioUrl?: string;
 }) => {
   const {
     userId,
@@ -36,7 +38,11 @@ const Card = ({
       </h2>
       <p className={styles.bio}>{bio}</p>
       {(hasAudio || audioKey || audioUrl) && (
-        <AudioPlayer userId={userId} audioTitle={audioTitle} />
+        <AudioPlayer
+          userId={userId}
+          audioTitle={audioTitle}
+          previewAudioUrl={previewAudioUrl}
+        />
       )}
       <ul className={styles.snsList}>
         {sns.map((link) => (
