@@ -60,8 +60,8 @@ export function getModerationNotificationGuidance(
       actionLabel: actionLabels[action],
       guidance:
         "利用停止中は通常の編集を行えません。対応方法を確認してください。",
-      actionUrl: "/help",
-      actionLinkLabel: "対応方法を確認",
+      actionUrl: "/support",
+      actionLinkLabel: "解除申請を確認",
     };
   }
 

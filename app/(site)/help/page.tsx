@@ -49,6 +49,7 @@ export default function HelpPage() {
             <a href="#getting-started">登録から編集まで</a>
             <a href="#edit-guide">編集画面の説明</a>
             <a href="#qr-code">QRコードの使い方</a>
+            <a href="#moderation-support">非公開・利用停止への対応</a>
           </div>
         </nav>
 
@@ -226,6 +227,36 @@ export default function HelpPage() {
                 イベントではQRコードを印刷して掲示するなど、オンライン以外の場でも活用できます。
               </p>
             </section>
+          </div>
+        </section>
+
+        <section
+          id="moderation-support"
+          className={styles.section}
+          aria-labelledby="moderation-support-title"
+        >
+          <div className={styles.sectionHeading}>
+            <span>03</span>
+            <div>
+              <p>MODERATION SUPPORT</p>
+              <h2 id="moderation-support-title">
+                非公開・利用停止への対応
+              </h2>
+            </div>
+          </div>
+          <div className={`${styles.guideCard} ${styles.wideCard}`}>
+            <h3>通知で対象と理由を確認してください</h3>
+            <p>
+              音声やリンクが非公開になった場合は、ベルの通知とプロフィール編集画面に対象・理由・必要な対応が表示されます。
+              通常の違反は修正後に公開され、管理者が事後確認します。誹謗中傷やなりすましなどは、管理者の確認が完了するまで非公開です。
+            </p>
+            <p>
+              修正方法について確認したい場合や、利用停止の解除を申請する場合は、対応状況と申請画面を利用してください。
+              利用停止の解除申請期間は、利用停止から60日間です。
+            </p>
+            <Link className={styles.supportLink} href="/support">
+              対応状況と申請を確認
+            </Link>
           </div>
         </section>
 

@@ -14,7 +14,7 @@ type NotificationItem = {
   actionLabel?: string;
   reason?: string;
   guidance?: string;
-  actionUrl?: "/profile/edit" | "/help";
+  actionUrl?: "/profile/edit" | "/help" | "/support";
   actionLinkLabel?: string;
   handledAt?: string;
   readAt: string | null;

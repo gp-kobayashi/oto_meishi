@@ -49,4 +49,16 @@ describe("getModerationNotification", () => {
       actionLinkLabel: "リンクを修正",
     });
   });
+
+  it("利用停止通知は解除申請画面への導線を返す", () => {
+    expect(
+      getModerationNotificationGuidance("profile", "suspend", null),
+    ).toEqual({
+      actionLabel: "利用停止",
+      guidance:
+        "利用停止中は通常の編集を行えません。対応方法を確認してください。",
+      actionUrl: "/support",
+      actionLinkLabel: "解除申請を確認",
+    });
+  });
 });
