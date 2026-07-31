@@ -310,6 +310,33 @@ describe('APIバリデーション関数', () => {
       expect(result.data?.displayName).toBe('テストユーザー');
     });
 
+    it('URLがあるSNSリンクのラベルが空の場合はエラーを返す', () => {
+      const result = sanitizeProfileData({
+        userId: 'testuser',
+        sns: [
+          { service: 'x', url: 'https://x.com/test', label: '   ' },
+        ],
+      });
+
+      expect(result.data).toBeNull();
+      expect(result.error).toEqual({
+        field: 'sns',
+        message: 'SNSラベルを入力してください。',
+      });
+    });
+
+    it('URLとラベルが空の追加行は無視する', () => {
+      const result = sanitizeProfileData({
+        userId: 'testuser',
+        sns: [
+          { service: 'other', url: '', label: '' },
+        ],
+      });
+
+      expect(result.error).toBeNull();
+      expect(result.data?.sns).toEqual([]);
+    });
+
     it('無効なuserIdはエラーを返す', () => {
       const input = {
         userId: 'test@user',

@@ -257,8 +257,30 @@ export function sanitizeProfileData(
     return { data: null, error: audioTitleError };
   }
 
+  const socialLinkInputs = Array.isArray(body.sns) ? body.sns : [];
+  const hasUrlWithoutLabel = socialLinkInputs.some((link) => {
+    if (typeof link !== "object" || link === null) {
+      return false;
+    }
+    const candidate = link as Record<string, unknown>;
+    const url = typeof candidate.url === "string" ? candidate.url.trim() : "";
+    const label =
+      typeof candidate.label === "string" ? candidate.label.trim() : "";
+    return Boolean(url) && !label;
+  });
+
+  if (hasUrlWithoutLabel) {
+    return {
+      data: null,
+      error: {
+        field: "sns",
+        message: "SNSラベルを入力してください。",
+      },
+    };
+  }
+
   // SNSリンクのサニタイズ
-  const socialLinks = sanitizeSocialLinks(Array.isArray(body.sns) ? body.sns : []);
+  const socialLinks = sanitizeSocialLinks(socialLinkInputs);
 
   // SNSリンクの個数制限チェック
   if (socialLinks.length > MAX_SNS_COUNT) {
