@@ -75,6 +75,11 @@ describe('バリデーション関数', () => {
     it('空文字はエラーを返さない', () => {
       expect(validateSocialLabel('')).toBeUndefined();
     });
+
+    it('必須の場合は空のSNSラベルを拒否する', () => {
+      expect(validateSocialLabel('', true)).toBe('ラベルを入力してください。');
+      expect(validateSocialLabel('  ', true)).toBe('ラベルを入力してください。');
+    });
   });
 
   describe('validateSocialUrl', () => {
@@ -114,6 +119,20 @@ describe('バリデーション関数', () => {
 
       const result = validateProfile(profile);
       expect(result).toEqual({});
+    });
+
+    it('URLが入力されたリンクのラベルが空の場合はエラーを返す', () => {
+      const profile = {
+        displayName: 'テストユーザー',
+        bio: 'テスト自己紹介',
+        audioTitle: 'テスト音声',
+        sns: [
+          { service: 'x', url: 'https://x.com/test', label: '' },
+        ],
+      };
+
+      const result = validateProfile(profile);
+      expect(result.sns?.[0]?.label).toBe('ラベルを入力してください。');
     });
 
     it('表示名が文字数制限を超える場合はエラーを返す', () => {

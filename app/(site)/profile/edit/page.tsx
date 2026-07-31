@@ -338,7 +338,10 @@ export default function ProfileEditPage() {
             ...prev.socialLinks,
             [index]: {
               ...prev.socialLinks?.[index],
-              label: validateSocialLabel(value),
+              label: validateSocialLabel(
+                value,
+                Boolean(next[index].url.trim()),
+              ),
             },
           },
         }));
@@ -352,6 +355,10 @@ export default function ProfileEditPage() {
             [index]: {
               ...prev.socialLinks?.[index],
               url: validateSocialUrl(value),
+              label: validateSocialLabel(
+                next[index].label,
+                Boolean(value.trim()),
+              ),
             },
           },
         }));

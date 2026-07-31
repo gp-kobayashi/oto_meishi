@@ -57,7 +57,13 @@ export function validateAudioTitle(value: string): string | undefined {
 /**
  * SNSラベルの文字数制限チェック
  */
-export function validateSocialLabel(value: string): string | undefined {
+export function validateSocialLabel(
+  value: string,
+  required = false,
+): string | undefined {
+  if (required && !value.trim()) {
+    return "ラベルを入力してください。";
+  }
   if (value.length > MAX_SOCIAL_LABEL_LENGTH) {
     return `文字数制限を超えています（${MAX_SOCIAL_LABEL_LENGTH}文字まで）`;
   }
@@ -109,7 +115,10 @@ export function validateProfile(data: ProfileData): ValidationError {
   // SNSラベルのバリデーション
   const snsErrors: Record<number, { label?: string; url?: string }> = {};
   data.sns.forEach((link, index) => {
-    const labelError = validateSocialLabel(link.label);
+    const labelError = validateSocialLabel(
+      link.label,
+      Boolean(link.url.trim()),
+    );
     const urlError = validateSocialUrl(link.url);
     if (labelError || urlError) {
       snsErrors[index] = {
