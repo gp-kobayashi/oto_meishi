@@ -177,6 +177,19 @@ describe("ProfileEditPage", () => {
     expect(input?.accept).toContain("audio/*");
   });
 
+  it("ダークとカラフルのテーマクラスを編集カードへ反映する", async () => {
+    await renderLoadedPage();
+    const editorCard = screen.getByText("編集モード").closest("article");
+    expect(editorCard).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "ダーク" }));
+    expect(editorCard?.className).toMatch(/dark/);
+
+    fireEvent.click(screen.getByRole("button", { name: "カラフル" }));
+    expect(editorCard?.className).toMatch(/colorful/);
+    expect(editorCard?.className).not.toMatch(/dark/);
+  });
+
   it("64MiBを超える音声は送信前に拒否する", async () => {
     await renderLoadedPage();
     const oversizedFile = new File(["audio bytes"], "large.wav", {

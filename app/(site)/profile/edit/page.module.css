@@ -26,6 +26,16 @@
 }
 
 .cardEditor {
+  --editor-text: #0f172a;
+  --editor-muted: #475569;
+  --editor-subtle: #64748b;
+  --editor-surface: #f8fafc;
+  --editor-surface-border: #e2e8f0;
+  --editor-input-bg: #ffffff;
+  --editor-input-text: #0f172a;
+  --editor-input-border: rgba(148, 163, 184, 0.55);
+  --editor-placeholder: #64748b;
+  --editor-error: #dc2626;
   width: 90%;
   max-width: 980px;
   margin: 0 auto;
@@ -121,7 +131,7 @@
 }
 
 .validationError {
-  color: #dc2626;
+  color: var(--editor-error);
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
@@ -130,7 +140,7 @@
 .label {
   font-size: 0.95rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--editor-text);
 }
 
 .titleInput,
@@ -141,14 +151,22 @@
   width: 90%;
   min-width: 0;
   border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.55);
-  background: #ffffff;
+  border: 1px solid var(--editor-input-border);
+  background: var(--editor-input-bg);
   padding: 14px 16px;
-  color: #0f172a;
+  color: var(--editor-input-text);
   font-size: 0.95rem;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease;
+}
+
+.titleInput::placeholder,
+.bioInput::placeholder,
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--editor-placeholder);
+  opacity: 1;
 }
 
 .titleInput {
@@ -198,27 +216,27 @@
 
 .uploadLabel {
   margin: 0;
-  color: #334155;
+  color: var(--editor-text);
   font-size: 0.95rem;
   font-weight: 600;
 }
 
 .uploadHint {
   margin: 0;
-  color: #64748b;
+  color: var(--editor-subtle);
   font-size: 0.9rem;
 }
 
 .uploadRequirements {
   margin: 0;
-  color: #475569;
+  color: var(--editor-muted);
   font-size: 0.8rem;
   line-height: 1.6;
 }
 
 .audioFileError {
   margin: 0;
-  color: #dc2626;
+  color: var(--editor-error);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -255,7 +273,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--editor-text);
 }
 
 .actionsRow {
@@ -374,8 +392,8 @@
   gap: 14px;
   padding: 20px;
   border-radius: 22px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--editor-surface);
+  border: 1px solid var(--editor-surface-border);
 }
 
 .serviceRow {
@@ -385,7 +403,7 @@
 
 .smallLabel {
   font-size: 0.9rem;
-  color: #475569;
+  color: var(--editor-muted);
   font-weight: 600;
 }
 
@@ -426,9 +444,9 @@
 .uploadZone {
   position: relative;
   min-height: 130px;
-  border: 2px dashed rgba(148, 163, 184, 0.7);
+  border: 2px dashed var(--editor-input-border);
   border-radius: 20px;
-  background: rgba(242, 249, 255, 0.9);
+  background: var(--editor-surface);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -533,6 +551,16 @@
 }
 
 .dark {
+  --editor-text: #f8fafc;
+  --editor-muted: #cbd5e1;
+  --editor-subtle: #cbd5e1;
+  --editor-surface: rgba(30, 41, 59, 0.92);
+  --editor-surface-border: rgba(148, 163, 184, 0.5);
+  --editor-input-bg: #ffffff;
+  --editor-input-text: #0f172a;
+  --editor-input-border: #94a3b8;
+  --editor-placeholder: #475569;
+  --editor-error: #fecaca;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), #111827);
   color: #e2e8f0;
 }
@@ -542,6 +570,16 @@
 }
 
 .colorful {
+  --editor-text: #ffffff;
+  --editor-muted: #e0e7ff;
+  --editor-subtle: #e0e7ff;
+  --editor-surface: rgba(49, 46, 129, 0.88);
+  --editor-surface-border: rgba(199, 210, 254, 0.58);
+  --editor-input-bg: #ffffff;
+  --editor-input-text: #172554;
+  --editor-input-border: #c7d2fe;
+  --editor-placeholder: #475569;
+  --editor-error: #fecaca;
   background: linear-gradient(180deg, rgba(14, 12, 73, 0.9), #4338ca);
   color: #f8fafc;
 }
