@@ -468,7 +468,7 @@ export default function ProfileEditPage() {
         ...current,
         sns: [
           ...current.sns,
-          { service: "other", url: "", label: "リンクを追加" },
+          { service: "other", url: "", label: "" },
         ],
       };
     });
@@ -860,6 +860,7 @@ export default function ProfileEditPage() {
                         id={`label-${index}`}
                         className={`${styles.input} ${styles.smallInput}`}
                         type="text"
+                        placeholder="リンクを追加"
                         value={link.label}
                         onChange={(event) =>
                           updateSocialLink(index, "label", event.target.value)

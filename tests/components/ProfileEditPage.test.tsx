@@ -291,6 +291,19 @@ describe("ProfileEditPage", () => {
     ).toBe(true);
   });
 
+  it("新規リンクの案内文をラベルの入力値にしない", async () => {
+    await renderLoadedPage();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "+ リンクを追加" }),
+    );
+
+    const labelInputs = screen.getAllByLabelText<HTMLInputElement>("ラベル");
+    const newLabelInput = labelInputs.at(-1);
+    expect(newLabelInput?.value).toBe("");
+    expect(newLabelInput?.placeholder).toBe("リンクを追加");
+  });
+
   it("対象ごとの違反理由と確認中の公開状態を表示する", async () => {
     await renderLoadedPage({
       ...baseProfile,
