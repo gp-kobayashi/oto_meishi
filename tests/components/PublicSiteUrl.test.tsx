@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import Home from "@/app/(site)/page";
 import UserIdInputPage from "@/app/(site)/useridInput/page";
 import QRCode from "@/components/card/QRCode/QRCode";
+import ProfileShare from "@/components/card/profileShare/ProfileShare";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -39,6 +40,20 @@ describe("公開URLを使用する画面", () => {
   it("QRコードに共通設定から生成したプロフィールURLを設定する", () => {
     render(<QRCode username="sample-user" />);
 
+    expect(screen.getByTestId("qr-code-value").textContent).toBe(
+      "https://oto-meishi.com/sample-user",
+    );
+  });
+
+  it("QRコードと同じ公開プロフィールURLを共有欄に表示する", () => {
+    render(<ProfileShare username="sample-user" />);
+
+    const profileLink = screen.getByRole("link", {
+      name: "https://oto-meishi.com/sample-user",
+    });
+    expect(profileLink.getAttribute("href")).toBe(
+      "https://oto-meishi.com/sample-user",
+    );
     expect(screen.getByTestId("qr-code-value").textContent).toBe(
       "https://oto-meishi.com/sample-user",
     );

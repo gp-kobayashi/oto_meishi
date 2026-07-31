@@ -3,7 +3,7 @@ import styles from "./Card.module.css";
 import Background from "./background/Background";
 import AudioPlayer from "./audioPlayer/AudioPlayer";
 import SocialLink from "../card/socialLink/SocialLink";
-import QRCode from "./QRCode/QRCode";
+import ProfileShare from "./profileShare/ProfileShare";
 import type { ProfileData } from "@/lib/mock/profileData";
 import ReportMenu from "./reportMenu/ReportMenu";
 
@@ -51,10 +51,7 @@ const Card = ({
           </li>
         ))}
       </ul>
-      <div className={styles.qrCodeContainer}>
-        <p>QRコードで名刺を共有</p>
-        <QRCode username={userId} />
-      </div>
+      <ProfileShare username={userId} />
     </div>
   );
 };
