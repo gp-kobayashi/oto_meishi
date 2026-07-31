@@ -4,6 +4,8 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     authorizeProfileOwnerRequest: vi.fn(),
     findMany: vi.fn(),
+    socialLinkFindMany: vi.fn(),
+    moderationCaseFindMany: vi.fn(),
     count: vi.fn(),
     transaction: vi.fn(),
     userRateLimit: vi.fn(),
@@ -18,6 +20,8 @@ vi.mock("@/lib/profileOwnerAuth", () => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     userNotification: { findMany: mocks.findMany, count: mocks.count },
+    socialLink: { findMany: mocks.socialLinkFindMany },
+    moderationCase: { findMany: mocks.moderationCaseFindMany },
     $transaction: mocks.transaction,
   },
 }));
@@ -47,6 +51,14 @@ describe("GET /api/notifications", () => {
     mocks.getClientIp.mockReturnValue(null);
     mocks.findMany.mockReturnValue("find-many-query");
     mocks.count.mockReturnValue("count-query");
+    mocks.socialLinkFindMany.mockResolvedValue([]);
+    mocks.moderationCaseFindMany.mockResolvedValue([
+      {
+        targetType: "audio",
+        targetId: "profile-1",
+        reviewMode: "postReview",
+      },
+    ]);
     mocks.transaction.mockResolvedValue([
       [
         {
@@ -55,6 +67,17 @@ describe("GET /api/notifications", () => {
           message: "音声を非公開にしました。",
           readAt: null,
           createdAt: new Date("2026-07-21T06:00:00.000Z"),
+          profile: {
+            displayName: "テストユーザー",
+            audioTitle: "自己紹介音声",
+          },
+          moderationAction: {
+            targetType: "audio",
+            targetId: "profile-1",
+            action: "hide",
+            reason: "不適切な表現が含まれています。",
+            createdAt: new Date("2026-07-21T05:55:00.000Z"),
+          },
         },
       ],
       1,
@@ -73,6 +96,15 @@ describe("GET /api/notifications", () => {
           id: "notification-1",
           title: "音声の公開状態について",
           message: "音声を非公開にしました。",
+          targetType: "audio",
+          targetLabel: "自己紹介音声",
+          actionLabel: "非公開",
+          reason: "不適切な表現が含まれています。",
+          guidance:
+            "音声を修正すると公開され、管理者が事後確認を行います。",
+          actionUrl: "/profile/edit",
+          actionLinkLabel: "音声を修正",
+          handledAt: "2026-07-21T05:55:00.000Z",
           readAt: null,
           createdAt: "2026-07-21T06:00:00.000Z",
         },
@@ -87,6 +119,63 @@ describe("GET /api/notifications", () => {
     );
     expect(mocks.count).toHaveBeenCalledWith({
       where: { profileId: "profile-1", readAt: null },
+    });
+    expect(mocks.moderationCaseFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ profileId: "profile-1" }),
+      }),
+    );
+    expect(JSON.stringify(result)).not.toContain("adminUserId");
+    expect(JSON.stringify(result)).not.toContain("reviewNote");
+  });
+
+  it("削除済みリンクは代替名で表示し、所有プロフィール内だけを検索する", async () => {
+    mocks.transaction.mockResolvedValueOnce([
+      [
+        {
+          id: "notification-link",
+          title: "リンクの公開状態について",
+          message: "リンクを非公開にしました。",
+          readAt: null,
+          createdAt: new Date("2026-07-21T06:00:00.000Z"),
+          profile: { displayName: "テスト", audioTitle: "" },
+          moderationAction: {
+            targetType: "socialLink",
+            targetId: "deleted-link",
+            action: "hide",
+            reason: "選択されたサービスと異なるURLです。",
+            createdAt: new Date("2026-07-21T05:55:00.000Z"),
+          },
+        },
+      ],
+      1,
+    ]);
+    mocks.moderationCaseFindMany.mockResolvedValueOnce([
+      {
+        targetType: "socialLink",
+        targetId: "deleted-link",
+        reviewMode: "preReview",
+      },
+    ]);
+
+    const response = await GET(request());
+    const result = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(result.notifications[0]).toEqual(
+      expect.objectContaining({
+        targetType: "socialLink",
+        targetLabel: "対象のリンク",
+        guidance:
+          "リンクを修正しても、管理者の確認が完了するまで公開されません。",
+      }),
+    );
+    expect(mocks.socialLinkFindMany).toHaveBeenCalledWith({
+      where: {
+        profileId: "profile-1",
+        id: { in: ["deleted-link"] },
+      },
+      select: { id: true, label: true },
     });
   });
 
