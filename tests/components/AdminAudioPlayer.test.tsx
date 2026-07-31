@@ -44,4 +44,34 @@ describe("AdminAudioPlayer", () => {
       "https://signed.example/audio",
     );
   });
+
+  it("指定した音声履歴を管理者トークンで取得する", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ audioUrl: "https://signed.example/old" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    render(
+      <AdminAudioPlayer
+        profileId="profile-1"
+        snapshotId="snapshot-1"
+        label="非公開時の音声を確認"
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "非公開時の音声を確認" }),
+    );
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/admin/audio/playback?profileId=profile-1&snapshotId=snapshot-1",
+        {
+          cache: "no-store",
+          headers: { Authorization: "Bearer admin-token" },
+        },
+      );
+    });
+  });
 });

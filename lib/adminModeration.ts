@@ -19,6 +19,7 @@ export type ModerationListItem = {
   linkCount: number;
   hiddenLinkCount: number;
   pendingReportCount: number;
+  pendingReviewCount: number;
   updatedAt: string;
 };
 

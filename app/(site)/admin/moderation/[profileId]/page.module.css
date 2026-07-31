@@ -473,6 +473,121 @@
 .requestResolution label { font-size: 13px; font-weight: 700; }
 .requestResolution textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #cbd5e1; border-radius: 9px; font: inherit; resize: vertical; }
 
+.caseList {
+  display: grid;
+  gap: 16px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.caseItem {
+  padding: 18px;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  background: #fffaf5;
+}
+
+.caseHeading,
+.caseHeading > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.caseHeading {
+  justify-content: space-between;
+}
+
+.caseMessage {
+  margin: 14px 0 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.snapshotComparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.snapshotComparison > div {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.snapshotComparison h3,
+.timelineHeading {
+  margin: 0 0 9px;
+  font-size: 14px;
+}
+
+.snapshotComparison pre {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 13px;
+}
+
+.snapshotComparison time,
+.caseTimeline time,
+.caseTimeline span {
+  display: block;
+  margin-top: 7px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.timelineHeading {
+  margin-top: 18px;
+}
+
+.caseTimeline {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.caseTimeline li {
+  padding-left: 4px;
+}
+
+.caseReview {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #fed7aa;
+}
+
+.caseReview label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.caseReview textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font: inherit;
+  resize: vertical;
+}
+
+.reviewWarning {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .reportActions button {
   padding: 7px 10px;
   border: 1px solid #cbd5e1;
@@ -592,5 +707,14 @@
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
+  }
+
+  .caseHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .snapshotComparison {
+    grid-template-columns: 1fr;
   }
 }

@@ -59,12 +59,54 @@ export async function GET(request: Request) {
     }
   }
 
-  const profileId = new URL(request.url).searchParams.get("profileId")?.trim();
+  const searchParams = new URL(request.url).searchParams;
+  const profileId = searchParams.get("profileId")?.trim();
+  const snapshotId = searchParams.get("snapshotId")?.trim();
   if (!profileId || profileId.length > 100) {
     return NextResponse.json(
       { error: "プロフィールIDが不正です。" },
       { status: 400 },
     );
+  }
+
+  if (snapshotId) {
+    if (snapshotId.length > 100) {
+      return NextResponse.json(
+        { error: "音声履歴IDが不正です。" },
+        { status: 400 },
+      );
+    }
+    const snapshot = await prisma.moderationSnapshot.findFirst({
+      where: {
+        id: snapshotId,
+        moderationCase: { profileId, targetType: "audio" },
+        storageObjectKey: { not: null },
+        expiresAt: { gt: new Date() },
+      },
+      select: { storageObjectKey: true },
+    });
+    if (!snapshot?.storageObjectKey) {
+      return NextResponse.json(
+        { error: "保持期間内の音声履歴が見つかりません。" },
+        { status: 404 },
+      );
+    }
+    try {
+      const audioUrl = await createSignedAudioUrl(
+        snapshot.storageObjectKey,
+        PLAYBACK_URL_EXPIRY_SECONDS,
+      );
+      return NextResponse.json(
+        { audioUrl },
+        { headers: { "Cache-Control": "private, no-store" } },
+      );
+    } catch (error) {
+      console.error("Failed to create snapshot audio playback URL", error);
+      return NextResponse.json(
+        { error: "音声履歴の再生URLを発行できませんでした。" },
+        { status: 500 },
+      );
+    }
   }
 
   const profile = await prisma.profile.findUnique({

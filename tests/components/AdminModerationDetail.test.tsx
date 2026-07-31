@@ -82,6 +82,62 @@ describe("AdminModerationDetail", () => {
                 updatedAt: "2026-07-17T05:00:00.000Z",
               },
             ],
+            moderationCases: [
+              {
+                id: "case-1",
+                targetType: "socialLink",
+                targetId: "link-1",
+                reasonCode: "unsafeLink",
+                status: "preReviewPending",
+                reviewMode: "preReview",
+                userMessage: "安全でないリンクのため",
+                reviewDueAt: "2026-09-15T00:00:00.000Z",
+                retentionExpiresAt: "2026-09-15T00:00:00.000Z",
+                resolvedAt: null,
+                createdAt: "2026-07-17T01:00:00.000Z",
+                updatedAt: "2026-07-17T04:00:00.000Z",
+                snapshots: [
+                  {
+                    id: "snapshot-1",
+                    kind: "reported",
+                    content: {
+                      service: "youtube",
+                      url: "https://unsafe.example",
+                      label: "変更前",
+                    },
+                    contentHash: null,
+                    storageObjectKey: null,
+                    expiresAt: "2026-09-15T00:00:00.000Z",
+                    createdAt: "2026-07-17T01:00:00.000Z",
+                  },
+                  {
+                    id: "snapshot-2",
+                    kind: "corrected",
+                    content: {
+                      service: "youtube",
+                      url: "https://youtube.com/example",
+                      label: "YouTube",
+                    },
+                    contentHash: null,
+                    storageObjectKey: null,
+                    expiresAt: "2026-09-15T00:00:00.000Z",
+                    createdAt: "2026-07-17T04:00:00.000Z",
+                  },
+                ],
+                events: [
+                  {
+                    id: "event-1",
+                    eventType: "contentChanged",
+                    actorType: "user",
+                    actorIdentifier: "auth-use",
+                    previousStatus: "correctionRequired",
+                    newStatus: "preReviewPending",
+                    details: { targetType: "socialLink" },
+                    createdAt: "2026-07-17T04:00:00.000Z",
+                  },
+                ],
+              },
+            ],
             history: [
               {
                 id: "action-1",
@@ -114,7 +170,7 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("削除済み音声の対応状況")).toBeDefined();
     expect(screen.getByText("事後確認待ち（公開中）")).toBeDefined();
     expect(screen.getByText("hidden")).toBeDefined();
-    expect(screen.getByText("user / auth-use")).toBeDefined();
+    expect(screen.getAllByText("user / auth-use")).toHaveLength(2);
     expect(
       screen.getByText(
         "削除前の音声は確認期限まで管理者確認用として保持されます。",
@@ -130,6 +186,42 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("未確認")).toBeDefined();
     expect(screen.getByText(/最終変更:.*admin.*auth-adm/)).toBeDefined();
     expect(screen.getByText(/対応メモ: リンク先を確認しました/)).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: "修正内容と審査状況" }),
+    ).toBeDefined();
+    expect(screen.getByText("安全でないリンク")).toBeDefined();
+    expect(screen.getByText(/url: https:\/\/unsafe\.example/)).toBeDefined();
+    expect(
+      screen.getByText(/url: https:\/\/youtube\.com\/example/),
+    ).toBeDefined();
+    expect(screen.getByText("ユーザーが内容を変更")).toBeDefined();
+
+    const approveCaseButton = screen.getByRole("button", {
+      name: "修正を承認",
+    }) as HTMLButtonElement;
+    expect(approveCaseButton.disabled).toBe(true);
+    fireEvent.change(
+      screen.getByLabelText("ユーザーに通知する審査理由（必須）"),
+      { target: { value: "安全なリンクへの変更を確認しました。" } },
+    );
+    fireEvent.click(approveCaseButton);
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/moderation/cases/case-1",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer admin-token",
+          },
+          body: JSON.stringify({
+            decision: "approve",
+            reason: "安全なリンクへの変更を確認しました。",
+          }),
+        },
+      );
+    });
+
     expect(
       screen.getByRole("heading", { name: "問い合わせ・解除申請" }),
     ).toBeDefined();

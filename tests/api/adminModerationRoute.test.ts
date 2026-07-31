@@ -49,7 +49,7 @@ describe("GET /api/admin/moderation", () => {
           audioStatus: "active",
           updatedAt: new Date("2026-07-17T00:00:00.000Z"),
           sns: [{ status: "active" }, { status: "hidden" }],
-          _count: { reports: 2 },
+        _count: { reports: 2, moderationCases: 1 },
         },
       ],
       1,
@@ -68,6 +68,7 @@ describe("GET /api/admin/moderation", () => {
       linkCount: 2,
       hiddenLinkCount: 1,
       pendingReportCount: 2,
+      pendingReviewCount: 1,
       updatedAt: "2026-07-17T00:00:00.000Z",
     });
     expect(result.items[0].audioUrl).toBeUndefined();

@@ -37,6 +37,7 @@ describe("AdminPage", () => {
               linkCount: 2,
               hiddenLinkCount: 1,
               pendingReportCount: 2,
+              pendingReviewCount: 1,
               updatedAt: "2026-07-17T00:00:00.000Z",
             },
           ],
@@ -52,6 +53,7 @@ describe("AdminPage", () => {
     expect(screen.getByText("@sample-user")).toBeDefined();
     expect(screen.getByText("2件（非公開 1件）")).toBeDefined();
     expect(screen.getByText("未確認の通報")).toBeDefined();
+    expect(screen.getByText("審査待ち")).toBeDefined();
     expect(screen.getByText("2件", { selector: "p" })).toBeDefined();
   });
 

@@ -3,7 +3,15 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
-export default function AdminAudioPlayer({ profileId }: { profileId: string }) {
+export default function AdminAudioPlayer({
+  profileId,
+  snapshotId,
+  label = "音声を確認",
+}: {
+  profileId: string;
+  snapshotId?: string;
+  label?: string;
+}) {
   const [audioUrl, setAudioUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -26,7 +34,11 @@ export default function AdminAudioPlayer({ profileId }: { profileId: string }) {
       }
 
       const response = await fetch(
-        `/api/admin/audio/playback?profileId=${encodeURIComponent(profileId)}`,
+        `/api/admin/audio/playback?profileId=${encodeURIComponent(profileId)}${
+          snapshotId
+            ? `&snapshotId=${encodeURIComponent(snapshotId)}`
+            : ""
+        }`,
         {
           cache: "no-store",
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -56,7 +68,7 @@ export default function AdminAudioPlayer({ profileId }: { profileId: string }) {
   return (
     <div>
       <button type="button" disabled={loading} onClick={() => void loadAudio()}>
-        {loading ? "音声を読み込み中..." : "音声を確認"}
+        {loading ? "音声を読み込み中..." : label}
       </button>
       {error ? <p role="alert">{error}</p> : null}
     </div>

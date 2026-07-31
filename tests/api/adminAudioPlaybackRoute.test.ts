@@ -4,6 +4,7 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     authorizeAdminRequest: vi.fn(),
     findUnique: vi.fn(),
+    snapshotFindFirst: vi.fn(),
     createSignedAudioUrl: vi.fn(),
     extractKeyFromUrl: vi.fn(),
     consumeAdminPlaybackRateLimit: vi.fn(),
@@ -15,7 +16,10 @@ vi.mock("@/lib/adminAuth", () => ({
   authorizeAdminRequest: mocks.authorizeAdminRequest,
 }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { profile: { findUnique: mocks.findUnique } },
+  prisma: {
+    profile: { findUnique: mocks.findUnique },
+    moderationSnapshot: { findFirst: mocks.snapshotFindFirst },
+  },
 }));
 vi.mock("@/lib/r2Storage", () => ({
   createSignedAudioUrl: mocks.createSignedAudioUrl,
@@ -74,6 +78,34 @@ describe("GET /api/admin/audio/playback", () => {
       "audio/testuser/voice.m4a",
       300,
     );
+  });
+
+  it("保持期間内の修正前音声に署名URLを発行する", async () => {
+    mocks.snapshotFindFirst.mockResolvedValueOnce({
+      storageObjectKey: "audio/testuser/reported.m4a",
+    });
+    const response = await GET(
+      new Request(
+        "http://localhost/api/admin/audio/playback?profileId=profile-1&snapshotId=snapshot-1",
+        { headers: { Authorization: "Bearer admin-token" } },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.snapshotFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: "snapshot-1",
+        moderationCase: { profileId: "profile-1", targetType: "audio" },
+        storageObjectKey: { not: null },
+        expiresAt: { gt: expect.any(Date) },
+      },
+      select: { storageObjectKey: true },
+    });
+    expect(mocks.createSignedAudioUrl).toHaveBeenCalledWith(
+      "audio/testuser/reported.m4a",
+      300,
+    );
+    expect(mocks.findUnique).not.toHaveBeenCalled();
   });
 
   it("管理者権限がなければプロフィールを検索しない", async () => {

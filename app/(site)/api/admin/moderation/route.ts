@@ -23,6 +23,13 @@ function getFilterWhere(filter: ModerationFilter): Prisma.ProfileWhereInput {
           { audioStatus: { not: "active" } },
           { sns: { some: { status: "hidden" } } },
           { reports: { some: { status: "pending" } } },
+          {
+            moderationCases: {
+              some: {
+                status: { in: ["postReviewPending", "preReviewPending"] },
+              },
+            },
+          },
         ],
       };
     case "active":
@@ -30,6 +37,11 @@ function getFilterWhere(filter: ModerationFilter): Prisma.ProfileWhereInput {
         status: "active",
         audioStatus: "active",
         sns: { none: { status: "hidden" } },
+        moderationCases: {
+          none: {
+            status: { in: ["postReviewPending", "preReviewPending"] },
+          },
+        },
       };
     case "hidden":
       return { status: "hidden" };
@@ -85,7 +97,14 @@ export async function GET(request: Request) {
           updatedAt: true,
           sns: { select: { status: true } },
           _count: {
-            select: { reports: { where: { status: "pending" } } },
+            select: {
+              reports: { where: { status: "pending" } },
+              moderationCases: {
+                where: {
+                  status: { in: ["postReviewPending", "preReviewPending"] },
+                },
+              },
+            },
           },
         },
       }),
@@ -107,6 +126,7 @@ export async function GET(request: Request) {
             (link) => link.status === "hidden",
           ).length,
           pendingReportCount: profile._count.reports,
+          pendingReviewCount: profile._count.moderationCases,
           updatedAt: profile.updatedAt.toISOString(),
         })),
         pagination: {
