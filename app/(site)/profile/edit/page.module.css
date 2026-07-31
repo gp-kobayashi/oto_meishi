@@ -81,6 +81,23 @@
   gap: 18px;
 }
 
+.cardTopBar,
+.actionsRow,
+.themeOptions,
+.cardBody,
+.audioGroup,
+.audioField,
+.uploadZone,
+.uploadZoneLabel,
+.sectionHeader,
+.socialList,
+.socialRow,
+.serviceRow {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 .moderationNotice {
   display: grid;
   gap: 8px;
@@ -206,8 +223,16 @@
   gap: 10px;
 }
 
+.audioField > div {
+  min-width: 0;
+  max-width: 100%;
+}
+
 .audioPlayer {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   border-radius: 16px;
   background: #f8fafc;
   margin-top: 10px;
@@ -224,12 +249,14 @@
   color: var(--editor-text);
   font-size: 0.95rem;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .uploadHint {
   margin: 0;
   color: var(--editor-subtle);
   font-size: 0.9rem;
+  overflow-wrap: anywhere;
 }
 
 .uploadRequirements {
@@ -237,6 +264,7 @@
   color: var(--editor-muted);
   font-size: 0.8rem;
   line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 
 .audioFileError {
@@ -378,6 +406,17 @@
     background-color 0.2s ease,
     border-color 0.2s ease,
     color 0.2s ease;
+}
+
+.previewButton,
+.themeButton,
+.addButton,
+.removeButton,
+.deleteAudioButton {
+  max-width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .themeButton:hover {
@@ -567,7 +606,9 @@
 
 .uploadZone {
   position: relative;
+  width: 100%;
   min-height: 130px;
+  overflow: hidden;
   border: 2px dashed var(--editor-input-border);
   border-radius: 20px;
   background: var(--editor-surface);
@@ -589,6 +630,9 @@
   inset: 0;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   opacity: 0;
   cursor: pointer;
 }
@@ -608,7 +652,7 @@
   }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 780px) {
   .main {
     width: min(100% - 24px, 520px);
     padding: 22px 12px 120px;
@@ -616,9 +660,21 @@
 
   .fixedSaveControls {
     right: max(12px, env(safe-area-inset-right));
+    left: max(12px, env(safe-area-inset-left));
     bottom: max(12px, env(safe-area-inset-bottom));
-    max-width: calc(100vw - 24px);
-    flex-wrap: wrap;
+    width: auto;
+    max-width: none;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .fixedSaveControls .saveButton {
+    width: 100%;
+    max-width: none;
+  }
+
+  .fixedSaveControls .saveMessage {
+    width: 100%;
   }
 
   .cardEditor {
@@ -636,9 +692,22 @@
     box-sizing: border-box;
   }
 
+  .uploadZone {
+    padding: 14px 12px;
+  }
+
   .cardTopBar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .actionsRow {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .themeOptions {
+    width: 100%;
   }
 
   .sectionHeader,
