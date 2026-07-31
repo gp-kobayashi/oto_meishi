@@ -97,6 +97,19 @@ revoke all on table public."ModerationCase" from anon, authenticated;
 comment on table public."ModerationCase" is
   'Server-managed remediation workflow for moderated profile content.';
 
+-- Some existing environments recorded the initial table migration without
+-- retaining this helper. Define it here so this migration is self-contained.
+create or replace function public.update_updated_at_column()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new."updatedAt" = now();
+  return new;
+end;
+$$;
+
 create trigger update_moderation_case_updated_at
 before update on public."ModerationCase"
 for each row
