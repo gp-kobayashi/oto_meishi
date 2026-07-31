@@ -57,7 +57,7 @@
 
 @media (max-width: 780px) {
   .signup {
-    width: 520px;
+    width: min(520px, calc(100% - 32px));
     grid-template-columns: 1fr;
     align-items: start;
     padding: 40px 0 72px;
