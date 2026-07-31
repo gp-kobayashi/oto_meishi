@@ -319,13 +319,21 @@
   font-weight: 700;
 }
 
-.actionDialog textarea {
+.actionDialog textarea,
+.actionDialog select {
   width: 100%;
   padding: 11px;
   border: 1px solid #cbd5e1;
   border-radius: 9px;
   font: inherit;
   resize: vertical;
+}
+
+.reviewModeHelp {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .characterCount {

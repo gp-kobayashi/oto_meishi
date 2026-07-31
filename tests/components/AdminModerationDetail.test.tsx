@@ -149,10 +149,42 @@ describe("AdminModerationDetail", () => {
       name: "理由を記録して実行",
     }) as HTMLButtonElement;
     expect(submitButton.disabled).toBe(true);
+    expect(
+      screen.getByLabelText<HTMLSelectElement>("違反分類（必須）").value,
+    ).toBe("inappropriateContent");
+    expect(
+      screen.getByText(
+        "誹謗中傷・なりすまし・その他は確認完了まで非公開、それ以外は修正後に公開して事後確認します。",
+      ),
+    ).toBeDefined();
 
-    fireEvent.change(screen.getByLabelText("対応理由（必須）"), {
-      target: { value: "不適切な内容を確認" },
+    fireEvent.change(screen.getByLabelText("違反分類（必須）"), {
+      target: { value: "harassment" },
     });
+    fireEvent.change(
+      screen.getByLabelText("ユーザーに表示する対応理由（必須）"),
+      {
+      target: { value: "不適切な内容を確認" },
+      },
+    );
     expect(submitButton.disabled).toBe(false);
+    fireEvent.click(submitButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith("/api/admin/moderation/actions", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer admin-token",
+        },
+        body: JSON.stringify({
+          targetType: "profile",
+          targetId: "profile-1",
+          action: "hide",
+          reason: "不適切な内容を確認",
+          reasonCode: "harassment",
+        }),
+      });
+    });
   });
 });

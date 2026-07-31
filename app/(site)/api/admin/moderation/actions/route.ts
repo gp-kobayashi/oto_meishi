@@ -9,6 +9,12 @@ import {
 } from "@/lib/adminActionRateLimit";
 import { getClientIp } from "@/lib/clientIp";
 import { getModerationNotification } from "@/lib/moderationNotification";
+import {
+  getModerationDeadline,
+  isModerationReasonCode,
+  resolveModerationReviewMode,
+  type ModerationReasonCode,
+} from "@/lib/moderationRemediation";
 
 const MAX_MODERATION_ACTION_BODY_BYTES = 16 * 1024;
 
@@ -20,6 +26,7 @@ type ActionRequest = {
   targetId?: unknown;
   action?: unknown;
   reason?: unknown;
+  reasonCode?: unknown;
 };
 
 const targetTypes: TargetType[] = ["profile", "audio", "socialLink"];
@@ -114,6 +121,21 @@ export async function PATCH(request: Request) {
         ? (jsonBody.value as ActionRequest)
         : {};
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const reasonCode: ModerationReasonCode =
+      typeof body.reasonCode === "string" &&
+      isModerationReasonCode(body.reasonCode)
+        ? body.reasonCode
+        : "other";
+    if (
+      body.reasonCode !== undefined &&
+      (typeof body.reasonCode !== "string" ||
+        !isModerationReasonCode(body.reasonCode))
+    ) {
+      return Response.json(
+        { error: "有効な違反分類を指定してください。" },
+        { status: 400 },
+      );
+    }
     if (
       !isTargetType(body.targetType) ||
       typeof body.targetId !== "string" ||
@@ -200,6 +222,23 @@ export async function PATCH(request: Request) {
         },
         select: { id: true },
       });
+      if (action === "hide") {
+        const reviewMode = resolveModerationReviewMode(reasonCode);
+        const deadline = getModerationDeadline();
+        await tx.moderationCase.create({
+          data: {
+            profileId,
+            targetType,
+            targetId,
+            reasonCode,
+            reviewMode,
+            status: "correctionRequired",
+            userMessage: reason,
+            reviewDueAt: deadline,
+            retentionExpiresAt: deadline,
+          },
+        });
+      }
       const notification = getModerationNotification(targetType, action);
       await tx.userNotification.create({
         data: {

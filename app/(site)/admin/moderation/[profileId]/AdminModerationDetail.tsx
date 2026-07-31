@@ -52,6 +52,16 @@ const reportReasonLabels = {
   other: "その他",
 };
 
+const moderationReasonOptions = [
+  { value: "inappropriateContent", label: "不適切な内容" },
+  { value: "copyrightConcern", label: "著作権に関する問題" },
+  { value: "harassment", label: "誹謗中傷" },
+  { value: "unsafeLink", label: "安全でないリンク" },
+  { value: "serviceMismatch", label: "選択サービスとURLの不一致" },
+  { value: "impersonation", label: "なりすまし" },
+  { value: "other", label: "その他" },
+] as const;
+
 const reportStatusLabels = {
   pending: "未確認",
   reviewed: "確認済み",
@@ -93,6 +103,9 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   const [error, setError] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [reason, setReason] = useState("");
+  const [reasonCode, setReasonCode] = useState<
+    (typeof moderationReasonOptions)[number]["value"]
+  >("inappropriateContent");
   const [actionError, setActionError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -148,6 +161,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   const openAction = (action: PendingAction) => {
     setPendingAction(action);
     setReason("");
+    setReasonCode("inappropriateContent");
     setActionError("");
     setActionMessage("");
   };
@@ -176,6 +190,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
           targetId: pendingAction.targetId,
           action: pendingAction.action,
           reason: reason.trim(),
+          ...(pendingAction.action === "hide" ? { reasonCode } : {}),
         }),
       });
       const result = await response.json().catch(() => ({}));
@@ -655,7 +670,34 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                   </h2>
                   <p>実行すると管理操作履歴に管理者・理由・変更内容が保存されます。</p>
                   <form onSubmit={submitAction}>
-                    <label htmlFor="moderation-reason">対応理由（必須）</label>
+                    {pendingAction.action === "hide" ? (
+                      <>
+                        <label htmlFor="moderation-reason-code">
+                          違反分類（必須）
+                        </label>
+                        <select
+                          id="moderation-reason-code"
+                          value={reasonCode}
+                          onChange={(event) =>
+                            setReasonCode(
+                              event.target.value as typeof reasonCode,
+                            )
+                          }
+                        >
+                          {moderationReasonOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <p className={styles.reviewModeHelp}>
+                          誹謗中傷・なりすまし・その他は確認完了まで非公開、それ以外は修正後に公開して事後確認します。
+                        </p>
+                      </>
+                    ) : null}
+                    <label htmlFor="moderation-reason">
+                      ユーザーに表示する対応理由（必須）
+                    </label>
                     <textarea
                       id="moderation-reason"
                       value={reason}

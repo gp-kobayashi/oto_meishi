@@ -10,6 +10,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkUpdate: vi.fn(),
     actionCreate: vi.fn(),
     notificationCreate: vi.fn(),
+    moderationCaseCreate: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
   },
@@ -37,6 +38,7 @@ const tx = {
     update: mocks.socialLinkUpdate,
   },
   moderationAction: { create: mocks.actionCreate },
+  moderationCase: { create: mocks.moderationCaseCreate },
   userNotification: { create: mocks.notificationCreate },
 };
 
@@ -59,6 +61,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
     mocks.profileUpdate.mockResolvedValue({});
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
+    mocks.moderationCaseCreate.mockResolvedValue({ id: "case-1" });
     mocks.consumeAdminActionRateLimit.mockReturnValue({
       allowed: true,
       limit: 60,
@@ -82,6 +85,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
         targetId: "profile-1",
         action: "hide",
         reason: "不適切な内容のため",
+        reasonCode: "harassment",
       }),
     );
 
@@ -108,6 +112,36 @@ describe("PATCH /api/admin/moderation/actions", () => {
         message:
           "規約違反が確認されたため、プロフィールを非公開にしました。",
       },
+    });
+    expect(mocks.moderationCaseCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        profileId: "profile-1",
+        targetType: "profile",
+        targetId: "profile-1",
+        reasonCode: "harassment",
+        reviewMode: "preReview",
+        status: "correctionRequired",
+        userMessage: "不適切な内容のため",
+      }),
+    });
+  });
+
+  it("違反分類がない既存リクエストは安全側の事前確認として保存する", async () => {
+    const response = await PATCH(
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "hide",
+        reason: "分類されていない違反",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationCaseCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        reasonCode: "other",
+        reviewMode: "preReview",
+      }),
     });
   });
 
