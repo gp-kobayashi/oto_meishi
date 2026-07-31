@@ -228,7 +228,11 @@ export async function GET(
             createdAt: moderationCase.createdAt.toISOString(),
             updatedAt: moderationCase.updatedAt.toISOString(),
             snapshots: moderationCase.snapshots.map((snapshot) => ({
-              ...snapshot,
+              id: snapshot.id,
+              kind: snapshot.kind,
+              content: snapshot.content,
+              contentHash: snapshot.contentHash,
+              hasStoredAudio: Boolean(snapshot.storageObjectKey),
               expiresAt: snapshot.expiresAt.toISOString(),
               createdAt: snapshot.createdAt.toISOString(),
             })),

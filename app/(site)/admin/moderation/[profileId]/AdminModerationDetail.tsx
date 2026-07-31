@@ -745,7 +745,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                   {formatDate(latestReported.createdAt)}
                                 </time>
                                 {moderationCase.targetType === "audio" &&
-                                latestReported.storageObjectKey ? (
+                                latestReported.hasStoredAudio ? (
                                   <AdminAudioPlayer
                                     profileId={data.profile.id}
                                     snapshotId={latestReported.id}
@@ -768,7 +768,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                   {formatDate(latestCorrected.createdAt)}
                                 </time>
                                 {moderationCase.targetType === "audio" &&
-                                latestCorrected.storageObjectKey ? (
+                                latestCorrected.hasStoredAudio ? (
                                   <AdminAudioPlayer
                                     profileId={data.profile.id}
                                     snapshotId={latestCorrected.id}

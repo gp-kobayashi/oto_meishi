@@ -125,7 +125,7 @@ export type ModerationDetailResponse = {
         kind: "reported" | "corrected";
         content: unknown;
         contentHash: string | null;
-        storageObjectKey: string | null;
+        hasStoredAudio: boolean;
         expiresAt: string;
         createdAt: string;
       }[];
