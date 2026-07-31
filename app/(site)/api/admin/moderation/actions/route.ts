@@ -165,7 +165,11 @@ export async function PATCH(request: Request) {
       if (targetType === "profile") {
         const target = await tx.profile.findUnique({
           where: { id: targetId },
-          select: { id: true, status: true },
+          select: {
+            id: true,
+            status: true,
+            accountModerationStatus: true,
+          },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
@@ -173,9 +177,25 @@ export async function PATCH(request: Request) {
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
+        const suspensionAppealDueAt =
+          action === "suspend" ? getModerationDeadline() : null;
         await tx.profile.update({
           where: { id: target.id },
-          data: { status: nextStatus as "active" | "hidden" | "suspended" },
+          data: {
+            status: nextStatus as "active" | "hidden" | "suspended",
+            ...(action === "suspend"
+              ? {
+                  accountModerationStatus: "suspended" as const,
+                  suspensionAppealDueAt,
+                }
+              : action === "restore" &&
+                  target.accountModerationStatus !== "active"
+                ? {
+                    accountModerationStatus: "active" as const,
+                    suspensionAppealDueAt: null,
+                  }
+                : {}),
+          },
         });
       } else if (targetType === "audio") {
         const target = await tx.profile.findUnique({

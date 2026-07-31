@@ -57,7 +57,11 @@ describe("PATCH /api/admin/moderation/actions", () => {
       admin: { id: "admin-1", authId: "auth-1", role: "admin" },
     });
     mocks.transaction.mockImplementation((callback) => callback(tx));
-    mocks.profileFindUnique.mockResolvedValue({ id: "profile-1", status: "active" });
+    mocks.profileFindUnique.mockResolvedValue({
+      id: "profile-1",
+      status: "active",
+      accountModerationStatus: "active",
+    });
     mocks.profileUpdate.mockResolvedValue({});
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
@@ -152,6 +156,32 @@ describe("PATCH /api/admin/moderation/actions", () => {
 
     expect(response.status).toBe(400);
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("プロフィール利用停止時に60日間の解除申請期限を設定する", async () => {
+    const before = Date.now();
+    const response = await PATCH(
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "suspend",
+        reason: "繰り返しの規約違反",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const update = mocks.profileUpdate.mock.calls[0][0];
+    expect(update.where).toEqual({ id: "profile-1" });
+    expect(update.data).toEqual(
+      expect.objectContaining({
+        status: "suspended",
+        accountModerationStatus: "suspended",
+      }),
+    );
+    expect(update.data.suspensionAppealDueAt.getTime()).toBeGreaterThanOrEqual(
+      before + 59 * 24 * 60 * 60 * 1000,
+    );
+    expect(mocks.moderationCaseCreate).not.toHaveBeenCalled();
   });
 
   it("管理操作JSONが16KBを超える場合は413を返す", async () => {
@@ -306,7 +336,11 @@ describe("PATCH /api/admin/moderation/actions", () => {
   });
 
   it("同じ状態への変更は409で履歴を作らない", async () => {
-    mocks.profileFindUnique.mockResolvedValue({ id: "profile-1", status: "hidden" });
+    mocks.profileFindUnique.mockResolvedValue({
+      id: "profile-1",
+      status: "hidden",
+      accountModerationStatus: "active",
+    });
 
     const response = await PATCH(
       request({ targetType: "profile", targetId: "profile-1", action: "hide", reason: "確認" }),
