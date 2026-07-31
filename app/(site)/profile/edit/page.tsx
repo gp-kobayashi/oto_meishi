@@ -25,6 +25,7 @@ import {
 } from "@/lib/audioUploadConstraints";
 import styles from "./page.module.css";
 import AudioPlayer from "@/components/card/audioPlayer/AudioPlayer";
+import Card from "@/components/card/Card";
 
 const themeOptions = [
   { value: "normal", label: "標準" },
@@ -208,6 +209,10 @@ export default function ProfileEditPage() {
   const [audioUploadMessages, setAudioUploadMessages] = useState<string[]>([]);
   const [audioFileError, setAudioFileError] = useState<string>("");
   const [deletingAudio, setDeletingAudio] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">(
+    "desktop",
+  );
   const [validationErrors, setValidationErrors] = useState<{
     displayName?: string;
     bio?: string;
@@ -269,6 +274,21 @@ export default function ProfileEditPage() {
       if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl);
     };
   }, [audioPreviewUrl]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setPreviewOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [previewOpen]);
 
   const updateField = (field: keyof ProfileData, value: string) => {
     setProfile((current) =>
@@ -584,6 +604,20 @@ export default function ProfileEditPage() {
   const audioModerationCase = profile?.moderationCases?.find(
     (moderationCase) => moderationCase.targetType === "audio",
   );
+  const previewProfile: ProfileData | null = profile
+    ? {
+        ...profile,
+        hasAudio: Boolean(
+          audioPreviewUrl || profile.audioKey || profile.audioUrl,
+        ),
+        sns: profile.sns.filter(
+          (link) =>
+            link.status !== "hidden" &&
+            Boolean(link.label.trim()) &&
+            Boolean(link.url.trim()),
+        ),
+      }
+    : null;
 
   return (
     <section className={styles.main}>
@@ -609,6 +643,13 @@ export default function ProfileEditPage() {
                 <p className={styles.cardBadge}>編集モード</p>
               </div>
               <div className={styles.actionsRow}>
+                <button
+                  type="button"
+                  className={styles.previewButton}
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  公開表示をプレビュー
+                </button>
                 <div className={styles.themeOptions}>
                   {themeOptions.map((option) => (
                     <button
@@ -865,6 +906,74 @@ export default function ProfileEditPage() {
                 + リンクを追加
               </button>
             </div>
+            {previewOpen && previewProfile ? (
+              <div
+                className={styles.previewBackdrop}
+                onMouseDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    setPreviewOpen(false);
+                  }
+                }}
+              >
+                <section
+                  className={styles.previewDialog}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="profile-preview-title"
+                >
+                  <header className={styles.previewHeader}>
+                    <div>
+                      <p className={styles.previewEyebrow}>保存前プレビュー</p>
+                      <h2 id="profile-preview-title">公開プロフィール表示</h2>
+                      <p>
+                        この操作では変更内容は保存されません。
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.previewCloseButton}
+                      onClick={() => setPreviewOpen(false)}
+                      autoFocus
+                    >
+                      閉じる
+                    </button>
+                  </header>
+                  <div
+                    className={styles.previewModeSelector}
+                    aria-label="プレビュー表示幅"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={previewMode === "desktop"}
+                      onClick={() => setPreviewMode("desktop")}
+                    >
+                      PC表示
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={previewMode === "mobile"}
+                      onClick={() => setPreviewMode("mobile")}
+                    >
+                      スマートフォン表示
+                    </button>
+                  </div>
+                  <div className={styles.previewViewport}>
+                    <div
+                      className={`${styles.previewCanvas} ${
+                        previewMode === "mobile"
+                          ? styles.previewCanvasMobile
+                          : styles.previewCanvasDesktop
+                      }`}
+                    >
+                      <Card
+                        link={previewProfile}
+                        previewAudioUrl={audioPreviewUrl}
+                      />
+                    </div>
+                  </div>
+                </section>
+              </div>
+            ) : null}
           </article>
         )}
       </section>

@@ -1,6 +1,12 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import ProfileEditPage from "@/app/(site)/profile/edit/page";
 import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 
@@ -188,6 +194,47 @@ describe("ProfileEditPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "カラフル" }));
     expect(editorCard?.className).toMatch(/colorful/);
     expect(editorCard?.className).not.toMatch(/dark/);
+  });
+
+  it("未保存の内容をPCとスマートフォン表示でプレビューする", async () => {
+    const fetchMock = await renderLoadedPage();
+    fireEvent.change(screen.getByLabelText("表示名"), {
+      target: { value: "保存前の表示名" },
+    });
+    fireEvent.change(screen.getByLabelText("自己紹介"), {
+      target: { value: "保存前の自己紹介" },
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "公開表示をプレビュー" }),
+    );
+    const dialog = screen.getByRole("dialog", {
+      name: "公開プロフィール表示",
+    });
+    expect(within(dialog).getByText("保存前の表示名")).toBeDefined();
+    expect(within(dialog).getByText("保存前の自己紹介")).toBeDefined();
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "PC表示" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "スマートフォン表示",
+      }),
+    );
+    expect(
+      within(dialog)
+        .getByRole("button", { name: "スマートフォン表示" })
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+    expect(
+      fetchMock.mock.calls.filter(([, init]) => init?.method === "POST"),
+    ).toHaveLength(0);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "閉じる" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("64MiBを超える音声は送信前に拒否する", async () => {
