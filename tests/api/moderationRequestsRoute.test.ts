@@ -178,6 +178,21 @@ describe("/api/moderation/requests", () => {
     expect(mocks.requestCreate).not.toHaveBeenCalled();
   });
 
+  it("削除待ち状態では利用停止解除申請を受け付けない", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      ...activeModerationProfile,
+      status: "hidden",
+      accountModerationStatus: "deletionPending",
+      suspensionAppealDueAt: new Date(Date.now() + 60_000),
+      moderationCases: [],
+    });
+
+    const response = await POST(request({ message: "解除を希望します。" }));
+
+    expect(response.status).toBe(403);
+    expect(mocks.requestCreate).not.toHaveBeenCalled();
+  });
+
   it("確認中の同種申請がある場合は重複送信を拒否する", async () => {
     mocks.requestFindFirst.mockResolvedValueOnce({ id: "pending-request" });
 

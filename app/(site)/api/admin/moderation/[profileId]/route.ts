@@ -58,6 +58,20 @@ export async function GET(
             updatedAt: true,
           },
         },
+        moderationRequests: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 50,
+          select: {
+            id: true,
+            kind: true,
+            status: true,
+            message: true,
+            responseMessage: true,
+            resolvedAt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         moderationCases: {
           where: { targetType: "audio" },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -164,6 +178,15 @@ export async function GET(
             createdAt: report.createdAt.toISOString(),
             updatedAt: report.updatedAt.toISOString(),
           })),
+          moderationRequests: profile.moderationRequests.map(
+            (moderationRequest) => ({
+              ...moderationRequest,
+              resolvedAt:
+                moderationRequest.resolvedAt?.toISOString() ?? null,
+              createdAt: moderationRequest.createdAt.toISOString(),
+              updatedAt: moderationRequest.updatedAt.toISOString(),
+            }),
+          ),
           history: history.map((entry) => ({
             id: entry.id,
             targetType: entry.targetType,

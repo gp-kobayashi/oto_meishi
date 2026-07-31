@@ -464,6 +464,15 @@
   border-top: 1px solid #fecaca;
 }
 
+.rejected {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.requestResolution { display: grid; gap: 8px; margin-top: 14px; }
+.requestResolution label { font-size: 13px; font-weight: 700; }
+.requestResolution textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #cbd5e1; border-radius: 9px; font: inherit; resize: vertical; }
+
 .reportActions button {
   padding: 7px 10px;
   border: 1px solid #cbd5e1;

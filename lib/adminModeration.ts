@@ -85,6 +85,16 @@ export type ModerationDetailResponse = {
       createdAt: string;
       updatedAt: string;
     }[];
+    moderationRequests: {
+      id: string;
+      kind: "inquiry" | "accountAppeal";
+      status: "pending" | "resolved" | "rejected";
+      message: string;
+      responseMessage: string;
+      resolvedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }[];
     history: {
       id: string;
       targetType: "profile" | "audio" | "socialLink";

@@ -73,6 +73,18 @@ describe("GET /api/admin/moderation/[profileId]", () => {
           updatedAt: new Date("2026-07-17T02:00:00.000Z"),
         },
       ],
+      moderationRequests: [
+        {
+          id: "request-1",
+          kind: "accountAppeal",
+          status: "pending",
+          message: "問題箇所を修正しました。",
+          responseMessage: "",
+          resolvedAt: null,
+          createdAt: new Date("2026-07-17T05:00:00.000Z"),
+          updatedAt: new Date("2026-07-17T05:00:00.000Z"),
+        },
+      ],
       moderationCases: [
         {
           id: "case-1",
@@ -146,6 +158,18 @@ describe("GET /api/admin/moderation/[profileId]", () => {
           reviewerRole: null,
           reviewedAt: null,
           createdAt: "2026-07-17T02:00:00.000Z",
+        },
+      ],
+      moderationRequests: [
+        {
+          id: "request-1",
+          kind: "accountAppeal",
+          status: "pending",
+          message: "問題箇所を修正しました。",
+          responseMessage: "",
+          resolvedAt: null,
+          createdAt: "2026-07-17T05:00:00.000Z",
+          updatedAt: "2026-07-17T05:00:00.000Z",
         },
       ],
       history: [

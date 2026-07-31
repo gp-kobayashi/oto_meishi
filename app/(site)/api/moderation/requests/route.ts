@@ -105,7 +105,9 @@ export async function GET(request: Request) {
 
     const isSuspended =
       profile.status === "suspended" ||
-      profile.accountModerationStatus !== "active";
+      profile.accountModerationStatus === "suspended";
+    const isDeletionPending =
+      profile.accountModerationStatus === "deletionPending";
     const hasModeratedContent =
       profile.status === "hidden" ||
       profile.audioStatus !== "active" ||
@@ -115,7 +117,9 @@ export async function GET(request: Request) {
     return Response.json(
       {
         eligibility: {
-          kind: isSuspended
+          kind: isDeletionPending
+            ? null
+            : isSuspended
             ? "accountAppeal"
             : hasModeratedContent
               ? "inquiry"
@@ -230,7 +234,13 @@ export async function POST(request: Request) {
 
     const isSuspended =
       profile.status === "suspended" ||
-      profile.accountModerationStatus !== "active";
+      profile.accountModerationStatus === "suspended";
+    if (profile.accountModerationStatus === "deletionPending") {
+      return Response.json(
+        { error: "削除手続き中のため申請できません。" },
+        { status: 403, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
     const kind = isSuspended ? "accountAppeal" : "inquiry";
     if (
       isSuspended &&

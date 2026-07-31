@@ -70,6 +70,18 @@ describe("AdminModerationDetail", () => {
                 updatedAt: "2026-07-17T02:00:00.000Z",
               },
             ],
+            moderationRequests: [
+              {
+                id: "request-1",
+                kind: "accountAppeal",
+                status: "pending",
+                message: "問題箇所を修正しました。",
+                responseMessage: "",
+                resolvedAt: null,
+                createdAt: "2026-07-17T05:00:00.000Z",
+                updatedAt: "2026-07-17T05:00:00.000Z",
+              },
+            ],
             history: [
               {
                 id: "action-1",
@@ -118,6 +130,35 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("未確認")).toBeDefined();
     expect(screen.getByText(/最終変更:.*admin.*auth-adm/)).toBeDefined();
     expect(screen.getByText(/対応メモ: リンク先を確認しました/)).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: "問い合わせ・解除申請" }),
+    ).toBeDefined();
+    expect(screen.getByText("問題箇所を修正しました。")).toBeDefined();
+
+    const appealButton = screen.getByRole("button", {
+      name: "解除を承認",
+    }) as HTMLButtonElement;
+    expect(appealButton.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("ユーザー向け回答（必須）"), {
+      target: { value: "修正を確認したため利用停止を解除します。" },
+    });
+    fireEvent.click(appealButton);
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/moderation/requests/request-1",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer admin-token",
+          },
+          body: JSON.stringify({
+            status: "resolved",
+            responseMessage: "修正を確認したため利用停止を解除します。",
+          }),
+        },
+      );
+    });
 
     fireEvent.click(screen.getByRole("button", { name: "確認済みにする" }));
     const reportSubmitButton = screen.getByRole("button", {
