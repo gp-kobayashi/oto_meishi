@@ -19,6 +19,17 @@
 .itemHeading span { flex: 0 0 auto; padding: 3px 6px; border-radius: 999px; background: #dbeafe; color: #1d4ed8; font-size: 10px; font-weight: 800; }
 .list p { margin-top: 7px; color: #475569; font-size: 13px; line-height: 1.65; }
 .list time { display: block; margin-top: 8px; color: #94a3b8; font-size: 11px; }
+.details { display: grid; gap: 6px; margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.72); }
+.details div { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 8px; font-size: 12px; line-height: 1.55; }
+.details dt { color: #64748b; font-weight: 700; }
+.details dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: #334155; }
+.list .guidance { display: grid; gap: 3px; margin-top: 10px; padding-left: 10px; border-left: 3px solid #60a5fa; color: #334155; }
+.guidance strong { color: #1d4ed8; font-size: 11px; }
+.itemFooter { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: 10px; }
+.itemFooter time { margin-top: 0; }
+.actionLink { flex: 0 0 auto; padding: 7px 10px; border-radius: 8px; background: #2563eb; color: #fff; font-size: 12px; font-weight: 700; text-decoration: none; }
+.actionLink:hover { background: #1d4ed8; }
+.actionLink:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.28); outline-offset: 2px; }
 .message, .error { margin: 0; padding: 36px 18px; color: #64748b; font-size: 13px; text-align: center; }
 .error { color: #b91c1c; }
 .readError { margin: 0; padding: 10px 18px; border-bottom: 1px solid #fecaca; background: #fef2f2; color: #b91c1c; font-size: 12px; text-align: center; }

@@ -2,12 +2,21 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FiBell } from "react-icons/fi";
+import Link from "next/link";
 import styles from "./NotificationBell.module.css";
 
 type NotificationItem = {
   id: string;
   title: string;
   message: string;
+  targetType?: "profile" | "audio" | "socialLink";
+  targetLabel?: string;
+  actionLabel?: string;
+  reason?: string;
+  guidance?: string;
+  actionUrl?: "/profile/edit" | "/help";
+  actionLinkLabel?: string;
+  handledAt?: string;
   readAt: string | null;
   createdAt: string;
 };
@@ -223,9 +232,49 @@ export default function NotificationBell({ accessToken }: { accessToken: string 
                     {!notification.readAt ? <span>未読</span> : null}
                   </div>
                   <p>{notification.message}</p>
-                  <time dateTime={notification.createdAt}>
-                    {formatDate(notification.createdAt)}
-                  </time>
+                  {notification.targetLabel &&
+                  notification.actionLabel &&
+                  notification.reason ? (
+                    <dl className={styles.details}>
+                      <div>
+                        <dt>対象</dt>
+                        <dd>{notification.targetLabel}</dd>
+                      </div>
+                      <div>
+                        <dt>対応</dt>
+                        <dd>{notification.actionLabel}</dd>
+                      </div>
+                      <div>
+                        <dt>理由</dt>
+                        <dd>{notification.reason}</dd>
+                      </div>
+                    </dl>
+                  ) : null}
+                  {notification.guidance ? (
+                    <p className={styles.guidance}>
+                      <strong>次に行うこと</strong>
+                      {notification.guidance}
+                    </p>
+                  ) : null}
+                  <div className={styles.itemFooter}>
+                    <time
+                      dateTime={notification.handledAt ?? notification.createdAt}
+                    >
+                      対応日時：
+                      {formatDate(
+                        notification.handledAt ?? notification.createdAt,
+                      )}
+                    </time>
+                    {notification.actionUrl && notification.actionLinkLabel ? (
+                      <Link
+                        className={styles.actionLink}
+                        href={notification.actionUrl}
+                        onClick={closePanel}
+                      >
+                        {notification.actionLinkLabel}
+                      </Link>
+                    ) : null}
+                  </div>
                 </li>
               ))}
             </ol>

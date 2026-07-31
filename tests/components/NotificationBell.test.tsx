@@ -23,6 +23,15 @@ describe("NotificationBell", () => {
                   title: "音声の公開状態について",
                   message:
                     "規約違反が確認されたため、音声を非公開にしました。",
+                  targetType: "audio",
+                  targetLabel: "自己紹介音声",
+                  actionLabel: "非公開",
+                  reason: "不適切な表現が含まれています。",
+                  guidance:
+                    "音声を修正すると公開され、管理者が事後確認を行います。",
+                  actionUrl: "/profile/edit",
+                  actionLinkLabel: "音声を修正",
+                  handledAt: "2026-07-21T05:55:00.000Z",
                   readAt: null,
                   createdAt: "2026-07-21T06:00:00.000Z",
                 },
@@ -42,6 +51,17 @@ describe("NotificationBell", () => {
         "規約違反が確認されたため、音声を非公開にしました。",
       ),
     ).toBeDefined();
+    expect(screen.getByText("自己紹介音声")).toBeDefined();
+    expect(screen.getByText("不適切な表現が含まれています。")).toBeDefined();
+    expect(
+      screen.getByText(
+        "音声を修正すると公開され、管理者が事後確認を行います。",
+      ),
+    ).toBeDefined();
+    expect(screen.getByText(/対応日時：/)).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "音声を修正" }).getAttribute("href"),
+    ).toBe("/profile/edit");
     expect(screen.getByRole("heading", { name: "通知" })).toBeDefined();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(fetchMock).toHaveBeenLastCalledWith("/api/notifications/read", {
