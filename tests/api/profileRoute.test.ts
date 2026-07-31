@@ -8,6 +8,15 @@ const { mocks } = vi.hoisted(() => ({
     profileUpdate: vi.fn(),
     socialLinkDeleteMany: vi.fn(),
     socialLinkCreateMany: vi.fn(),
+    socialLinkCreate: vi.fn(),
+    socialLinkUpdate: vi.fn(),
+    socialLinkDelete: vi.fn(),
+    moderationCaseFindFirst: vi.fn(),
+    moderationCaseCreate: vi.fn(),
+    moderationCaseUpdate: vi.fn(),
+    moderationSnapshotFindFirst: vi.fn(),
+    moderationSnapshotCreate: vi.fn(),
+    moderationCaseEventCreate: vi.fn(),
     transaction: vi.fn(),
     consumeProfileSaveUserRateLimit: vi.fn(),
     consumeProfileSaveIpRateLimit: vi.fn(),
@@ -36,6 +45,9 @@ vi.mock("@/lib/prisma", () => ({
     socialLink: {
       deleteMany: mocks.socialLinkDeleteMany,
       createMany: mocks.socialLinkCreateMany,
+      create: mocks.socialLinkCreate,
+      update: mocks.socialLinkUpdate,
+      delete: mocks.socialLinkDelete,
     },
   },
 }));
@@ -78,6 +90,13 @@ describe("/api/profile route", () => {
     });
     mocks.socialLinkDeleteMany.mockResolvedValue({ count: 0 });
     mocks.socialLinkCreateMany.mockResolvedValue({ count: 0 });
+    mocks.socialLinkCreate.mockResolvedValue({});
+    mocks.socialLinkUpdate.mockResolvedValue({});
+    mocks.socialLinkDelete.mockResolvedValue({});
+    mocks.moderationCaseCreate.mockResolvedValue({ id: "case-1" });
+    mocks.moderationCaseUpdate.mockResolvedValue({ id: "case-1" });
+    mocks.moderationSnapshotCreate.mockResolvedValue({});
+    mocks.moderationCaseEventCreate.mockResolvedValue({});
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
         profile: {
@@ -88,6 +107,21 @@ describe("/api/profile route", () => {
         socialLink: {
           deleteMany: mocks.socialLinkDeleteMany,
           createMany: mocks.socialLinkCreateMany,
+          create: mocks.socialLinkCreate,
+          update: mocks.socialLinkUpdate,
+          delete: mocks.socialLinkDelete,
+        },
+        moderationCase: {
+          findFirst: mocks.moderationCaseFindFirst,
+          create: mocks.moderationCaseCreate,
+          update: mocks.moderationCaseUpdate,
+        },
+        moderationSnapshot: {
+          findFirst: mocks.moderationSnapshotFindFirst,
+          create: mocks.moderationSnapshotCreate,
+        },
+        moderationCaseEvent: {
+          create: mocks.moderationCaseEventCreate,
         },
       }),
     );
@@ -653,7 +687,7 @@ describe("/api/profile route", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("非公開リンクの変更は通常のプロフィール保存では受け付けない", async () => {
+  it("非公開前と同じURLへの変更は修正として受け付けない", async () => {
     mocks.profileFindUnique.mockResolvedValueOnce({
       id: "profile-1",
       userId: "testuser",
@@ -681,6 +715,76 @@ describe("/api/profile route", () => {
         displayName: "Test User",
         sns: [
           {
+            id: "link-hidden",
+            service: "youtube",
+            url: "https://youtube.com/@before/",
+            label: "変更後のラベル",
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "非公開前と同じリンクです。別のURLへ変更してください。",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("非公開リンクを変更すると事後確認待ちとして公開する", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "Test User",
+      bio: "",
+      audioStatus: "active",
+      audioTitle: "",
+      audioUrl: "",
+      theme: "normal",
+      sns: [
+        {
+          id: "link-hidden",
+          profileId: "profile-1",
+          service: "youtube",
+          url: "https://youtube.com/@before",
+          label: "YouTube",
+          sortOrder: 0,
+          status: "hidden",
+        },
+      ],
+    };
+    const savedProfile = {
+      ...existingProfile,
+      sns: [
+        {
+          ...existingProfile.sns[0],
+          url: "https://youtube.com/@after",
+          status: "active",
+        },
+      ],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(savedProfile);
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-link",
+      status: "correctionRequired",
+      reviewMode: "postReview",
+    });
+    mocks.moderationCaseUpdate.mockResolvedValueOnce({ id: "case-link" });
+    mocks.moderationSnapshotFindFirst.mockResolvedValueOnce({
+      id: "snapshot-reported",
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        sns: [
+          {
+            id: "link-hidden",
             service: "youtube",
             url: "https://youtube.com/@after",
             label: "YouTube",
@@ -689,11 +793,110 @@ describe("/api/profile route", () => {
       }),
     );
 
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual({
-      error: "管理対応中のリンクは、この保存操作では変更できません。",
+    expect(response.status).toBe(200);
+    expect(mocks.socialLinkUpdate).toHaveBeenCalledWith({
+      where: { id: "link-hidden" },
+      data: {
+        service: "youtube",
+        url: "https://youtube.com/@after",
+        label: "YouTube",
+        sortOrder: 0,
+        status: "active",
+      },
     });
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-link" },
+      data: expect.objectContaining({
+        status: "postReviewPending",
+        resolvedAt: null,
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-link",
+        kind: "corrected",
+        content: {
+          service: "youtube",
+          url: "https://youtube.com/@after",
+          label: "YouTube",
+        },
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "contentChanged",
+        previousStatus: "correctionRequired",
+        newStatus: "postReviewPending",
+      }),
+    });
+  });
+
+  it("非公開リンクを削除すると削除履歴を残す", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "Test User",
+      bio: "",
+      audioStatus: "active",
+      audioTitle: "",
+      audioUrl: "",
+      theme: "normal",
+      sns: [
+        {
+          id: "link-hidden",
+          profileId: "profile-1",
+          service: "youtube",
+          url: "https://youtube.com/@before",
+          label: "YouTube",
+          sortOrder: 0,
+          status: "hidden",
+        },
+      ],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      ...existingProfile,
+      sns: [],
+    });
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-link",
+      status: "correctionRequired",
+      reviewMode: "postReview",
+    });
+    mocks.moderationCaseUpdate.mockResolvedValueOnce({ id: "case-link" });
+    mocks.moderationSnapshotFindFirst.mockResolvedValueOnce({
+      id: "snapshot-reported",
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        sns: [],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.socialLinkDelete).toHaveBeenCalledWith({
+      where: { id: "link-hidden" },
+    });
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-link",
+        kind: "corrected",
+        content: { deleted: true },
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "contentDeleted",
+        newStatus: "postReviewPending",
+      }),
+    });
   });
 
   it("既存プロフィール更新時にthemeとSNS serviceを正規化し、SNSを置き換える", async () => {
@@ -706,7 +909,17 @@ describe("/api/profile route", () => {
       audioUrl: "",
       audioTitle: "",
       theme: "dark",
-      sns: [{ id: "link-1" }],
+      sns: [
+        {
+          id: "link-1",
+          profileId: "profile-1",
+          service: "website",
+          url: "https://before.example.com",
+          label: "Before",
+          sortOrder: 0,
+          status: "active",
+        },
+      ],
     };
     const savedProfile = {
       ...existingProfile,
@@ -749,19 +962,15 @@ describe("/api/profile route", () => {
       },
       include: { sns: true },
     });
-    expect(mocks.socialLinkDeleteMany).toHaveBeenCalledWith({
-      where: { profileId: "profile-1" },
-    });
-    expect(mocks.socialLinkCreateMany).toHaveBeenCalledWith({
-      data: [
-        {
-          profileId: "profile-1",
-          service: "other",
-          url: "https://example.com",
-          label: "Site",
-          sortOrder: 0,
-        },
-      ],
+    expect(mocks.socialLinkUpdate).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: {
+        service: "other",
+        url: "https://example.com",
+        label: "Site",
+        sortOrder: 0,
+        status: "active",
+      },
     });
   });
 

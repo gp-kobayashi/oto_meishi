@@ -14,9 +14,11 @@ type SocialService =
   | "other";
 
 type SocialLink = {
+  id?: string;
   service: SocialService;
   url: string;
   label: string;
+  status?: "active" | "hidden";
 };
 type theme = "normal" | "dark" | "light" | "colorful";
 

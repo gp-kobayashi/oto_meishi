@@ -9,6 +9,11 @@ import {
   consumeProfileSaveIpRateLimit,
   consumeProfileSaveUserRateLimit,
 } from "@/lib/profileSaveRateLimit";
+import {
+  compareModeratedUrls,
+  getModerationDeadline,
+  getPendingStatusForReviewMode,
+} from "@/lib/moderationRemediation";
 import { getClientIp } from "@/lib/clientIp";
 import {
   consumePrivateProfileReadIpRateLimit,
@@ -27,6 +32,15 @@ type ComparableSocialLink = {
   label: string;
   sortOrder: number;
 };
+
+type ExistingSocialLink = ComparableSocialLink & {
+  id: string;
+  status: "active" | "hidden";
+};
+
+type ProfileTransaction = Parameters<
+  Parameters<typeof prisma.$transaction>[0]
+>[0];
 
 function toProfileRequestBody(value: unknown): ProfileRequestBody {
   return typeof value === "object" && value !== null
@@ -59,6 +73,133 @@ function areSocialLinksUnchanged(
       existing.sortOrder === requested.sortOrder
     );
   });
+}
+
+function findRequestedExistingLink(
+  existingLinks: ExistingSocialLink[],
+  requestedLink: ComparableSocialLink,
+): ExistingSocialLink | undefined {
+  if (requestedLink.id) {
+    return existingLinks.find((link) => link.id === requestedLink.id);
+  }
+
+  return existingLinks.find(
+    (link) =>
+      link.status === "active" && link.sortOrder === requestedLink.sortOrder,
+  );
+}
+
+function isSocialLinkContentUnchanged(
+  existing: ComparableSocialLink,
+  requested: ComparableSocialLink,
+): boolean {
+  return (
+    existing.service === requested.service &&
+    existing.url === requested.url &&
+    existing.label === requested.label
+  );
+}
+
+async function recordModeratedLinkCorrection({
+  transaction,
+  profileId,
+  link,
+  requestedLink,
+  actorId,
+  deleted,
+}: {
+  transaction: ProfileTransaction;
+  profileId: string;
+  link: ExistingSocialLink;
+  requestedLink?: ComparableSocialLink;
+  actorId: string;
+  deleted: boolean;
+}) {
+  const deadline = getModerationDeadline();
+  const existingCase = await transaction.moderationCase.findFirst({
+    where: {
+      targetType: "socialLink",
+      targetId: link.id,
+      status: {
+        in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+      },
+    },
+    select: { id: true, status: true, reviewMode: true },
+  });
+  const reviewMode = existingCase?.reviewMode ?? "postReview";
+  const pendingStatus = getPendingStatusForReviewMode(reviewMode);
+  const moderationCase = existingCase
+    ? await transaction.moderationCase.update({
+        where: { id: existingCase.id },
+        data: {
+          status: pendingStatus,
+          reviewDueAt: deadline,
+          retentionExpiresAt: deadline,
+          resolvedAt: null,
+        },
+        select: { id: true },
+      })
+    : await transaction.moderationCase.create({
+        data: {
+          profileId,
+          targetType: "socialLink",
+          targetId: link.id,
+          reasonCode: "unsafeLink",
+          reviewMode,
+          status: pendingStatus,
+          userMessage: "非公開リンクが修正されました。",
+          reviewDueAt: deadline,
+          retentionExpiresAt: deadline,
+        },
+        select: { id: true },
+      });
+
+  const reportedSnapshot = await transaction.moderationSnapshot.findFirst({
+    where: { moderationCaseId: moderationCase.id, kind: "reported" },
+    select: { id: true },
+  });
+  if (!reportedSnapshot) {
+    await transaction.moderationSnapshot.create({
+      data: {
+        moderationCaseId: moderationCase.id,
+        kind: "reported",
+        content: {
+          service: link.service,
+          url: link.url,
+          label: link.label,
+        },
+        expiresAt: deadline,
+      },
+    });
+  }
+
+  await transaction.moderationSnapshot.create({
+    data: {
+      moderationCaseId: moderationCase.id,
+      kind: "corrected",
+      content: deleted
+        ? { deleted: true }
+        : {
+            service: requestedLink?.service,
+            url: requestedLink?.url,
+            label: requestedLink?.label,
+          },
+      expiresAt: deadline,
+    },
+  });
+  await transaction.moderationCaseEvent.create({
+    data: {
+      moderationCaseId: moderationCase.id,
+      eventType: deleted ? "contentDeleted" : "contentChanged",
+      actorType: "user",
+      actorId,
+      previousStatus: existingCase?.status ?? "correctionRequired",
+      newStatus: pendingStatus,
+      details: { targetType: "socialLink", targetId: link.id },
+    },
+  });
+
+  return { pendingStatus, reviewMode };
 }
 
 export async function GET(request: Request) {
@@ -382,19 +523,38 @@ export async function POST(request: Request) {
         existingProfile.sns,
         socialLinks,
       );
-      if (
-        !preserveExistingLinks &&
-        existingProfile.sns.some(
-          (link) => (link.status ?? "active") !== "active",
-        )
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "管理対応中のリンクは、この保存操作では変更できません。",
-          },
-          { status: 409 },
+      const existingLinks = existingProfile.sns.map((link) => ({
+        ...link,
+        status: link.status ?? ("active" as const),
+      }));
+      for (const requestedLink of socialLinks) {
+        if (
+          requestedLink.id &&
+          !existingLinks.some((link) => link.id === requestedLink.id)
+        ) {
+          return NextResponse.json(
+            { error: "プロフィールに属さないリンクは変更できません。" },
+            { status: 403 },
+          );
+        }
+
+        const existingLink = findRequestedExistingLink(
+          existingLinks,
+          requestedLink,
         );
+        if (
+          existingLink?.status === "hidden" &&
+          !isSocialLinkContentUnchanged(existingLink, requestedLink) &&
+          compareModeratedUrls(existingLink.url, requestedLink.url) !== "changed"
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "非公開前と同じリンクです。別のURLへ変更してください。",
+            },
+            { status: 409 },
+          );
+        }
       }
     }
 
@@ -440,18 +600,80 @@ export async function POST(request: Request) {
         });
       }
 
-      await transaction.socialLink.deleteMany({ where: { profileId } });
+      const existingLinks = (existingProfile?.sns ?? []).map((link) => ({
+        ...link,
+        status: link.status ?? ("active" as const),
+      }));
+      const retainedLinkIds = new Set<string>();
 
-      if (socialLinks.length > 0) {
-        await transaction.socialLink.createMany({
-          data: socialLinks.map((link) => ({
+      for (const requestedLink of socialLinks) {
+        const existingLink = findRequestedExistingLink(
+          existingLinks,
+          requestedLink,
+        );
+        if (!existingLink) {
+          await transaction.socialLink.create({
+            data: {
+              profileId,
+              service: requestedLink.service,
+              url: requestedLink.url,
+              label: requestedLink.label,
+              sortOrder: requestedLink.sortOrder,
+            },
+          });
+          continue;
+        }
+
+        retainedLinkIds.add(existingLink.id);
+        if (
+          isSocialLinkContentUnchanged(existingLink, requestedLink) &&
+          existingLink.sortOrder === requestedLink.sortOrder
+        ) {
+          continue;
+        }
+
+        let nextStatus = existingLink.status;
+        if (
+          existingLink.status === "hidden" &&
+          !isSocialLinkContentUnchanged(existingLink, requestedLink)
+        ) {
+          const correction = await recordModeratedLinkCorrection({
+            transaction,
             profileId,
-            service: link.service,
-            url: link.url,
-            label: link.label,
-            sortOrder: link.sortOrder,
-          })),
+            link: existingLink,
+            requestedLink,
+            actorId: supabaseUser.id,
+            deleted: false,
+          });
+          nextStatus =
+            correction.reviewMode === "postReview" ? "active" : "hidden";
+        }
+
+        await transaction.socialLink.update({
+          where: { id: existingLink.id },
+          data: {
+            service: requestedLink.service,
+            url: requestedLink.url,
+            label: requestedLink.label,
+            sortOrder: requestedLink.sortOrder,
+            status: nextStatus,
+          },
         });
+      }
+
+      for (const existingLink of existingLinks) {
+        if (retainedLinkIds.has(existingLink.id)) continue;
+
+        if (existingLink.status === "hidden") {
+          await recordModeratedLinkCorrection({
+            transaction,
+            profileId,
+            link: existingLink,
+            actorId: supabaseUser.id,
+            deleted: true,
+          });
+        }
+        await transaction.socialLink.delete({ where: { id: existingLink.id } });
       }
 
       return transaction.profile.findUnique({

@@ -39,6 +39,7 @@ export interface SanitizedProfileData {
   audioKey: string;
   audioTitle: string;
   sns: Array<{
+    id?: string;
     service: SocialService;
     url: string;
     label: string;
@@ -160,6 +161,7 @@ export function normalizeSocialService(service: string): SocialService {
  * SNSリンクのフィルタリングと正規化
  */
 export function sanitizeSocialLinks(socialLinks: unknown[]): Array<{
+  id?: string;
   service: SocialService;
   url: string;
   label: string;
@@ -182,6 +184,10 @@ export function sanitizeSocialLinks(socialLinks: unknown[]): Array<{
     .map((link, index) => {
       const l = link as SocialLink;
       return {
+        ...(typeof (link as { id?: unknown }).id === "string" &&
+        (link as { id: string }).id.trim()
+          ? { id: (link as { id: string }).id.trim() }
+          : {}),
         service: normalizeSocialService(l.service),
         url: l.url.trim(),
         label: l.label.trim(),
