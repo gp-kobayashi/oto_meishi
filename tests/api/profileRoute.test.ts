@@ -683,8 +683,8 @@ describe("/api/profile route", () => {
     expect(mocks.socialLinkCreateMany).not.toHaveBeenCalled();
   });
 
-  it("非公開音声のタイトル変更は通常のプロフィール保存では受け付けない", async () => {
-    mocks.profileFindUnique.mockResolvedValueOnce({
+  it("非公開音声の状態を維持したまま音声タイトルを変更できる", async () => {
+    const existingProfile = {
       id: "profile-1",
       userId: "testuser",
       authId: "auth-user-1",
@@ -694,7 +694,11 @@ describe("/api/profile route", () => {
       audioTitle: "変更前",
       audioUrl: "",
       sns: [],
-    });
+    };
+    const savedProfile = { ...existingProfile, audioTitle: "変更後" };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileUpdate.mockResolvedValueOnce(savedProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(savedProfile);
 
     const response = await POST(
       postRequest({
@@ -704,11 +708,17 @@ describe("/api/profile route", () => {
       }),
     );
 
-    expect(response.status).toBe(409);
-    await expect(response.json()).resolves.toEqual({
-      error: "管理対応中の音声タイトルは、この保存操作では変更できません。",
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { userId: "testuser" },
+      data: {
+        displayName: "Test User",
+        bio: "",
+        audioTitle: "変更後",
+        theme: "normal",
+      },
+      include: { sns: true },
     });
-    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("非公開前と同じURLへの変更は修正として受け付けない", async () => {

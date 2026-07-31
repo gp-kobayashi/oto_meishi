@@ -530,19 +530,6 @@ export async function POST(request: Request) {
         );
       }
 
-      if (
-        (existingProfile.audioStatus ?? "active") !== "active" &&
-        audioTitle !== existingProfile.audioTitle
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "管理対応中の音声タイトルは、この保存操作では変更できません。",
-          },
-          { status: 409 },
-        );
-      }
-
       preserveExistingLinks = areSocialLinksUnchanged(
         existingProfile.sns,
         socialLinks,

@@ -428,6 +428,7 @@ describe("/api/audio/upload route", () => {
         id: true,
         authId: true,
         status: true,
+        accountModerationStatus: true,
         audioStatus: true,
         audioKey: true,
         audioUrl: true,
@@ -444,10 +445,11 @@ describe("/api/audio/upload route", () => {
           },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 1,
-          select: {
-            id: true,
-            status: true,
-            snapshots: {
+            select: {
+              id: true,
+              status: true,
+              reviewMode: true,
+              snapshots: {
               where: { kind: "reported" },
               orderBy: [{ createdAt: "desc" }, { id: "desc" }],
               take: 1,
@@ -620,7 +622,6 @@ describe("/api/audio/upload route", () => {
       where: {
         userId: "testuser",
         authId: "auth-user-1",
-        status: "active",
         audioStatus: "active",
       },
       data: {
@@ -647,6 +648,7 @@ describe("/api/audio/upload route", () => {
         {
           id: "case-1",
           status: "postReviewPending",
+          reviewMode: "postReview",
           snapshots: [{ contentHash: null }],
         },
       ],
@@ -659,7 +661,6 @@ describe("/api/audio/upload route", () => {
       where: {
         userId: "testuser",
         authId: "auth-user-1",
-        status: "active",
         audioStatus: "removed",
       },
       data: {
@@ -695,6 +696,119 @@ describe("/api/audio/upload route", () => {
     });
   });
 
+  it("通常違反の非公開音声を変更すると公開して事後確認待ちにする", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      audioStatus: "hidden",
+      audioKey: "audio/testuser/hidden.m4a",
+      audioUrl: "",
+      moderationCases: [
+        {
+          id: "case-1",
+          status: "correctionRequired",
+          reviewMode: "postReview",
+          snapshots: [{ contentHash: null }],
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateProfile).toHaveBeenCalledWith({
+      where: {
+        userId: "testuser",
+        authId: "auth-user-1",
+        audioStatus: "hidden",
+      },
+      data: {
+        audioKey: "audio/testuser/voice-123.m4a",
+        audioUrl: "",
+        audioStatus: "active",
+      },
+    });
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: expect.objectContaining({
+        reviewMode: "postReview",
+        status: "postReviewPending",
+      }),
+      select: { id: true },
+    });
+  });
+
+  it("なりすまし等の非公開音声を変更しても事前確認まで非公開を維持する", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "hidden",
+      accountModerationStatus: "active",
+      audioStatus: "hidden",
+      audioKey: "audio/testuser/hidden.m4a",
+      audioUrl: "",
+      moderationCases: [
+        {
+          id: "case-1",
+          status: "correctionRequired",
+          reviewMode: "preReview",
+          snapshots: [{ contentHash: null }],
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateProfile).toHaveBeenCalledWith({
+      where: {
+        userId: "testuser",
+        authId: "auth-user-1",
+        audioStatus: "hidden",
+      },
+      data: {
+        audioKey: "audio/testuser/voice-123.m4a",
+        audioUrl: "",
+        audioStatus: "hidden",
+      },
+    });
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: expect.objectContaining({
+        reviewMode: "preReview",
+        status: "preReviewPending",
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        previousStatus: "correctionRequired",
+        newStatus: "preReviewPending",
+      }),
+    });
+  });
+
+  it("利用停止中のアカウントは音声を変更できない", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "suspended",
+      audioStatus: "hidden",
+      audioKey: "",
+      audioUrl: "",
+      moderationCases: [],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(403);
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+  });
+
   it("削除前と同じ音声は再登録しない", async () => {
     const previousHash = createHash("sha256")
       .update("converted audio")
@@ -710,6 +824,7 @@ describe("/api/audio/upload route", () => {
         {
           id: "case-1",
           status: "postReviewPending",
+          reviewMode: "postReview",
           snapshots: [{ contentHash: previousHash }],
         },
       ],
@@ -719,7 +834,7 @@ describe("/api/audio/upload route", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
-      error: "削除前と同じ音声です。別の音声へ変更してください。",
+      error: "非公開前と同じ音声です。別の音声へ変更してください。",
     });
     expect(mocks.uploadToR2).not.toHaveBeenCalled();
     expect(mocks.updateProfile).not.toHaveBeenCalled();

@@ -30,6 +30,7 @@ import {
   compareModeratedContentHashes,
   createModerationContentHash,
   getModerationDeadline,
+  getPendingStatusForReviewMode,
 } from "@/lib/moderationRemediation";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
@@ -161,6 +162,7 @@ export async function POST(request: NextRequest) {
         id: true,
         authId: true,
         status: true,
+        accountModerationStatus: true,
         audioStatus: true,
         audioKey: true,
         audioUrl: true,
@@ -180,6 +182,7 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             status: true,
+            reviewMode: true,
             snapshots: {
               where: { kind: "reported" },
               orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -203,8 +206,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (
-      (profile.status ?? "active") !== "active" ||
-      !["active", "removed"].includes(profile.audioStatus ?? "active")
+      profile.status === "suspended" ||
+      (profile.accountModerationStatus ?? "active") !== "active" ||
+      !["active", "hidden", "removed"].includes(
+        profile.audioStatus ?? "active",
+      )
     ) {
       return NextResponse.json(
         { error: "管理対応中のため、音声をアップロードできません。" },
@@ -280,7 +286,7 @@ export async function POST(request: NextRequest) {
       const previousContentHash =
         profile.moderationCases[0]?.snapshots[0]?.contentHash;
       if (
-        profile.audioStatus === "removed" &&
+        profile.audioStatus !== "active" &&
         previousContentHash &&
         compareModeratedContentHashes(previousContentHash, contentHash) ===
           "same"
@@ -288,7 +294,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           {
             error:
-              "削除前と同じ音声です。別の音声へ変更してください。",
+              "非公開前と同じ音声です。別の音声へ変更してください。",
           },
           { status: 409 },
         );
@@ -301,29 +307,35 @@ export async function POST(request: NextRequest) {
       try {
         const deadline = getModerationDeadline();
         await prisma.$transaction(async (tx) => {
+          const existingCase = profile.moderationCases[0];
+          const reviewMode = existingCase?.reviewMode ?? "postReview";
+          const pendingStatus = getPendingStatusForReviewMode(reviewMode);
+          const isModeratedReplacement = profile.audioStatus !== "active";
+
           await tx.profile.update({
             where: {
               userId,
               authId: authenticatedUserId,
-              status: "active",
               audioStatus: profile.audioStatus,
             },
             data: {
               audioKey,
               audioUrl: "",
-              audioStatus: "active",
+              audioStatus:
+                isModeratedReplacement && reviewMode === "preReview"
+                  ? "hidden"
+                  : "active",
             },
           });
 
-          if (profile.audioStatus !== "removed") return;
+          if (!isModeratedReplacement) return;
 
-          const existingCase = profile.moderationCases[0];
           const moderationCase = existingCase
             ? await tx.moderationCase.update({
                 where: { id: existingCase.id },
                 data: {
-                  reviewMode: "postReview",
-                  status: "postReviewPending",
+                  reviewMode,
+                  status: pendingStatus,
                   reviewDueAt: deadline,
                   retentionExpiresAt: deadline,
                   resolvedAt: null,
@@ -336,9 +348,9 @@ export async function POST(request: NextRequest) {
                   targetType: "audio",
                   targetId: profile.id,
                   reasonCode: "other",
-                  reviewMode: "postReview",
-                  status: "postReviewPending",
-                  userMessage: "削除後に新しい音声が登録されました。",
+                  reviewMode,
+                  status: pendingStatus,
+                  userMessage: "非公開後に新しい音声が登録されました。",
                   reviewDueAt: deadline,
                   retentionExpiresAt: deadline,
                 },
@@ -365,7 +377,7 @@ export async function POST(request: NextRequest) {
               actorType: "user",
               actorId: authenticatedUserId,
               previousStatus: existingCase?.status ?? "correctionRequired",
-              newStatus: "postReviewPending",
+              newStatus: pendingStatus,
               details: { targetType: "audio" },
             },
           });
