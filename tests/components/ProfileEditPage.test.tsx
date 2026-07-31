@@ -274,6 +274,71 @@ describe("ProfileEditPage", () => {
     ).toBeDefined();
   });
 
+  it("音声とリンクが非公開でも対象外のプロフィール項目を保存できる", async () => {
+    const moderatedProfile = {
+      ...baseProfile,
+      audioStatus: "hidden" as const,
+      sns: [
+        {
+          ...baseProfile.sns[0],
+          status: "hidden" as const,
+        },
+      ],
+      moderationCases: [
+        {
+          id: "case-audio",
+          targetType: "audio" as const,
+          targetId: "profile-1",
+          reasonCode: "inappropriateContent" as const,
+          reviewMode: "postReview" as const,
+          status: "correctionRequired" as const,
+          userMessage: "音声を変更してください。",
+          reviewDueAt: "2026-09-29T00:00:00.000Z",
+        },
+        {
+          id: "case-link",
+          targetType: "socialLink" as const,
+          targetId: "link-1",
+          reasonCode: "unsafeLink" as const,
+          reviewMode: "postReview" as const,
+          status: "correctionRequired" as const,
+          userMessage: "リンクを変更してください。",
+          reviewDueAt: "2026-09-29T00:00:00.000Z",
+        },
+      ],
+    };
+    const fetchMock = await renderLoadedPage(moderatedProfile);
+    fetchMock.mockResolvedValueOnce(
+      Response.json({
+        ...moderatedProfile,
+        displayName: "変更後の表示名",
+      }),
+    );
+
+    fireEvent.change(screen.getByLabelText("表示名"), {
+      target: { value: "変更後の表示名" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+
+    expect(await screen.findByText("プロフィールを保存しました。")).toBeDefined();
+    const requestBody = JSON.parse(
+      (fetchMock.mock.calls[1][1] as RequestInit).body as string,
+    );
+    expect(requestBody).toEqual(
+      expect.objectContaining({
+        displayName: "変更後の表示名",
+        audioStatus: "hidden",
+        sns: [
+          expect.objectContaining({
+            id: "link-1",
+            status: "hidden",
+            url: "https://x.com/test",
+          }),
+        ],
+      }),
+    );
+  });
+
   it("文字数制限を超えた入力にはバリデーションエラーを表示する", async () => {
     await renderLoadedPage();
 

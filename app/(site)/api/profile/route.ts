@@ -14,6 +14,7 @@ import {
   getModerationDeadline,
   getPendingStatusForReviewMode,
 } from "@/lib/moderationRemediation";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { getClientIp } from "@/lib/clientIp";
 import {
   consumePrivateProfileReadIpRateLimit,
@@ -24,6 +25,29 @@ import {
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
 type ProfileRequestBody = Parameters<typeof sanitizeProfileData>[0];
+
+const ownerModerationCasesQuery = {
+  where: {
+    status: {
+      in: [
+        "correctionRequired",
+        "postReviewPending",
+        "preReviewPending",
+      ],
+    },
+  },
+  select: {
+    id: true,
+    targetType: true,
+    targetId: true,
+    reasonCode: true,
+    reviewMode: true,
+    status: true,
+    userMessage: true,
+    reviewDueAt: true,
+  },
+  orderBy: { updatedAt: "desc" },
+} satisfies Prisma.ModerationCaseFindManyArgs;
 
 type ComparableSocialLink = {
   id?: string;
@@ -280,28 +304,7 @@ export async function GET(request: Request) {
         where: { authId: user.id },
         include: {
           sns: true,
-          moderationCases: {
-            where: {
-              status: {
-                in: [
-                  "correctionRequired",
-                  "postReviewPending",
-                  "preReviewPending",
-                ],
-              },
-            },
-            select: {
-              id: true,
-              targetType: true,
-              targetId: true,
-              reasonCode: true,
-              reviewMode: true,
-              status: true,
-              userMessage: true,
-              reviewDueAt: true,
-            },
-            orderBy: { updatedAt: "desc" },
-          },
+          moderationCases: ownerModerationCasesQuery,
         },
       });
 
@@ -473,9 +476,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const { data: profileInput, error: validationError } = sanitizeProfileData(
-      toProfileRequestBody(jsonBody.value),
-    );
+    const requestBody = toProfileRequestBody(jsonBody.value);
+    const hasAudioTitleInput = Object.hasOwn(requestBody, "audioTitle");
+    const hasSocialLinksInput = Object.hasOwn(requestBody, "sns");
+    const { data: profileInput, error: validationError } =
+      sanitizeProfileData(requestBody);
 
     if (validationError || !profileInput) {
       return NextResponse.json(
@@ -497,6 +502,8 @@ export async function POST(request: Request) {
       where: { userId },
       include: { sns: true },
     });
+    let audioTitleToSave = audioTitle;
+    let socialLinksToSave = socialLinks;
     let preserveExistingLinks = false;
     if (!existingProfile) {
       // 新規作成時：このアカウントがすでに別のuserIdでプロフィールを作成していないか確認
@@ -511,6 +518,21 @@ export async function POST(request: Request) {
       }
 
     } else {
+      if (!hasAudioTitleInput) {
+        audioTitleToSave = existingProfile.audioTitle;
+      }
+      if (!hasSocialLinksInput) {
+        socialLinksToSave = existingProfile.sns.map(
+          ({ id, service, url, label, sortOrder }) => ({
+            id,
+            service,
+            url,
+            label,
+            sortOrder,
+          }),
+        );
+      }
+
       // 未紐付けプロフィールをリクエストだけで取得できないよう、所有者の完全一致を必須にする
       if (existingProfile.authId !== supabaseUser.id) {
         return NextResponse.json(
@@ -532,13 +554,13 @@ export async function POST(request: Request) {
 
       preserveExistingLinks = areSocialLinksUnchanged(
         existingProfile.sns,
-        socialLinks,
+        socialLinksToSave,
       );
       const existingLinks = existingProfile.sns.map((link) => ({
         ...link,
         status: link.status ?? ("active" as const),
       }));
-      for (const requestedLink of socialLinks) {
+      for (const requestedLink of socialLinksToSave) {
         if (
           requestedLink.id &&
           !existingLinks.some((link) => link.id === requestedLink.id)
@@ -581,7 +603,7 @@ export async function POST(request: Request) {
             bio,
             audioUrl: "",
             audioKey: "",
-            audioTitle,
+            audioTitle: audioTitleToSave,
             theme,
             sns: {
               create: [],
@@ -596,7 +618,7 @@ export async function POST(request: Request) {
           data: {
             displayName: displayName || userId,
             bio,
-            audioTitle,
+            audioTitle: audioTitleToSave,
             theme,
           },
           include: { sns: true },
@@ -607,7 +629,10 @@ export async function POST(request: Request) {
       if (preserveExistingLinks) {
         return transaction.profile.findUnique({
           where: { userId },
-          include: { sns: true },
+          include: {
+            sns: true,
+            moderationCases: ownerModerationCasesQuery,
+          },
         });
       }
 
@@ -617,7 +642,7 @@ export async function POST(request: Request) {
       }));
       const retainedLinkIds = new Set<string>();
 
-      for (const requestedLink of socialLinks) {
+      for (const requestedLink of socialLinksToSave) {
         const existingLink = findRequestedExistingLink(
           existingLinks,
           requestedLink,
@@ -689,7 +714,10 @@ export async function POST(request: Request) {
 
       return transaction.profile.findUnique({
         where: { userId },
-        include: { sns: true },
+        include: {
+          sns: true,
+          moderationCases: ownerModerationCasesQuery,
+        },
       });
     });
 

@@ -561,10 +561,7 @@ export default function ProfileEditPage() {
         throw new Error(savedProfileResponse.error || "保存に失敗しました。");
       }
 
-      setProfile({
-        ...(savedProfileResponse as ProfileData),
-        moderationCases: profile.moderationCases,
-      });
+      setProfile(savedProfileResponse as ProfileData);
       setAudioFile(null);
       setAudioPreviewUrl((previousUrl) => {
         if (previousUrl) URL.revokeObjectURL(previousUrl);

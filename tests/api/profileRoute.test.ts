@@ -641,7 +641,7 @@ describe("/api/profile route", () => {
       id: "profile-1",
       userId: "testuser",
       authId: "auth-user-1",
-      status: "active",
+      status: "hidden",
       accountModerationStatus: "active",
       displayName: "変更前",
       bio: "変更前の自己紹介",
@@ -681,6 +681,62 @@ describe("/api/profile route", () => {
     expect(mocks.profileUpdate).toHaveBeenCalled();
     expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
     expect(mocks.socialLinkCreateMany).not.toHaveBeenCalled();
+  });
+
+  it("リクエストに含まれない音声とリンクを変更せずに保持する", async () => {
+    const hiddenLink = {
+      id: "link-hidden",
+      profileId: "profile-1",
+      service: "youtube",
+      url: "https://youtube.com/@example",
+      label: "YouTube",
+      sortOrder: 0,
+      status: "hidden",
+    };
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "変更前",
+      bio: "",
+      audioStatus: "hidden",
+      audioTitle: "保持するタイトル",
+      audioUrl: "",
+      theme: "normal",
+      sns: [hiddenLink],
+    };
+    const savedProfile = {
+      ...existingProfile,
+      displayName: "変更後",
+      moderationCases: [],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileUpdate.mockResolvedValueOnce(savedProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(savedProfile);
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "変更後",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { userId: "testuser" },
+      data: {
+        displayName: "変更後",
+        bio: "",
+        audioTitle: "保持するタイトル",
+        theme: "normal",
+      },
+      include: { sns: true },
+    });
+    expect(mocks.socialLinkUpdate).not.toHaveBeenCalled();
+    expect(mocks.socialLinkDelete).not.toHaveBeenCalled();
+    expect(mocks.socialLinkCreate).not.toHaveBeenCalled();
   });
 
   it("非公開音声の状態を維持したまま音声タイトルを変更できる", async () => {
@@ -863,6 +919,78 @@ describe("/api/profile route", () => {
         previousStatus: "correctionRequired",
         newStatus: "postReviewPending",
       }),
+    });
+  });
+
+  it("事前確認対象の非公開リンクは変更後も非公開を維持する", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "hidden",
+      accountModerationStatus: "active",
+      displayName: "Test User",
+      bio: "",
+      audioStatus: "active",
+      audioTitle: "",
+      audioUrl: "",
+      theme: "normal",
+      sns: [
+        {
+          id: "link-hidden",
+          profileId: "profile-1",
+          service: "x",
+          url: "https://x.com/before",
+          label: "X",
+          sortOrder: 0,
+          status: "hidden",
+        },
+      ],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-link",
+      status: "correctionRequired",
+      reviewMode: "preReview",
+    });
+    mocks.moderationCaseUpdate.mockResolvedValueOnce({ id: "case-link" });
+    mocks.moderationSnapshotFindFirst.mockResolvedValueOnce({
+      id: "snapshot-reported",
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        sns: [
+          {
+            id: "link-hidden",
+            service: "x",
+            url: "https://x.com/after",
+            label: "X",
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.socialLinkUpdate).toHaveBeenCalledWith({
+      where: { id: "link-hidden" },
+      data: {
+        service: "x",
+        url: "https://x.com/after",
+        label: "X",
+        sortOrder: 0,
+        status: "hidden",
+      },
+    });
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-link" },
+      data: expect.objectContaining({
+        status: "preReviewPending",
+      }),
+      select: { id: true },
     });
   });
 
