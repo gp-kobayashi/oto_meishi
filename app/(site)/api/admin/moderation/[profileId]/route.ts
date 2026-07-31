@@ -73,27 +73,43 @@ export async function GET(
           },
         },
         moderationCases: {
-          where: { targetType: "audio" },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          take: 1,
+          take: 50,
           select: {
             id: true,
+            targetType: true,
+            targetId: true,
+            reasonCode: true,
             status: true,
             reviewMode: true,
+            userMessage: true,
             reviewDueAt: true,
+            retentionExpiresAt: true,
+            resolvedAt: true,
+            createdAt: true,
+            updatedAt: true,
             snapshots: {
-              where: { kind: "reported" },
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-              take: 1,
-              select: { content: true },
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              select: {
+                id: true,
+                kind: true,
+                content: true,
+                contentHash: true,
+                storageObjectKey: true,
+                expiresAt: true,
+                createdAt: true,
+              },
             },
             events: {
-              where: { eventType: "contentDeleted" },
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-              take: 1,
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
               select: {
+                id: true,
+                eventType: true,
                 actorType: true,
                 actorId: true,
+                previousStatus: true,
+                newStatus: true,
+                details: true,
                 createdAt: true,
               },
             },
@@ -125,9 +141,19 @@ export async function GET(
         adminUser: { select: { authId: true, role: true } },
       },
     });
-    const deletedAudioCase = profile.moderationCases[0];
-    const deletedAudioEvent = deletedAudioCase?.events[0];
-    const reportedAudio = deletedAudioCase?.snapshots[0]?.content;
+    const deletedAudioCase = profile.moderationCases.find(
+      (moderationCase) =>
+        moderationCase.targetType === "audio" &&
+        moderationCase.events.some(
+          (event) => event.eventType === "contentDeleted",
+        ),
+    );
+    const deletedAudioEvent = deletedAudioCase?.events.findLast(
+      (event) => event.eventType === "contentDeleted",
+    );
+    const reportedAudio = deletedAudioCase?.snapshots.findLast(
+      (snapshot) => snapshot.kind === "reported",
+    )?.content;
 
     return Response.json(
       {
@@ -187,6 +213,32 @@ export async function GET(
               updatedAt: moderationRequest.updatedAt.toISOString(),
             }),
           ),
+          moderationCases: profile.moderationCases.map((moderationCase) => ({
+            id: moderationCase.id,
+            targetType: moderationCase.targetType,
+            targetId: moderationCase.targetId,
+            reasonCode: moderationCase.reasonCode,
+            status: moderationCase.status,
+            reviewMode: moderationCase.reviewMode,
+            userMessage: moderationCase.userMessage,
+            reviewDueAt: moderationCase.reviewDueAt.toISOString(),
+            retentionExpiresAt:
+              moderationCase.retentionExpiresAt.toISOString(),
+            resolvedAt: moderationCase.resolvedAt?.toISOString() ?? null,
+            createdAt: moderationCase.createdAt.toISOString(),
+            updatedAt: moderationCase.updatedAt.toISOString(),
+            snapshots: moderationCase.snapshots.map((snapshot) => ({
+              ...snapshot,
+              expiresAt: snapshot.expiresAt.toISOString(),
+              createdAt: snapshot.createdAt.toISOString(),
+            })),
+            events: moderationCase.events.map((event) => ({
+              ...event,
+              actorIdentifier: event.actorId?.slice(0, 8) ?? null,
+              actorId: undefined,
+              createdAt: event.createdAt.toISOString(),
+            })),
+          })),
           history: history.map((entry) => ({
             id: entry.id,
             targetType: entry.targetType,

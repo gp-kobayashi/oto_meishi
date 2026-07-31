@@ -95,6 +95,71 @@ export type ModerationDetailResponse = {
       createdAt: string;
       updatedAt: string;
     }[];
+    moderationCases: {
+      id: string;
+      targetType: "profile" | "audio" | "socialLink";
+      targetId: string;
+      reasonCode:
+        | "inappropriateContent"
+        | "copyrightConcern"
+        | "harassment"
+        | "unsafeLink"
+        | "serviceMismatch"
+        | "impersonation"
+        | "other";
+      status:
+        | "correctionRequired"
+        | "postReviewPending"
+        | "preReviewPending"
+        | "confirmed";
+      reviewMode: "postReview" | "preReview";
+      userMessage: string;
+      reviewDueAt: string;
+      retentionExpiresAt: string;
+      resolvedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+      snapshots: {
+        id: string;
+        kind: "reported" | "corrected";
+        content: unknown;
+        contentHash: string | null;
+        storageObjectKey: string | null;
+        expiresAt: string;
+        createdAt: string;
+      }[];
+      events: {
+        id: string;
+        eventType:
+          | "created"
+          | "contentChanged"
+          | "contentDeleted"
+          | "statusChanged"
+          | "reviewApproved"
+          | "reviewRejected"
+          | "accountSuspended"
+          | "appealSubmitted"
+          | "accountRestored"
+          | "deletionScheduled"
+          | "autoConfirmed";
+        actorType: "admin" | "user" | "system";
+        actorIdentifier: string | null;
+        previousStatus:
+          | "correctionRequired"
+          | "postReviewPending"
+          | "preReviewPending"
+          | "confirmed"
+          | null;
+        newStatus:
+          | "correctionRequired"
+          | "postReviewPending"
+          | "preReviewPending"
+          | "confirmed"
+          | null;
+        details: unknown;
+        createdAt: string;
+      }[];
+    }[];
     history: {
       id: string;
       targetType: "profile" | "audio" | "socialLink";

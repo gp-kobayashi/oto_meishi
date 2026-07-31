@@ -88,21 +88,40 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       moderationCases: [
         {
           id: "case-1",
+          targetType: "audio",
+          targetId: "profile-1",
+          reasonCode: "inappropriateContent",
           status: "postReviewPending",
           reviewMode: "postReview",
+          userMessage: "不適切な音声のため",
           reviewDueAt: new Date("2026-09-15T00:00:00.000Z"),
+          retentionExpiresAt: new Date("2026-09-15T00:00:00.000Z"),
+          resolvedAt: null,
+          createdAt: new Date("2026-07-17T01:00:00.000Z"),
+          updatedAt: new Date("2026-07-17T04:00:00.000Z"),
           snapshots: [
             {
+              id: "snapshot-1",
+              kind: "reported",
               content: {
                 audioTitle: "削除前の音声",
                 audioStatus: "hidden",
               },
+              contentHash: "old-hash",
+              storageObjectKey: "audio/old.mp3",
+              expiresAt: new Date("2026-09-15T00:00:00.000Z"),
+              createdAt: new Date("2026-07-17T01:00:00.000Z"),
             },
           ],
           events: [
             {
+              id: "event-1",
+              eventType: "contentDeleted",
               actorType: "user",
               actorId: "auth-user-123456",
+              previousStatus: "correctionRequired",
+              newStatus: "postReviewPending",
+              details: { targetType: "audio" },
               createdAt: new Date("2026-07-17T04:00:00.000Z"),
             },
           ],
@@ -170,6 +189,38 @@ describe("GET /api/admin/moderation/[profileId]", () => {
           resolvedAt: null,
           createdAt: "2026-07-17T05:00:00.000Z",
           updatedAt: "2026-07-17T05:00:00.000Z",
+        },
+      ],
+      moderationCases: [
+        {
+          id: "case-1",
+          targetType: "audio",
+          targetId: "profile-1",
+          reasonCode: "inappropriateContent",
+          status: "postReviewPending",
+          reviewMode: "postReview",
+          userMessage: "不適切な音声のため",
+          snapshots: [
+            {
+              id: "snapshot-1",
+              kind: "reported",
+              content: {
+                audioTitle: "削除前の音声",
+                audioStatus: "hidden",
+              },
+            },
+          ],
+          events: [
+            {
+              id: "event-1",
+              eventType: "contentDeleted",
+              actorType: "user",
+              actorIdentifier: "auth-use",
+              previousStatus: "correctionRequired",
+              newStatus: "postReviewPending",
+              createdAt: "2026-07-17T04:00:00.000Z",
+            },
+          ],
         },
       ],
       history: [
