@@ -1,4 +1,5 @@
 import { authorizeAdminRequest } from "@/lib/adminAuth";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
@@ -161,6 +162,8 @@ export async function PATCH(request: Request) {
     const result = await prisma.$transaction(async (tx) => {
       let profileId: string;
       let previousStatus: string;
+      let reportedContent: Prisma.InputJsonObject = {};
+      let reportedStorageObjectKey: string | null = null;
 
       if (targetType === "profile") {
         const target = await tx.profile.findUnique({
@@ -169,11 +172,20 @@ export async function PATCH(request: Request) {
             id: true,
             status: true,
             accountModerationStatus: true,
+            displayName: true,
+            bio: true,
+            theme: true,
           },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
         previousStatus = target.status;
+        reportedContent = {
+          displayName: target.displayName ?? "",
+          bio: target.bio ?? "",
+          theme: target.theme ?? "",
+          status: target.status,
+        };
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
@@ -200,11 +212,23 @@ export async function PATCH(request: Request) {
       } else if (targetType === "audio") {
         const target = await tx.profile.findUnique({
           where: { id: targetId },
-          select: { id: true, audioStatus: true },
+          select: {
+            id: true,
+            audioKey: true,
+            audioUrl: true,
+            audioTitle: true,
+            audioStatus: true,
+          },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
         previousStatus = target.audioStatus;
+        reportedContent = {
+          audioTitle: target.audioTitle ?? "",
+          audioStatus: target.audioStatus,
+          hasAudio: Boolean(target.audioKey || target.audioUrl),
+        };
+        reportedStorageObjectKey = target.audioKey || null;
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
@@ -215,11 +239,24 @@ export async function PATCH(request: Request) {
       } else {
         const target = await tx.socialLink.findUnique({
           where: { id: targetId },
-          select: { id: true, profileId: true, status: true },
+          select: {
+            id: true,
+            profileId: true,
+            service: true,
+            label: true,
+            url: true,
+            status: true,
+          },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.profileId;
         previousStatus = target.status;
+        reportedContent = {
+          service: target.service,
+          label: target.label,
+          url: target.url,
+          status: target.status,
+        };
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
@@ -245,7 +282,7 @@ export async function PATCH(request: Request) {
       if (action === "hide") {
         const reviewMode = resolveModerationReviewMode(reasonCode);
         const deadline = getModerationDeadline();
-        await tx.moderationCase.create({
+        const moderationCase = await tx.moderationCase.create({
           data: {
             profileId,
             targetType,
@@ -256,6 +293,27 @@ export async function PATCH(request: Request) {
             userMessage: reason,
             reviewDueAt: deadline,
             retentionExpiresAt: deadline,
+          },
+          select: { id: true },
+        });
+        await tx.moderationSnapshot.create({
+          data: {
+            moderationCaseId: moderationCase.id,
+            kind: "reported",
+            content: reportedContent,
+            storageObjectKey: reportedStorageObjectKey,
+            expiresAt: deadline,
+          },
+        });
+        await tx.moderationCaseEvent.create({
+          data: {
+            moderationCaseId: moderationCase.id,
+            eventType: "created",
+            actorType: "admin",
+            actorId: authorization.admin.id,
+            previousStatus: null,
+            newStatus: "correctionRequired",
+            details: { targetType, targetId, reasonCode },
           },
         });
       }

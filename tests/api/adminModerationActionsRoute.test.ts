@@ -11,6 +11,8 @@ const { mocks } = vi.hoisted(() => ({
     actionCreate: vi.fn(),
     notificationCreate: vi.fn(),
     moderationCaseCreate: vi.fn(),
+    moderationSnapshotCreate: vi.fn(),
+    moderationCaseEventCreate: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
   },
@@ -39,6 +41,8 @@ const tx = {
   },
   moderationAction: { create: mocks.actionCreate },
   moderationCase: { create: mocks.moderationCaseCreate },
+  moderationSnapshot: { create: mocks.moderationSnapshotCreate },
+  moderationCaseEvent: { create: mocks.moderationCaseEventCreate },
   userNotification: { create: mocks.notificationCreate },
 };
 
@@ -61,6 +65,9 @@ describe("PATCH /api/admin/moderation/actions", () => {
       id: "profile-1",
       status: "active",
       accountModerationStatus: "active",
+      displayName: "変更前の名前",
+      bio: "変更前の自己紹介",
+      theme: "normal",
     });
     mocks.profileUpdate.mockResolvedValue({});
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
@@ -127,6 +134,27 @@ describe("PATCH /api/admin/moderation/actions", () => {
         status: "correctionRequired",
         userMessage: "不適切な内容のため",
       }),
+      select: { id: true },
+    });
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        kind: "reported",
+        content: {
+          displayName: "変更前の名前",
+          bio: "変更前の自己紹介",
+          theme: "normal",
+          status: "active",
+        },
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        eventType: "created",
+        actorType: "admin",
+        newStatus: "correctionRequired",
+      }),
     });
   });
 
@@ -146,6 +174,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
         reasonCode: "other",
         reviewMode: "preReview",
       }),
+      select: { id: true },
     });
   });
 
