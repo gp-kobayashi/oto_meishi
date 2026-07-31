@@ -23,3 +23,39 @@
   overflow-wrap: anywhere;
   text-underline-offset: 3px;
 }
+
+.copyButton {
+  min-height: 42px;
+  margin-top: 14px;
+  padding: 9px 18px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.copyButton:hover {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+
+.copyButton:focus-visible {
+  outline: 3px solid color-mix(in srgb, currentColor 28%, transparent);
+  outline-offset: 3px;
+}
+
+.successMessage,
+.errorMessage {
+  margin: 10px 0 0;
+  font-weight: 700;
+}
+
+.successMessage {
+  color: #047857;
+}
+
+.errorMessage {
+  color: #b91c1c;
+}

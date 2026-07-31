@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import Home from "@/app/(site)/page";
 import UserIdInputPage from "@/app/(site)/useridInput/page";
@@ -56,6 +56,40 @@ describe("公開URLを使用する画面", () => {
     );
     expect(screen.getByTestId("qr-code-value").textContent).toBe(
       "https://oto-meishi.com/sample-user",
+    );
+  });
+
+  it("公開プロフィールURLをコピーして完了メッセージを表示する", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<ProfileShare username="sample-user" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "URLをコピー" }));
+
+    expect((await screen.findByRole("status")).textContent).toBe(
+      "URLをコピーしました。",
+    );
+    expect(writeText).toHaveBeenCalledWith(
+      "https://oto-meishi.com/sample-user",
+    );
+  });
+
+  it("URLのコピーに失敗した場合はエラーを表示する", async () => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: vi.fn().mockRejectedValue(new Error("copy failed")),
+      },
+    });
+    render(<ProfileShare username="sample-user" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "URLをコピー" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "URLをコピーできませんでした。",
     );
   });
 });
