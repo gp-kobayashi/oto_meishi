@@ -32,6 +32,7 @@ const baseProfile = {
   theme: "normal",
   sns: [
     {
+      id: "link-1",
       service: "x",
       url: "https://x.com/test",
       label: "X",
@@ -228,6 +229,49 @@ describe("ProfileEditPage", () => {
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "+ リンクを追加" }).disabled,
     ).toBe(true);
+  });
+
+  it("対象ごとの違反理由と確認中の公開状態を表示する", async () => {
+    await renderLoadedPage({
+      ...baseProfile,
+      moderationCases: [
+        {
+          id: "case-audio",
+          targetType: "audio",
+          targetId: "profile-1",
+          reasonCode: "copyrightConcern",
+          reviewMode: "postReview",
+          status: "postReviewPending",
+          userMessage: "音声を変更してください。",
+          reviewDueAt: "2026-09-29T00:00:00.000Z",
+        },
+        {
+          id: "case-link",
+          targetType: "socialLink",
+          targetId: "link-1",
+          reasonCode: "impersonation",
+          reviewMode: "preReview",
+          status: "preReviewPending",
+          userMessage: "本人と確認できるリンクへ変更してください。",
+          reviewDueAt: "2026-09-29T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(screen.getByText("著作権に関する問題")).toBeDefined();
+    expect(screen.getByText("管理者確認待ち（公開中）")).toBeDefined();
+    expect(
+      screen.getByText(
+        "変更内容は公開されています。管理者が事後確認を行います。",
+      ),
+    ).toBeDefined();
+    expect(screen.getByText("なりすまし")).toBeDefined();
+    expect(screen.getByText("管理者確認待ち（非公開）")).toBeDefined();
+    expect(
+      screen.getByText(
+        "変更内容は管理者の確認が完了するまで公開されません。",
+      ),
+    ).toBeDefined();
   });
 
   it("文字数制限を超えた入力にはバリデーションエラーを表示する", async () => {

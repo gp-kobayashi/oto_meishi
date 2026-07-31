@@ -278,7 +278,31 @@ export async function GET(request: Request) {
 
       const profile = await prisma.profile.findUnique({
         where: { authId: user.id },
-        include: { sns: true },
+        include: {
+          sns: true,
+          moderationCases: {
+            where: {
+              status: {
+                in: [
+                  "correctionRequired",
+                  "postReviewPending",
+                  "preReviewPending",
+                ],
+              },
+            },
+            select: {
+              id: true,
+              targetType: true,
+              targetId: true,
+              reasonCode: true,
+              reviewMode: true,
+              status: true,
+              userMessage: true,
+              reviewDueAt: true,
+            },
+            orderBy: { updatedAt: "desc" },
+          },
+        },
       });
 
       if (!profile) {

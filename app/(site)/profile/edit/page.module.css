@@ -69,6 +69,38 @@
   gap: 18px;
 }
 
+.moderationNotice {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #f59e0b;
+  border-radius: 16px;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.moderationNoticeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.moderationNoticeHeader span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: #fef3c7;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.moderationNotice p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+
 .fieldRow {
   display: grid;
   gap: 8px;

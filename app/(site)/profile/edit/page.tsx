@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ChangeEvent, type DragEvent } from "react";
 import type {
+  ModerationCase,
   ProfileData,
   SocialLink,
   SocialService,
@@ -65,6 +66,45 @@ const serviceUrlPlaceholders: Record<SocialService, string> = {
 };
 
 type SaveState = "idle" | "saving" | "success" | "error";
+
+const moderationReasonLabels: Record<ModerationCase["reasonCode"], string> = {
+  inappropriateContent: "不適切な内容",
+  copyrightConcern: "著作権に関する問題",
+  harassment: "誹謗中傷",
+  unsafeLink: "安全でないリンク",
+  serviceMismatch: "選択したサービスとURLの不一致",
+  impersonation: "なりすまし",
+  other: "その他の問題",
+};
+
+const moderationStatusLabels: Record<ModerationCase["status"], string> = {
+  correctionRequired: "非公開・修正が必要",
+  postReviewPending: "管理者確認待ち（公開中）",
+  preReviewPending: "管理者確認待ち（非公開）",
+  confirmed: "確認済み",
+};
+
+function ModerationNotice({ moderationCase }: { moderationCase: ModerationCase }) {
+  const guidance =
+    moderationCase.status === "postReviewPending"
+      ? "変更内容は公開されています。管理者が事後確認を行います。"
+      : moderationCase.status === "preReviewPending"
+        ? "変更内容は管理者の確認が完了するまで公開されません。"
+        : moderationCase.reviewMode === "postReview"
+          ? "問題の箇所を変更すると公開され、管理者が事後確認を行います。"
+          : "問題の箇所を変更しても、管理者の確認が完了するまで公開されません。";
+
+  return (
+    <aside className={styles.moderationNotice} role="status">
+      <div className={styles.moderationNoticeHeader}>
+        <strong>{moderationStatusLabels[moderationCase.status]}</strong>
+        <span>{moderationReasonLabels[moderationCase.reasonCode]}</span>
+      </div>
+      <p>{moderationCase.userMessage}</p>
+      <p>{guidance}</p>
+    </aside>
+  );
+}
 
 function getAudioUploadErrorMessage(
   status: number,
@@ -521,7 +561,10 @@ export default function ProfileEditPage() {
         throw new Error(savedProfileResponse.error || "保存に失敗しました。");
       }
 
-      setProfile(savedProfileResponse as ProfileData);
+      setProfile({
+        ...(savedProfileResponse as ProfileData),
+        moderationCases: profile.moderationCases,
+      });
       setAudioFile(null);
       setAudioPreviewUrl((previousUrl) => {
         if (previousUrl) URL.revokeObjectURL(previousUrl);
@@ -538,6 +581,12 @@ export default function ProfileEditPage() {
   };
 
   const socialLinks = profile?.sns ?? [];
+  const profileModerationCase = profile?.moderationCases?.find(
+    (moderationCase) => moderationCase.targetType === "profile",
+  );
+  const audioModerationCase = profile?.moderationCases?.find(
+    (moderationCase) => moderationCase.targetType === "audio",
+  );
 
   return (
     <section className={styles.main}>
@@ -581,6 +630,10 @@ export default function ProfileEditPage() {
             </div>
 
             <div className={styles.cardBody}>
+              {profileModerationCase ? (
+                <ModerationNotice moderationCase={profileModerationCase} />
+              ) : null}
+
               <div className={styles.fieldRow}>
                 <ValidatedFieldLabel
                   htmlFor="displayName"
@@ -613,6 +666,9 @@ export default function ProfileEditPage() {
               </div>
 
               <div className={styles.audioGroup}>
+                {audioModerationCase ? (
+                  <ModerationNotice moderationCase={audioModerationCase} />
+                ) : null}
                 <div className={styles.audioField}>
                   <ValidatedFieldLabel
                     htmlFor="audioTitle"
@@ -717,9 +773,21 @@ export default function ProfileEditPage() {
               <div className={styles.socialList}>
                 {socialLinks.map((link, index) => (
                   <div
-                    key={`${link.service}-${index}`}
+                    key={link.id ?? `${link.service}-${index}`}
                     className={styles.socialRow}
                   >
+                    {profile.moderationCases
+                      ?.filter(
+                        (moderationCase) =>
+                          moderationCase.targetType === "socialLink" &&
+                          moderationCase.targetId === link.id,
+                      )
+                      .map((moderationCase) => (
+                        <ModerationNotice
+                          key={moderationCase.id}
+                          moderationCase={moderationCase}
+                        />
+                      ))}
                     <div className={styles.serviceRow}>
                       <label
                         className={styles.smallLabel}
