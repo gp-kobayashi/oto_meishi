@@ -544,13 +544,15 @@ describe("/api/profile route", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("管理対応中のプロフィールはユーザー自身でも変更できない", async () => {
+  it("利用停止中のアカウントはプロフィールを変更できない", async () => {
     mocks.profileFindUnique.mockResolvedValueOnce({
       id: "profile-1",
       userId: "testuser",
       authId: "auth-user-1",
-      status: "hidden",
+      status: "suspended",
+      accountModerationStatus: "suspended",
       audioStatus: "active",
+      audioTitle: "",
       audioUrl: "",
       sns: [],
     });
@@ -560,8 +562,138 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "アカウント利用停止中のため、プロフィールを変更できません。",
+    });
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
     expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("非公開の音声とリンクを維持したままプロフィール項目を変更できる", async () => {
+    const hiddenLink = {
+      id: "link-hidden",
+      profileId: "profile-1",
+      service: "youtube",
+      url: "https://youtube.com/@example",
+      label: "YouTube",
+      sortOrder: 0,
+      status: "hidden",
+    };
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "変更前",
+      bio: "変更前の自己紹介",
+      audioStatus: "hidden",
+      audioTitle: "非公開音声",
+      audioUrl: "",
+      theme: "normal",
+      sns: [hiddenLink],
+    };
+    const savedProfile = {
+      ...existingProfile,
+      displayName: "変更後",
+      bio: "変更後の自己紹介",
+    };
+
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileUpdate.mockResolvedValueOnce(savedProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(savedProfile);
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "変更後",
+        bio: "変更後の自己紹介",
+        audioTitle: "非公開音声",
+        sns: [
+          {
+            service: "youtube",
+            url: "https://youtube.com/@example",
+            label: "YouTube",
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalled();
+    expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
+    expect(mocks.socialLinkCreateMany).not.toHaveBeenCalled();
+  });
+
+  it("非公開音声のタイトル変更は通常のプロフィール保存では受け付けない", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      audioStatus: "hidden",
+      audioTitle: "変更前",
+      audioUrl: "",
+      sns: [],
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        audioTitle: "変更後",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "管理対応中の音声タイトルは、この保存操作では変更できません。",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("非公開リンクの変更は通常のプロフィール保存では受け付けない", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      audioStatus: "active",
+      audioTitle: "",
+      audioUrl: "",
+      sns: [
+        {
+          id: "link-hidden",
+          service: "youtube",
+          url: "https://youtube.com/@before",
+          label: "YouTube",
+          sortOrder: 0,
+          status: "hidden",
+        },
+      ],
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        sns: [
+          {
+            service: "youtube",
+            url: "https://youtube.com/@after",
+            label: "YouTube",
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "管理対応中のリンクは、この保存操作では変更できません。",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("既存プロフィール更新時にthemeとSNS serviceを正規化し、SNSを置き換える", async () => {

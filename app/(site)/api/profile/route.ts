@@ -20,10 +20,45 @@ const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
 type ProfileRequestBody = Parameters<typeof sanitizeProfileData>[0];
 
+type ComparableSocialLink = {
+  id?: string;
+  service: string;
+  url: string;
+  label: string;
+  sortOrder: number;
+};
+
 function toProfileRequestBody(value: unknown): ProfileRequestBody {
   return typeof value === "object" && value !== null
     ? (value as ProfileRequestBody)
     : {};
+}
+
+function areSocialLinksUnchanged(
+  existingLinks: ComparableSocialLink[],
+  requestedLinks: ComparableSocialLink[],
+): boolean {
+  if (existingLinks.length !== requestedLinks.length) return false;
+
+  const sortedExisting = [...existingLinks].sort(
+    (left, right) =>
+      left.sortOrder - right.sortOrder ||
+      (left.id ?? "").localeCompare(right.id ?? ""),
+  );
+  const sortedRequested = [...requestedLinks].sort(
+    (left, right) => left.sortOrder - right.sortOrder,
+  );
+
+  return sortedExisting.every((existing, index) => {
+    const requested = sortedRequested[index];
+    return (
+      requested !== undefined &&
+      existing.service === requested.service &&
+      existing.url === requested.url &&
+      existing.label === requested.label &&
+      existing.sortOrder === requested.sortOrder
+    );
+  });
 }
 
 export async function GET(request: Request) {
@@ -297,6 +332,7 @@ export async function POST(request: Request) {
       where: { userId },
       include: { sns: true },
     });
+    let preserveExistingLinks = false;
     if (!existingProfile) {
       // 新規作成時：このアカウントがすでに別のuserIdでプロフィールを作成していないか確認
       const existingProfileByAuth = await prisma.profile.findUnique({
@@ -320,16 +356,46 @@ export async function POST(request: Request) {
 
 
       if (
-        (existingProfile.status ?? "active") !== "active" ||
-        (existingProfile.audioStatus ?? "active") !== "active" ||
-        existingProfile.sns.some((link) => (link.status ?? "active") !== "active")
+        (existingProfile.accountModerationStatus ?? "active") !== "active" ||
+        existingProfile.status === "suspended"
       ) {
         return NextResponse.json(
-          { error: "管理対応中のため、プロフィールを変更できません。" },
+          { error: "アカウント利用停止中のため、プロフィールを変更できません。" },
           { status: 403 },
         );
       }
 
+      if (
+        (existingProfile.audioStatus ?? "active") !== "active" &&
+        audioTitle !== existingProfile.audioTitle
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "管理対応中の音声タイトルは、この保存操作では変更できません。",
+          },
+          { status: 409 },
+        );
+      }
+
+      preserveExistingLinks = areSocialLinksUnchanged(
+        existingProfile.sns,
+        socialLinks,
+      );
+      if (
+        !preserveExistingLinks &&
+        existingProfile.sns.some(
+          (link) => (link.status ?? "active") !== "active",
+        )
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              "管理対応中のリンクは、この保存操作では変更できません。",
+          },
+          { status: 409 },
+        );
+      }
     }
 
     const savedProfile = await prisma.$transaction(async (transaction) => {
@@ -365,6 +431,13 @@ export async function POST(request: Request) {
           include: { sns: true },
         });
         profileId = existingProfile.id;
+      }
+
+      if (preserveExistingLinks) {
+        return transaction.profile.findUnique({
+          where: { userId },
+          include: { sns: true },
+        });
       }
 
       await transaction.socialLink.deleteMany({ where: { profileId } });
