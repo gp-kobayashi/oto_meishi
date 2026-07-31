@@ -10,6 +10,7 @@
   position: relative;
   z-index: 1;
   width: min(998px, calc(100% - 48px));
+  box-sizing: border-box;
   min-height: calc(100vh - 72px);
   margin: 0 auto;
   padding: 60px 0 80px;
@@ -18,10 +19,13 @@
 
 .cardWrapper {
   width: 100%;
+  min-width: 0;
 }
 
 .editButton {
   display: inline-flex;
+  max-width: 100%;
+  box-sizing: border-box;
   align-items: left;
   padding: 10px 80px;
   margin: 10px auto;
@@ -84,5 +88,12 @@
   .profile {
     width: 100%;
     padding: 40px 16px;
+  }
+
+  .editButton {
+    justify-content: center;
+    width: min(100%, 280px);
+    padding-right: 24px;
+    padding-left: 24px;
   }
 }
