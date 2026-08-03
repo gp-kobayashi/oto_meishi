@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   compareModeratedContentHashes,
   compareModeratedUrls,
+  compareModerationSnapshotVersions,
   createModerationContentHash,
+  createModeratedUrlHash,
   getChangedModeratedProfileFields,
   getModerationDeadline,
   getPendingStatusForReviewMode,
@@ -118,6 +120,24 @@ describe("URLの同一内容判定", () => {
       "invalid",
     );
   });
+
+  it("正規化後に同じURLから同じ追跡用ハッシュを生成する", async () => {
+    const first = await createModeratedUrlHash(
+      "https://YOUTUBE.com/channel/example/?b=2&a=1#profile",
+    );
+    const second = await createModeratedUrlHash(
+      "https://youtube.com/channel/example?a=1&b=2",
+    );
+
+    expect(first).toMatch(/^[a-f0-9]{64}$/);
+    expect(first).toBe(second);
+  });
+
+  it("無効なURLから追跡用ハッシュを生成しない", async () => {
+    await expect(createModeratedUrlHash("http://example.com")).resolves.toBe(
+      null,
+    );
+  });
 });
 
 describe("音声の同一内容判定", () => {
@@ -145,5 +165,28 @@ describe("音声の同一内容判定", () => {
     );
 
     expect(compareModeratedContentHashes(previous, corrected)).toBe("changed");
+  });
+});
+
+describe("審査対象スナップショットの版判定", () => {
+  it("管理者が確認した版と最新の版が同じ場合はcurrentを返す", () => {
+    expect(compareModerationSnapshotVersions("snapshot-2", "snapshot-2")).toBe(
+      "current",
+    );
+  });
+
+  it("審査中に新しい版が追加された場合はstaleを返す", () => {
+    expect(compareModerationSnapshotVersions("snapshot-1", "snapshot-2")).toBe(
+      "stale",
+    );
+  });
+
+  it("比較対象が欠けている場合はmissingを返す", () => {
+    expect(compareModerationSnapshotVersions(null, "snapshot-2")).toBe(
+      "missing",
+    );
+    expect(compareModerationSnapshotVersions("snapshot-1", undefined)).toBe(
+      "missing",
+    );
   });
 });

@@ -16,6 +16,10 @@ export type ModerationPendingStatus =
   | "postReviewPending"
   | "preReviewPending";
 export type ModeratedUrlComparison = "same" | "changed" | "invalid";
+export type ModerationSnapshotVersionComparison =
+  | "current"
+  | "stale"
+  | "missing";
 export const MODERATED_PROFILE_FIELDS = [
   "displayName",
   "bio",
@@ -118,6 +122,15 @@ export function compareModeratedUrls(
   return previous === corrected ? "same" : "changed";
 }
 
+export async function createModeratedUrlHash(
+  value: string,
+): Promise<string | null> {
+  const normalizedUrl = normalizeModeratedUrl(value);
+  if (!normalizedUrl) return null;
+
+  return createModerationContentHash(new TextEncoder().encode(normalizedUrl));
+}
+
 export async function createModerationContentHash(
   content: ArrayBuffer | Uint8Array,
 ): Promise<string> {
@@ -139,4 +152,13 @@ export function compareModeratedContentHashes(
   return previousHash.trim().toLowerCase() === correctedHash.trim().toLowerCase()
     ? "same"
     : "changed";
+}
+
+export function compareModerationSnapshotVersions(
+  reviewedSnapshotId: string | null | undefined,
+  latestSnapshotId: string | null | undefined,
+): ModerationSnapshotVersionComparison {
+  if (!reviewedSnapshotId || !latestSnapshotId) return "missing";
+
+  return reviewedSnapshotId === latestSnapshotId ? "current" : "stale";
 }
