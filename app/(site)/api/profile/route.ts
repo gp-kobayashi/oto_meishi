@@ -11,6 +11,7 @@ import {
 } from "@/lib/profileSaveRateLimit";
 import {
   compareModeratedUrls,
+  createModeratedUrlHash,
   getChangedModeratedProfileFields,
   getModerationDeadline,
   getPendingStatusForReviewMode,
@@ -67,6 +68,13 @@ type ExistingSocialLink = ComparableSocialLink & {
 type ProfileTransaction = Parameters<
   Parameters<typeof prisma.$transaction>[0]
 >[0];
+
+type LinkModerationCase = {
+  snapshots: {
+    content: unknown;
+    contentHash: string | null;
+  }[];
+};
 
 function toProfileRequestBody(value: unknown): ProfileRequestBody {
   return typeof value === "object" && value !== null
@@ -126,6 +134,33 @@ function isSocialLinkContentUnchanged(
   );
 }
 
+async function hasMatchingModeratedLinkUrl(
+  moderationCases: LinkModerationCase[],
+  requestedUrl: string,
+): Promise<boolean> {
+  const requestedHash = await createModeratedUrlHash(requestedUrl);
+  if (!requestedHash) return false;
+
+  return moderationCases.some((moderationCase) =>
+    moderationCase.snapshots.some((snapshot) => {
+      if (snapshot.contentHash === requestedHash) return true;
+      if (
+        typeof snapshot.content !== "object" ||
+        snapshot.content === null ||
+        Array.isArray(snapshot.content)
+      ) {
+        return false;
+      }
+
+      const reportedUrl = (snapshot.content as Record<string, unknown>).url;
+      return (
+        typeof reportedUrl === "string" &&
+        compareModeratedUrls(reportedUrl, requestedUrl) === "same"
+      );
+    }),
+  );
+}
+
 async function recordModeratedLinkCorrection({
   transaction,
   profileId,
@@ -142,6 +177,9 @@ async function recordModeratedLinkCorrection({
   deleted: boolean;
 }) {
   const deadline = getModerationDeadline();
+  const correctedContentHash = deleted
+    ? null
+    : await createModeratedUrlHash(requestedLink?.url ?? "");
   const existingCase = await transaction.moderationCase.findFirst({
     where: {
       targetType: "socialLink",
@@ -196,6 +234,7 @@ async function recordModeratedLinkCorrection({
           url: link.url,
           label: link.label,
         },
+        contentHash: await createModeratedUrlHash(link.url),
         expiresAt: deadline,
       },
     });
@@ -212,6 +251,7 @@ async function recordModeratedLinkCorrection({
             url: requestedLink?.url,
             label: requestedLink?.label,
           },
+      contentHash: correctedContentHash,
       expiresAt: deadline,
     },
   });
@@ -580,7 +620,21 @@ export async function POST(request: Request) {
 
     const existingProfile = await prisma.profile.findUnique({
       where: { userId },
-      include: { sns: true },
+      include: {
+        sns: true,
+        moderationCases: {
+          where: {
+            targetType: "socialLink",
+            retentionExpiresAt: { gt: new Date() },
+          },
+          select: {
+            snapshots: {
+              where: { kind: "reported" },
+              select: { content: true, contentHash: true },
+            },
+          },
+        },
+      },
     });
     let audioTitleToSave = audioTitle;
     let socialLinksToSave = socialLinks;
@@ -655,6 +709,21 @@ export async function POST(request: Request) {
           existingLinks,
           requestedLink,
         );
+        if (
+          !existingLink &&
+          (await hasMatchingModeratedLinkUrl(
+            existingProfile.moderationCases ?? [],
+            requestedLink.url,
+          ))
+        ) {
+          return NextResponse.json(
+            {
+              error:
+                "過去に非公開となったリンクと同じURLです。別のURLを登録してください。",
+            },
+            { status: 409 },
+          );
+        }
         if (
           existingLink?.status === "hidden" &&
           !isSocialLinkContentUnchanged(existingLink, requestedLink) &&

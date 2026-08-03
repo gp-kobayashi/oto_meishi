@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createModeratedUrlHash } from "@/lib/moderationRemediation";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {
@@ -1203,6 +1204,97 @@ describe("/api/profile route", () => {
       }),
       select: { id: true },
     });
+  });
+
+  it("非公開リンクを削除して同じURLを新規登録しても保存しない", async () => {
+    const blockedUrl = "https://youtube.com/@blocked";
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "Test User",
+      bio: "",
+      audioTitle: "",
+      theme: "normal",
+      sns: [],
+      moderationCases: [
+        {
+          snapshots: [
+            {
+              content: { url: blockedUrl },
+              contentHash: await createModeratedUrlHash(blockedUrl),
+            },
+          ],
+        },
+      ],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        sns: [
+          {
+            service: "youtube",
+            url: "https://YOUTUBE.com/@blocked/#profile",
+            label: "YouTube",
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "過去に非公開となったリンクと同じURLです。別のURLを登録してください。",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.socialLinkCreate).not.toHaveBeenCalled();
+  });
+
+  it("ハッシュ未保存の旧ケースでもURLを正規化して再登録を拒否する", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "Test User",
+      bio: "",
+      audioTitle: "",
+      theme: "normal",
+      sns: [],
+      moderationCases: [
+        {
+          snapshots: [
+            {
+              content: { url: "https://youtube.com/@legacy/" },
+              contentHash: null,
+            },
+          ],
+        },
+      ],
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        sns: [
+          {
+            service: "youtube",
+            url: "https://YOUTUBE.com/@legacy#same",
+            label: "YouTube",
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
   it("公開中のリンクを審査待ち中に再編集すると最新内容を記録する", async () => {

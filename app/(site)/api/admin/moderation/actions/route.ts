@@ -11,6 +11,7 @@ import {
 import { getClientIp } from "@/lib/clientIp";
 import { getModerationNotification } from "@/lib/moderationNotification";
 import {
+  createModeratedUrlHash,
   getModerationDeadline,
   isModerationReasonCode,
   resolveModerationReviewMode,
@@ -163,6 +164,7 @@ export async function PATCH(request: Request) {
       let profileId: string;
       let previousStatus: string;
       let reportedContent: Prisma.InputJsonObject = {};
+      let reportedContentHash: string | null = null;
       let reportedStorageObjectKey: string | null = null;
 
       if (targetType === "profile") {
@@ -257,6 +259,7 @@ export async function PATCH(request: Request) {
           url: target.url,
           status: target.status,
         };
+        reportedContentHash = await createModeratedUrlHash(target.url);
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
@@ -342,6 +345,7 @@ export async function PATCH(request: Request) {
             moderationCaseId: moderationCase.id,
             kind: "reported",
             content: reportedContent,
+            contentHash: reportedContentHash,
             storageObjectKey: reportedStorageObjectKey,
             expiresAt: deadline,
           },

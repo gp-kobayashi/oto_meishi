@@ -186,6 +186,36 @@ describe("PATCH /api/admin/moderation/actions", () => {
     });
   });
 
+  it("リンクを非公開にすると正規化URLのハッシュを保存する", async () => {
+    mocks.socialLinkFindUnique.mockResolvedValueOnce({
+      id: "link-1",
+      profileId: "profile-1",
+      service: "youtube",
+      label: "YouTube",
+      url: "https://YOUTUBE.com/@blocked/#profile",
+      status: "active",
+    });
+
+    const response = await PATCH(
+      request({
+        targetType: "socialLink",
+        targetId: "link-1",
+        action: "hide",
+        reason: "危険なリンクのため",
+        reasonCode: "unsafeLink",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        kind: "reported",
+        contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    });
+  });
+
   it("プロフィールを直接復旧すると未完了の是正ケースも確認済みにする", async () => {
     mocks.profileFindUnique.mockResolvedValue({
       id: "profile-1",
