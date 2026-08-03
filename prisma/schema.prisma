@@ -264,6 +264,7 @@ model Profile {
   bio                     String
   audioUrl                String
   audioKey                String                  @default("")
+  audioContentHash        String?                 @db.VarChar(64)
   audioTitle              String
   audioStatus             AudioModerationStatus   @default(active)
   sns                     SocialLink[]
