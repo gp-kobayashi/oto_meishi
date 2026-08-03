@@ -137,6 +137,63 @@ describe("AdminModerationDetail", () => {
                   },
                 ],
               },
+              {
+                id: "case-profile",
+                targetType: "profile",
+                targetId: "profile-1",
+                reasonCode: "harassment",
+                status: "confirmed",
+                reviewMode: "preReview",
+                userMessage: "プロフィール内容の修正が必要です",
+                reviewDueAt: "2026-09-15T00:00:00.000Z",
+                retentionExpiresAt: "2026-09-15T00:00:00.000Z",
+                resolvedAt: "2026-07-17T05:00:00.000Z",
+                createdAt: "2026-07-17T01:00:00.000Z",
+                updatedAt: "2026-07-17T05:00:00.000Z",
+                snapshots: [
+                  {
+                    id: "snapshot-profile-reported",
+                    kind: "reported",
+                    content: {
+                      displayName: "変更前の名前",
+                      bio: "自己紹介です",
+                      theme: "normal",
+                    },
+                    contentHash: null,
+                    hasStoredAudio: false,
+                    expiresAt: "2026-09-15T00:00:00.000Z",
+                    createdAt: "2026-07-17T01:00:00.000Z",
+                  },
+                  {
+                    id: "snapshot-profile-corrected",
+                    kind: "corrected",
+                    content: {
+                      displayName: "修正後の名前",
+                      bio: "修正後の自己紹介",
+                      theme: "normal",
+                    },
+                    contentHash: null,
+                    hasStoredAudio: false,
+                    expiresAt: "2026-09-15T00:00:00.000Z",
+                    createdAt: "2026-07-17T04:30:00.000Z",
+                  },
+                ],
+                events: [
+                  {
+                    id: "event-profile",
+                    eventType: "contentChanged",
+                    actorType: "user",
+                    actorIdentifier: "auth-use",
+                    previousStatus: "correctionRequired",
+                    newStatus: "preReviewPending",
+                    details: {
+                      targetType: "profile",
+                      changedFields: ["displayName", "bio"],
+                    },
+                    createdAt: "2026-07-17T04:30:00.000Z",
+                  },
+                ],
+              },
             ],
             history: [
               {
@@ -170,7 +227,7 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("削除済み音声の対応状況")).toBeDefined();
     expect(screen.getByText("事後確認待ち（公開中）")).toBeDefined();
     expect(screen.getByText("hidden")).toBeDefined();
-    expect(screen.getAllByText("user / auth-use")).toHaveLength(2);
+    expect(screen.getAllByText("user / auth-use")).toHaveLength(3);
     expect(
       screen.getByText(
         "削除前の音声は確認期限まで管理者確認用として保持されます。",
@@ -194,7 +251,13 @@ describe("AdminModerationDetail", () => {
     expect(
       screen.getByText(/url: https:\/\/youtube\.com\/example/),
     ).toBeDefined();
-    expect(screen.getByText("ユーザーが内容を変更")).toBeDefined();
+    expect(screen.getAllByText("ユーザーが内容を変更")).toHaveLength(2);
+    expect(screen.getByText("変更された項目")).toBeDefined();
+    expect(screen.getByText("表示名")).toBeDefined();
+    expect(screen.getAllByText("自己紹介").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/変更日時:.*2026\/07\/17.*13:30/)).toBeDefined();
+    expect(screen.getByText(/displayName: 変更前の名前/)).toBeDefined();
+    expect(screen.getByText(/displayName: 修正後の名前/)).toBeDefined();
 
     const approveCaseButton = screen.getByRole("button", {
       name: "修正を承認",

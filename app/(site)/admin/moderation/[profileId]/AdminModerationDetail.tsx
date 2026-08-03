@@ -61,6 +61,12 @@ const targetTypeLabels = {
   socialLink: "リンク",
 };
 
+const profileFieldLabels = {
+  displayName: "表示名",
+  bio: "自己紹介",
+  theme: "テーマ",
+} as const;
+
 const actionLabels = {
   hide: "非公開",
   restore: "復旧",
@@ -131,6 +137,24 @@ const formatSnapshotContent = (content: unknown) => {
   return entries
     .map(([key, value]) => `${key}: ${String(value ?? "")}`)
     .join("\n");
+};
+
+const getChangedProfileFields = (details: unknown) => {
+  if (
+    typeof details !== "object" ||
+    details === null ||
+    Array.isArray(details)
+  ) {
+    return [];
+  }
+
+  const changedFields = (details as Record<string, unknown>).changedFields;
+  if (!Array.isArray(changedFields)) return [];
+
+  return changedFields.filter(
+    (field): field is keyof typeof profileFieldLabels =>
+      typeof field === "string" && field in profileFieldLabels,
+  );
 };
 
 type PendingAction = {
@@ -708,6 +732,13 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                     const isPending =
                       moderationCase.status === "postReviewPending" ||
                       moderationCase.status === "preReviewPending";
+                    const latestContentChange = moderationCase.events.findLast(
+                      (event) => event.eventType === "contentChanged",
+                    );
+                    const changedProfileFields =
+                      moderationCase.targetType === "profile"
+                        ? getChangedProfileFields(latestContentChange?.details)
+                        : [];
 
                     return (
                       <li className={styles.caseItem} key={moderationCase.id}>
@@ -731,6 +762,19 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                         <p className={styles.caseMessage}>
                           対応理由: {moderationCase.userMessage}
                         </p>
+                        {latestContentChange && changedProfileFields.length ? (
+                          <div className={styles.changeSummary}>
+                            <strong>変更された項目</strong>
+                            <ul>
+                              {changedProfileFields.map((field) => (
+                                <li key={field}>{profileFieldLabels[field]}</li>
+                              ))}
+                            </ul>
+                            <time dateTime={latestContentChange.createdAt}>
+                              変更日時: {formatDate(latestContentChange.createdAt)}
+                            </time>
+                          </div>
+                        ) : null}
                         <div className={styles.snapshotComparison}>
                           <div>
                             <h3>非公開時</h3>

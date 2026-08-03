@@ -505,6 +505,37 @@
   white-space: pre-wrap;
 }
 
+.changeSummary {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #fdba74;
+  border-radius: 10px;
+  background: #fff7ed;
+}
+
+.changeSummary ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.changeSummary li {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #9a3412;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.changeSummary time {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .snapshotComparison {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
