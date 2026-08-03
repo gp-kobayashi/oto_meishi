@@ -24,9 +24,11 @@ import { prisma } from "@/lib/prisma";
 describe("管理者ケース審査のロールバック統合テスト", () => {
   const testRunId = crypto.randomUUID();
   const testUserId = `integration-moderation-${testRunId}`;
+  const testAdminAuthId = `integration-moderation-admin-${testRunId}`;
   let profileId = "";
   let caseId = "";
   let snapshotId = "";
+  let adminUserId = "";
 
   beforeAll(async () => {
     mocks.authorizeAdminRequest.mockResolvedValue({
@@ -43,6 +45,12 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
       retryAfterSeconds: 60,
     });
     mocks.getClientIp.mockReturnValue(null);
+
+    const adminUser = await prisma.adminUser.create({
+      data: { authId: testAdminAuthId, role: "admin" },
+      select: { id: true },
+    });
+    adminUserId = adminUser.id;
 
     const profile = await prisma.profile.create({
       data: {
@@ -94,11 +102,25 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
     await prisma.$executeRawUnsafe(
       'alter table public."ModerationSnapshot" disable trigger prevent_moderation_snapshot_update_or_delete',
     );
+    await prisma.$executeRawUnsafe(
+      'alter table public."ModerationCaseEvent" disable trigger prevent_moderation_case_event_update_or_delete',
+    );
+    await prisma.$executeRawUnsafe(
+      'alter table public."ModerationAction" disable trigger prevent_moderation_action_update_or_delete',
+    );
     try {
+      await prisma.moderationAction.deleteMany({ where: { profileId } });
       await prisma.profile.deleteMany({ where: { id: profileId } });
+      await prisma.adminUser.deleteMany({ where: { id: adminUserId } });
     } finally {
       await prisma.$executeRawUnsafe(
         'alter table public."ModerationSnapshot" enable trigger prevent_moderation_snapshot_update_or_delete',
+      );
+      await prisma.$executeRawUnsafe(
+        'alter table public."ModerationCaseEvent" enable trigger prevent_moderation_case_event_update_or_delete',
+      );
+      await prisma.$executeRawUnsafe(
+        'alter table public."ModerationAction" enable trigger prevent_moderation_action_update_or_delete',
       );
       await prisma.$disconnect();
     }
@@ -146,5 +168,64 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
     });
     expect(actionCount).toBe(0);
     expect(eventCount).toBe(0);
+  });
+
+  it("500文字の審査理由でケース・履歴・通知を保存する", async () => {
+    const reason = "あ".repeat(500);
+    mocks.authorizeAdminRequest.mockResolvedValue({
+      ok: true,
+      admin: { id: adminUserId, authId: testAdminAuthId, role: "admin" },
+    });
+
+    const response = await PATCH(
+      new Request(`http://localhost/api/admin/moderation/cases/${caseId}`, {
+        method: "PATCH",
+        headers: {
+          Authorization: "Bearer integration-admin-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          decision: "approve",
+          reason,
+          reviewedSnapshotId: snapshotId,
+        }),
+      }),
+      { params: Promise.resolve({ caseId }) },
+    );
+
+    expect(response.status).toBe(200);
+
+    const [profile, moderationCase, moderationAction, notification, event] =
+      await Promise.all([
+        prisma.profile.findUnique({
+          where: { id: profileId },
+          select: { status: true },
+        }),
+        prisma.moderationCase.findUnique({
+          where: { id: caseId },
+          select: { status: true, resolvedAt: true },
+        }),
+        prisma.moderationAction.findFirst({
+          where: { profileId },
+          select: { reason: true },
+        }),
+        prisma.userNotification.findFirst({
+          where: { profileId },
+          select: { message: true },
+        }),
+        prisma.moderationCaseEvent.findFirst({
+          where: { moderationCaseId: caseId },
+          select: { eventType: true },
+        }),
+      ]);
+
+    expect(profile?.status).toBe("active");
+    expect(moderationCase).toEqual({
+      status: "confirmed",
+      resolvedAt: expect.any(Date),
+    });
+    expect(moderationAction).toEqual({ reason });
+    expect(notification).toEqual({ message: reason });
+    expect(event).toEqual({ eventType: "reviewApproved" });
   });
 });
