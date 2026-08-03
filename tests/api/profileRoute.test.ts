@@ -821,6 +821,163 @@ describe("/api/profile route", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("非公開プロフィール本体を修正すると事後確認待ちとして公開する", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "hidden",
+      accountModerationStatus: "active",
+      displayName: "変更前の名前",
+      bio: "変更前の自己紹介",
+      audioTitle: "",
+      theme: "normal",
+      sns: [],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      ...existingProfile,
+      status: "active",
+      displayName: "変更後の名前",
+      theme: "dark",
+    });
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-profile",
+      status: "correctionRequired",
+      reviewMode: "postReview",
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "変更後の名前",
+        bio: "変更前の自己紹介",
+        theme: "dark",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { userId: "testuser" },
+      data: {
+        displayName: "変更後の名前",
+        bio: "変更前の自己紹介",
+        audioTitle: "",
+        theme: "dark",
+        status: "active",
+      },
+      include: { sns: true },
+    });
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-profile" },
+      data: expect.objectContaining({
+        status: "postReviewPending",
+        resolvedAt: null,
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-profile",
+        kind: "corrected",
+        content: {
+          displayName: "変更後の名前",
+          bio: "変更前の自己紹介",
+          theme: "dark",
+        },
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "contentChanged",
+        previousStatus: "correctionRequired",
+        newStatus: "postReviewPending",
+        details: {
+          targetType: "profile",
+          targetId: "profile-1",
+          changedFields: ["displayName", "theme"],
+        },
+      }),
+    });
+  });
+
+  it("事前確認対象のプロフィール本体は修正後も非公開を維持する", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "hidden",
+      accountModerationStatus: "active",
+      displayName: "変更前の名前",
+      bio: "変更前の自己紹介",
+      audioTitle: "",
+      theme: "normal",
+      sns: [],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      ...existingProfile,
+      bio: "変更後の自己紹介",
+    });
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-profile",
+      status: "correctionRequired",
+      reviewMode: "preReview",
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "変更前の名前",
+        bio: "変更後の自己紹介",
+        theme: "normal",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "hidden" }),
+      }),
+    );
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-profile" },
+      data: expect.objectContaining({ status: "preReviewPending" }),
+      select: { id: true },
+    });
+  });
+
+  it("非公開プロフィール本体が未変更ならケースを遷移させない", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "hidden",
+      accountModerationStatus: "active",
+      displayName: "変更前の名前",
+      bio: "変更前の自己紹介",
+      audioTitle: "",
+      theme: "normal",
+      sns: [],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "変更前の名前",
+        bio: "変更前の自己紹介",
+        theme: "normal",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationCaseFindFirst).not.toHaveBeenCalled();
+    expect(mocks.moderationSnapshotCreate).not.toHaveBeenCalled();
+    expect(mocks.moderationCaseEventCreate).not.toHaveBeenCalled();
+  });
+
   it("非公開リンクを変更すると事後確認待ちとして公開する", async () => {
     const existingProfile = {
       id: "profile-1",

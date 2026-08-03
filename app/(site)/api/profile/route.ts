@@ -11,8 +11,10 @@ import {
 } from "@/lib/profileSaveRateLimit";
 import {
   compareModeratedUrls,
+  getChangedModeratedProfileFields,
   getModerationDeadline,
   getPendingStatusForReviewMode,
+  type ModeratedProfileContent,
 } from "@/lib/moderationRemediation";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { getClientIp } from "@/lib/clientIp";
@@ -224,6 +226,82 @@ async function recordModeratedLinkCorrection({
   });
 
   return { pendingStatus, reviewMode };
+}
+
+async function recordModeratedProfileCorrection({
+  transaction,
+  profileId,
+  reportedContent,
+  correctedContent,
+  actorId,
+}: {
+  transaction: ProfileTransaction;
+  profileId: string;
+  reportedContent: ModeratedProfileContent;
+  correctedContent: ModeratedProfileContent;
+  actorId: string;
+}) {
+  const changedFields = getChangedModeratedProfileFields(
+    reportedContent,
+    correctedContent,
+  );
+  if (changedFields.length === 0) return null;
+
+  const existingCase = await transaction.moderationCase.findFirst({
+    where: {
+      profileId,
+      targetType: "profile",
+      targetId: profileId,
+      status: {
+        in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+      },
+    },
+    select: { id: true, status: true, reviewMode: true },
+  });
+  if (!existingCase) return null;
+
+  const deadline = getModerationDeadline();
+  const pendingStatus = getPendingStatusForReviewMode(existingCase.reviewMode);
+  await transaction.moderationCase.update({
+    where: { id: existingCase.id },
+    data: {
+      status: pendingStatus,
+      reviewDueAt: deadline,
+      retentionExpiresAt: deadline,
+      resolvedAt: null,
+    },
+    select: { id: true },
+  });
+  await transaction.moderationSnapshot.create({
+    data: {
+      moderationCaseId: existingCase.id,
+      kind: "corrected",
+      content: correctedContent,
+      expiresAt: deadline,
+    },
+  });
+  await transaction.moderationCaseEvent.create({
+    data: {
+      moderationCaseId: existingCase.id,
+      eventType: "contentChanged",
+      actorType: "user",
+      actorId,
+      previousStatus: existingCase.status,
+      newStatus: pendingStatus,
+      details: {
+        targetType: "profile",
+        targetId: profileId,
+        changedFields,
+      },
+    },
+  });
+
+  return {
+    reviewMode: existingCase.reviewMode,
+    pendingStatus,
+    profileStatus:
+      existingCase.reviewMode === "postReview" ? "active" : "hidden",
+  } as const;
 }
 
 export async function GET(request: Request) {
@@ -613,6 +691,26 @@ export async function POST(request: Request) {
         });
         profileId = createdProfile.id;
       } else {
+        const reportedProfileContent: ModeratedProfileContent = {
+          displayName: existingProfile.displayName,
+          bio: existingProfile.bio,
+          theme: existingProfile.theme,
+        };
+        const correctedProfileContent: ModeratedProfileContent = {
+          displayName: displayName || userId,
+          bio,
+          theme,
+        };
+        const profileCorrection =
+          existingProfile.status === "hidden"
+            ? await recordModeratedProfileCorrection({
+                transaction,
+                profileId: existingProfile.id,
+                reportedContent: reportedProfileContent,
+                correctedContent: correctedProfileContent,
+                actorId: supabaseUser.id,
+              })
+            : null;
         await transaction.profile.update({
           where: { userId },
           data: {
@@ -620,6 +718,9 @@ export async function POST(request: Request) {
             bio,
             audioTitle: audioTitleToSave,
             theme,
+            ...(profileCorrection
+              ? { status: profileCorrection.profileStatus }
+              : {}),
           },
           include: { sns: true },
         });
