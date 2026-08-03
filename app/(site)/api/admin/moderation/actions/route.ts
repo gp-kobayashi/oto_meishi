@@ -166,7 +166,11 @@ export async function PATCH(request: Request) {
       let reportedContent: Prisma.InputJsonObject = {};
       let reportedContentHash: string | null = null;
       let reportedStorageObjectKey: string | null = null;
-      let accountModerationStatus: "active" | "suspended" | null = null;
+      let accountModerationStatus:
+        | "active"
+        | "suspended"
+        | "deletionPending"
+        | null = null;
 
       if (targetType === "profile") {
         const target = await tx.profile.findUnique({
