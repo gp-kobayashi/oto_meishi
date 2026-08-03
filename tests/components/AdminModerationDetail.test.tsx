@@ -272,6 +272,15 @@ describe("AdminModerationDetail", () => {
     ).toBeDefined();
     expect(screen.getByRole("link", { name: "リンク先を別タブで開く" }).getAttribute("href"))
       .toBe("https://youtube.com/example");
+    expect(
+      (screen.getByRole("button", { name: "リンクを復旧" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText(
+        "未完了の審査ケースがあります。ケースの「修正を承認」から再公開してください。",
+      ),
+    ).toBeDefined();
     expect(screen.getByRole("heading", { name: "管理操作履歴" })).toBeDefined();
     expect(screen.getByText("危険なリンクのため")).toBeDefined();
     expect(screen.getByRole("heading", { name: "通報" })).toBeDefined();

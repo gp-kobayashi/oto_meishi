@@ -110,6 +110,12 @@ const requestStatusLabels = {
   rejected: "却下",
 };
 
+const pendingModerationCaseStatuses = new Set([
+  "correctionRequired",
+  "postReviewPending",
+  "preReviewPending",
+]);
+
 const formatDate = (value: string) =>
   new Intl.DateTimeFormat("ja-JP", {
     dateStyle: "medium",
@@ -447,6 +453,17 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
     }
   };
 
+  const isDirectRestoreBlocked = (
+    targetType: PendingAction["targetType"],
+    targetId: string,
+  ) =>
+    data?.profile.moderationCases.some(
+      (moderationCase) =>
+        moderationCase.targetType === targetType &&
+        moderationCase.targetId === targetId &&
+        pendingModerationCaseStatuses.has(moderationCase.status),
+    ) ?? false;
+
   return (
     <section className={styles.page}>
       <div className={styles.container}>
@@ -545,19 +562,27 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                 ) : (
                   <button
                     type="button"
-                    onClick={() =>
+                    disabled={isDirectRestoreBlocked("profile", data.profile.id)}
+                    onClick={() => {
+                      if (isDirectRestoreBlocked("profile", data.profile.id)) return;
                       openAction({
                         targetType: "profile",
                         targetId: data.profile.id,
                         action: "restore",
                         targetLabel: "プロフィール",
                         actionLabel: "公開中",
-                      })
-                    }
+                      });
+                    }}
                   >
                     プロフィールを復旧
                   </button>
                 )}
+                {data.profile.status !== "active" &&
+                isDirectRestoreBlocked("profile", data.profile.id) ? (
+                  <p className={styles.restoreBlocked}>
+                    未完了の審査ケースがあります。ケースの「修正を承認」から再公開してください。
+                  </p>
+                ) : null}
               </div>
             </section>
 
@@ -634,7 +659,17 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                 <div className={styles.actions}>
                   <button
                     type="button"
-                    onClick={() =>
+                    disabled={
+                      data.profile.audioStatus !== "active" &&
+                      isDirectRestoreBlocked("audio", data.profile.id)
+                    }
+                    onClick={() => {
+                      if (
+                        data.profile.audioStatus !== "active" &&
+                        isDirectRestoreBlocked("audio", data.profile.id)
+                      ) {
+                        return;
+                      }
                       openAction({
                         targetType: "audio",
                         targetId: data.profile.id,
@@ -643,12 +678,18 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                         targetLabel: "音声",
                         actionLabel:
                           data.profile.audioStatus === "active" ? "非公開" : "公開中",
-                      })
-                    }
+                      });
+                    }}
                   >
                     音声を
                     {data.profile.audioStatus === "active" ? "非公開" : "復旧"}
                   </button>
+                  {data.profile.audioStatus !== "active" &&
+                  isDirectRestoreBlocked("audio", data.profile.id) ? (
+                    <p className={styles.restoreBlocked}>
+                      未完了の審査ケースがあります。ケースの「修正を承認」から再公開してください。
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </section>
@@ -688,20 +729,37 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                       <div className={styles.actions}>
                         <button
                           type="button"
-                          onClick={() =>
+                          disabled={
+                            socialLink.status !== "active" &&
+                            isDirectRestoreBlocked("socialLink", socialLink.id)
+                          }
+                          onClick={() => {
+                            if (
+                              socialLink.status !== "active" &&
+                              isDirectRestoreBlocked("socialLink", socialLink.id)
+                            ) {
+                              return;
+                            }
                             openAction({
                               targetType: "socialLink",
                               targetId: socialLink.id,
-                              action: socialLink.status === "active" ? "hide" : "restore",
+                              action:
+                                socialLink.status === "active" ? "hide" : "restore",
                               targetLabel: `リンク「${socialLink.label}」`,
                               actionLabel:
                                 socialLink.status === "active" ? "非公開" : "公開中",
-                            })
-                          }
+                            });
+                          }}
                         >
                           リンクを
                           {socialLink.status === "active" ? "非公開" : "復旧"}
                         </button>
+                        {socialLink.status !== "active" &&
+                        isDirectRestoreBlocked("socialLink", socialLink.id) ? (
+                          <p className={styles.restoreBlocked}>
+                            未完了の審査ケースがあります。ケースの「修正を承認」から再公開してください。
+                          </p>
+                        ) : null}
                       </div>
                     </article>
                   ))}
