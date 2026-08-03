@@ -229,6 +229,45 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
   });
 
+  it("500文字の審査理由を通知本文として保存できる", async () => {
+    const reason = "あ".repeat(500);
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason,
+        reviewedSnapshotId: "snapshot-latest",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.actionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ reason }),
+      select: { id: true },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ message: reason }),
+    });
+  });
+
+  it("501文字の審査理由はDB更新前に拒否する", async () => {
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "あ".repeat(501),
+        reviewedSnapshotId: "snapshot-latest",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "審査結果と500文字以内のユーザー向け理由を入力してください。",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("審査トランザクションの書き込みに失敗した場合は成功を返さない", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.notificationCreate.mockRejectedValueOnce(new Error("write failed"));
