@@ -170,16 +170,20 @@ export async function POST(request: NextRequest) {
         moderationCases: {
           where: {
             targetType: "audio",
-            status: {
-              in: [
-                "correctionRequired",
-                "postReviewPending",
-                "preReviewPending",
-              ],
-            },
+            OR: [
+              {
+                status: {
+                  in: [
+                    "correctionRequired",
+                    "postReviewPending",
+                    "preReviewPending",
+                  ],
+                },
+              },
+              { retentionExpiresAt: { gt: new Date() } },
+            ],
           },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          take: 1,
           select: {
             id: true,
             status: true,
@@ -284,13 +288,19 @@ export async function POST(request: NextRequest) {
 
       const convertedAudio = await fs.readFile(convertedPath);
       const contentHash = await createModerationContentHash(convertedAudio);
-      const previousContentHash =
-        profile.moderationCases[0]?.snapshots[0]?.contentHash;
+      const matchingReportedAudio = profile.moderationCases.some(
+        (moderationCase) =>
+          moderationCase.snapshots.some(
+            (snapshot) =>
+              snapshot.contentHash &&
+              compareModeratedContentHashes(
+                snapshot.contentHash,
+                contentHash,
+              ) === "same",
+          ),
+      );
       if (
-        profile.moderationCases[0] &&
-        previousContentHash &&
-        compareModeratedContentHashes(previousContentHash, contentHash) ===
-          "same"
+        matchingReportedAudio
       ) {
         return NextResponse.json(
           {
@@ -308,7 +318,12 @@ export async function POST(request: NextRequest) {
       try {
         const deadline = getModerationDeadline();
         await prisma.$transaction(async (tx) => {
-          const existingCase = profile.moderationCases[0];
+          const existingCase = profile.moderationCases.find(
+            (moderationCase) =>
+              moderationCase.status === "correctionRequired" ||
+              moderationCase.status === "postReviewPending" ||
+              moderationCase.status === "preReviewPending",
+          );
           const reviewMode = existingCase?.reviewMode ?? "postReview";
           const pendingStatus = getPendingStatusForReviewMode(reviewMode);
           const isModeratedReplacement =

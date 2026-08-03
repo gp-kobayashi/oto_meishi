@@ -216,6 +216,38 @@ describe("PATCH /api/admin/moderation/actions", () => {
     });
   });
 
+  it("音声を非公開にすると現在の音声ハッシュを保存する", async () => {
+    const audioContentHash = "c".repeat(64);
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      audioKey: "audio/testuser/current.m4a",
+      audioContentHash,
+      audioUrl: "",
+      audioTitle: "自己紹介音声",
+      audioStatus: "active",
+    });
+
+    const response = await PATCH(
+      request({
+        targetType: "audio",
+        targetId: "profile-1",
+        action: "hide",
+        reason: "不適切な音声のため",
+        reasonCode: "inappropriateContent",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        kind: "reported",
+        contentHash: audioContentHash,
+        storageObjectKey: "audio/testuser/current.m4a",
+      }),
+    });
+  });
+
   it("プロフィールを直接復旧すると未完了の是正ケースも確認済みにする", async () => {
     mocks.profileFindUnique.mockResolvedValue({
       id: "profile-1",

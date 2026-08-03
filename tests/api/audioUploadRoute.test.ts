@@ -439,17 +439,21 @@ describe("/api/audio/upload route", () => {
         moderationCases: {
           where: {
             targetType: "audio",
-            status: {
-              in: [
-                "correctionRequired",
-                "postReviewPending",
-                "preReviewPending",
-              ],
-            },
+            OR: [
+              {
+                status: {
+                  in: [
+                    "correctionRequired",
+                    "postReviewPending",
+                    "preReviewPending",
+                  ],
+                },
+              },
+              { retentionExpiresAt: { gt: expect.any(Date) } },
+            ],
           },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          take: 1,
-            select: {
+          select: {
               id: true,
               status: true,
               reviewMode: true,
@@ -894,6 +898,33 @@ describe("/api/audio/upload route", () => {
     });
     expect(mocks.uploadToR2).not.toHaveBeenCalled();
     expect(mocks.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("確認済みでも保持期限内の違反音声は再登録しない", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "active",
+      audioStatus: "removed",
+      audioKey: "",
+      audioContentHash: CONVERTED_AUDIO_HASH,
+      audioUrl: "",
+      moderationCases: [
+        {
+          id: "case-confirmed",
+          status: "confirmed",
+          reviewMode: "postReview",
+          snapshots: [{ contentHash: CONVERTED_AUDIO_HASH }],
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(409);
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+    expect(mocks.updateProfile).not.toHaveBeenCalled();
+    expect(mocks.moderationSnapshotCreate).not.toHaveBeenCalled();
   });
 
   it("DBへの紐付け失敗時は新しいR2音声を削除する", async () => {

@@ -34,6 +34,7 @@ export async function DELETE(request: Request) {
       id: true,
       audioUrl: true,
       audioKey: true,
+      audioContentHash: true,
       audioTitle: true,
       audioStatus: true,
     },
@@ -180,6 +181,7 @@ type AudioDeletionProfile = {
   id: string;
   audioUrl: string;
   audioKey: string;
+  audioContentHash: string | null;
   audioTitle: string;
   audioStatus: "active" | "hidden" | "removed";
 };
@@ -260,6 +262,7 @@ async function recordModeratedAudioDeletion({
           legacyMissingAudio: !audioKey,
         },
         storageObjectKey: audioKey,
+        contentHash: profile.audioContentHash,
         expiresAt: deadline,
       },
     });

@@ -217,6 +217,7 @@ export async function PATCH(request: Request) {
           select: {
             id: true,
             audioKey: true,
+            audioContentHash: true,
             audioUrl: true,
             audioTitle: true,
             audioStatus: true,
@@ -231,6 +232,7 @@ export async function PATCH(request: Request) {
           hasAudio: Boolean(target.audioKey || target.audioUrl),
         };
         reportedStorageObjectKey = target.audioKey || null;
+        reportedContentHash = target.audioContentHash;
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }

@@ -53,6 +53,7 @@ describe("DELETE /api/audio", () => {
       id: "profile-1",
       audioUrl: "https://r2.example/audio/test/old.m4a",
       audioKey: "audio/test/old.m4a",
+      audioContentHash: "a".repeat(64),
       audioTitle: "古い音声",
       audioStatus: "active",
     });
@@ -95,6 +96,7 @@ describe("DELETE /api/audio", () => {
         id: true,
         audioUrl: true,
         audioKey: true,
+        audioContentHash: true,
         audioTitle: true,
         audioStatus: true,
       },
@@ -140,6 +142,7 @@ describe("DELETE /api/audio", () => {
     mocks.findUnique.mockResolvedValueOnce({
       audioUrl: "https://r2.example/audio/test/hidden.m4a",
       audioKey: "audio/test/hidden.m4a",
+      audioContentHash: "b".repeat(64),
       id: "profile-1",
       audioTitle: "非公開音声",
       audioStatus: "hidden",
@@ -182,6 +185,7 @@ describe("DELETE /api/audio", () => {
         moderationCaseId: "case-1",
         kind: "reported",
         storageObjectKey: "audio/test/hidden.m4a",
+        contentHash: "b".repeat(64),
       }),
     });
     expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
