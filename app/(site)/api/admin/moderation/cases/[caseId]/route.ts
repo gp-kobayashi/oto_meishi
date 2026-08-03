@@ -6,7 +6,12 @@ import {
 } from "@/lib/adminActionRateLimit";
 import { getClientIp } from "@/lib/clientIp";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
-import { getModerationDeadline } from "@/lib/moderationRemediation";
+import {
+  compareModeratedContentHashes,
+  compareModeratedUrls,
+  compareModerationSnapshotVersions,
+  getModerationDeadline,
+} from "@/lib/moderationRemediation";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
@@ -63,9 +68,17 @@ export async function PATCH(
 
     const body =
       typeof jsonBody.value === "object" && jsonBody.value !== null
-        ? (jsonBody.value as { decision?: unknown; reason?: unknown })
+        ? (jsonBody.value as {
+            decision?: unknown;
+            reason?: unknown;
+            reviewedSnapshotId?: unknown;
+          })
         : {};
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const reviewedSnapshotId =
+      typeof body.reviewedSnapshotId === "string"
+        ? body.reviewedSnapshotId.trim()
+        : "";
     if (!isDecision(body.decision) || !reason || reason.length > 500) {
       return Response.json(
         { error: "審査結果と500文字以内のユーザー向け理由を入力してください。" },
@@ -73,6 +86,12 @@ export async function PATCH(
       );
     }
     const decision = body.decision;
+    if (decision === "approve" && !reviewedSnapshotId) {
+      return Response.json(
+        { error: "確認した審査対象のバージョンを指定してください。" },
+        { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
 
     const { caseId } = await params;
     const result = await prisma.$transaction(async (tx) => {
@@ -89,12 +108,18 @@ export async function PATCH(
             where: { kind: "corrected" },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: 1,
-            select: { content: true },
+            select: { id: true, content: true, contentHash: true },
           },
           profile: {
             select: {
               status: true,
               audioStatus: true,
+              displayName: true,
+              bio: true,
+              theme: true,
+              audioKey: true,
+              audioUrl: true,
+              audioContentHash: true,
               accountModerationStatus: true,
             },
           },
@@ -122,6 +147,24 @@ export async function PATCH(
       let action: "hide" | "restore" | "suspend" | "remove";
 
       if (decision === "approve") {
+        const latestSnapshot = moderationCase.snapshots[0];
+        if (
+          compareModerationSnapshotVersions(
+            reviewedSnapshotId,
+            latestSnapshot?.id,
+          ) !== "current" ||
+          !(await doesCurrentTargetMatchSnapshot(
+            tx,
+            moderationCase,
+            latestSnapshot,
+          ))
+        ) {
+          return {
+            error:
+              "審査対象が更新されています。最新の内容を読み込み直して確認してください。",
+            httpStatus: 409,
+          } as const;
+        }
         action = targetWasDeleted ? "remove" : "restore";
         if (!targetWasDeleted) {
           newTargetStatus = "active";
@@ -139,7 +182,7 @@ export async function PATCH(
             actorId: authorization.admin.id,
             previousStatus: moderationCase.status,
             newStatus: "confirmed",
-            details: { reason, targetWasDeleted },
+            details: { reason, targetWasDeleted, reviewedSnapshotId },
           },
         });
       } else {
@@ -248,6 +291,76 @@ function rateLimitResponse(retryAfterSeconds: number) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+async function doesCurrentTargetMatchSnapshot(
+  tx: Prisma.TransactionClient,
+  moderationCase: {
+    targetType: "profile" | "audio" | "socialLink";
+    targetId: string;
+    profile: {
+      displayName: string;
+      bio: string;
+      theme: string;
+      audioKey: string;
+      audioUrl: string;
+      audioContentHash: string | null;
+    };
+  },
+  snapshot:
+    | { content: unknown; contentHash: string | null }
+    | undefined,
+): Promise<boolean> {
+  if (!snapshot || !isRecord(snapshot.content)) return false;
+  if (snapshot.content.deleted === true) {
+    if (moderationCase.targetType === "audio") {
+      return (
+        !moderationCase.profile.audioKey && !moderationCase.profile.audioUrl
+      );
+    }
+    if (moderationCase.targetType === "socialLink") {
+      return (await tx.socialLink.findUnique({
+        where: { id: moderationCase.targetId },
+        select: { id: true },
+      })) === null;
+    }
+    return false;
+  }
+
+  if (moderationCase.targetType === "profile") {
+    return (
+      snapshot.content.displayName === moderationCase.profile.displayName &&
+      snapshot.content.bio === moderationCase.profile.bio &&
+      snapshot.content.theme === moderationCase.profile.theme
+    );
+  }
+
+  if (moderationCase.targetType === "audio") {
+    if (snapshot.contentHash && moderationCase.profile.audioContentHash) {
+      return (
+        compareModeratedContentHashes(
+          snapshot.contentHash,
+          moderationCase.profile.audioContentHash,
+        ) === "same"
+      );
+    }
+    return (
+      typeof snapshot.content.audioKey === "string" &&
+      snapshot.content.audioKey === moderationCase.profile.audioKey
+    );
+  }
+
+  const currentLink = await tx.socialLink.findUnique({
+    where: { id: moderationCase.targetId },
+    select: { service: true, url: true, label: true },
+  });
+  return (
+    currentLink !== null &&
+    snapshot.content.service === currentLink.service &&
+    typeof snapshot.content.url === "string" &&
+    compareModeratedUrls(snapshot.content.url, currentLink.url) === "same" &&
+    snapshot.content.label === currentLink.label
+  );
 }
 
 function getCurrentTargetStatus(moderationCase: {

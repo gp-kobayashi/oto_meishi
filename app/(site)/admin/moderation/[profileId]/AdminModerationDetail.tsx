@@ -397,6 +397,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   const reviewModerationCase = async (
     caseId: string,
     decision: "approve" | "continueHidden" | "requestChanges",
+    reviewedSnapshotId: string | null,
   ) => {
     const reviewReason = caseResponses[caseId]?.trim() ?? "";
     if (!reviewReason || updatingCaseId) return;
@@ -421,7 +422,11 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ decision, reason: reviewReason }),
+          body: JSON.stringify({
+            decision,
+            reason: reviewReason,
+            reviewedSnapshotId,
+          }),
         },
       );
       const result = await response.json().catch(() => ({}));
@@ -883,6 +888,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                 type="button"
                                 disabled={
                                   updatingCaseId === moderationCase.id ||
+                                  !latestCorrected ||
                                   !caseResponses[
                                     moderationCase.id
                                   ]?.trim()
@@ -891,6 +897,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                   void reviewModerationCase(
                                     moderationCase.id,
                                     "approve",
+                                    latestCorrected?.id ?? null,
                                   )
                                 }
                               >
@@ -908,6 +915,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                   void reviewModerationCase(
                                     moderationCase.id,
                                     "continueHidden",
+                                    latestCorrected?.id ?? null,
                                   )
                                 }
                               >
@@ -925,6 +933,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                   void reviewModerationCase(
                                     moderationCase.id,
                                     "requestChanges",
+                                    latestCorrected?.id ?? null,
                                   )
                                 }
                               >

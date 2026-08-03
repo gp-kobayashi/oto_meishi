@@ -8,6 +8,7 @@ const { mocks } = vi.hoisted(() => ({
     caseUpdate: vi.fn(),
     eventCreate: vi.fn(),
     profileUpdate: vi.fn(),
+    linkFindUnique: vi.fn(),
     linkUpdateMany: vi.fn(),
     actionCreate: vi.fn(),
     notificationCreate: vi.fn(),
@@ -50,10 +51,26 @@ const pendingCase = {
   targetId: "link-1",
   status: "preReviewPending",
   reviewMode: "preReview",
-  snapshots: [{ content: { url: "https://example.com/new" } }],
+  snapshots: [
+    {
+      id: "snapshot-latest",
+      content: {
+        service: "youtube",
+        url: "https://example.com/new",
+        label: "YouTube",
+      },
+      contentHash: null,
+    },
+  ],
   profile: {
     status: "active",
     audioStatus: "active",
+    displayName: "表示名",
+    bio: "自己紹介",
+    theme: "normal",
+    audioKey: "audio/current.m4a",
+    audioUrl: "",
+    audioContentHash: "a".repeat(64),
     accountModerationStatus: "active",
   },
 };
@@ -84,16 +101,28 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
         },
         moderationCaseEvent: { create: mocks.eventCreate },
         profile: { update: mocks.profileUpdate },
-        socialLink: { updateMany: mocks.linkUpdateMany },
+        socialLink: {
+          findUnique: mocks.linkFindUnique,
+          updateMany: mocks.linkUpdateMany,
+        },
         moderationAction: { create: mocks.actionCreate },
         userNotification: { create: mocks.notificationCreate },
       }),
     );
+    mocks.linkFindUnique.mockResolvedValue({
+      service: "youtube",
+      url: "https://example.com/new",
+      label: "YouTube",
+    });
   });
 
   it("事前確認の修正内容を承認して再公開する", async () => {
     const response = await PATCH(
-      request({ decision: "approve", reason: "修正を確認しました。" }),
+      request({
+        decision: "approve",
+        reason: "修正を確認しました。",
+        reviewedSnapshotId: "snapshot-latest",
+      }),
       context,
     );
 
@@ -185,15 +214,28 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
       targetId: "profile-1",
       status: "postReviewPending",
       reviewMode: "postReview",
-      snapshots: [{ content: { deleted: true } }],
+      snapshots: [
+        {
+          id: "snapshot-deleted",
+          content: { deleted: true },
+          contentHash: null,
+        },
+      ],
       profile: {
         ...pendingCase.profile,
         audioStatus: "removed",
+        audioKey: "",
+        audioUrl: "",
+        audioContentHash: null,
       },
     });
 
     const response = await PATCH(
-      request({ decision: "approve", reason: "削除を確認しました。" }),
+      request({
+        decision: "approve",
+        reason: "削除を確認しました。",
+        reviewedSnapshotId: "snapshot-deleted",
+      }),
       context,
     );
 
@@ -216,11 +258,90 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
 
     const response = await PATCH(
-      request({ decision: "approve", reason: "確認しました。" }),
+      request({
+        decision: "approve",
+        reason: "確認しました。",
+        reviewedSnapshotId: "snapshot-latest",
+      }),
       context,
     );
 
     expect(response.status).toBe(409);
     expect(mocks.caseUpdate).not.toHaveBeenCalled();
+  });
+
+  it("管理者が確認した後に最新版が変わっていた場合は承認を拒否する", async () => {
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正を確認しました。",
+        reviewedSnapshotId: "snapshot-old",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.caseUpdate).not.toHaveBeenCalled();
+    expect(mocks.linkUpdateMany).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it("確認したスナップショットIDがない承認リクエストを拒否する", async () => {
+    const response = await PATCH(
+      request({ decision: "approve", reason: "修正を確認しました。" }),
+      context,
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("最新スナップショットと現在のリンクが違う場合は承認を拒否する", async () => {
+    mocks.linkFindUnique.mockResolvedValueOnce({
+      service: "youtube",
+      url: "https://example.com/changed-after-review",
+      label: "YouTube",
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正を確認しました。",
+        reviewedSnapshotId: "snapshot-latest",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.caseUpdate).not.toHaveBeenCalled();
+    expect(mocks.linkUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("最新スナップショットと現在の音声ハッシュが違う場合は承認を拒否する", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      targetType: "audio",
+      targetId: "profile-1",
+      snapshots: [
+        {
+          id: "snapshot-audio",
+          content: { audioKey: "audio/reviewed.m4a" },
+          contentHash: "b".repeat(64),
+        },
+      ],
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "音声を確認しました。",
+        reviewedSnapshotId: "snapshot-audio",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.caseUpdate).not.toHaveBeenCalled();
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
   });
 });

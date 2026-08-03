@@ -283,6 +283,7 @@ describe("AdminModerationDetail", () => {
           body: JSON.stringify({
             decision: "approve",
             reason: "安全なリンクへの変更を確認しました。",
+            reviewedSnapshotId: "snapshot-2",
           }),
         },
       );
