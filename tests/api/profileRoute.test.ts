@@ -947,6 +947,60 @@ describe("/api/profile route", () => {
     });
   });
 
+  it("公開中のプロフィール本体を審査待ち中に再編集すると最新内容を記録する", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "最初の修正名",
+      bio: "修正前の自己紹介",
+      audioTitle: "",
+      theme: "normal",
+      sns: [],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      ...existingProfile,
+      displayName: "再編集後の名前",
+    });
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-profile",
+      status: "postReviewPending",
+      reviewMode: "postReview",
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "再編集後の名前",
+        bio: "修正前の自己紹介",
+        theme: "normal",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-profile",
+        kind: "corrected",
+        content: {
+          displayName: "再編集後の名前",
+          bio: "修正前の自己紹介",
+          theme: "normal",
+        },
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        previousStatus: "postReviewPending",
+        newStatus: "postReviewPending",
+        details: expect.objectContaining({ changedFields: ["displayName"] }),
+      }),
+    });
+  });
+
   it("非公開プロフィール本体が未変更ならケースを遷移させない", async () => {
     const existingProfile = {
       id: "profile-1",
@@ -1148,6 +1202,76 @@ describe("/api/profile route", () => {
         status: "preReviewPending",
       }),
       select: { id: true },
+    });
+  });
+
+  it("公開中のリンクを審査待ち中に再編集すると最新内容を記録する", async () => {
+    const existingProfile = {
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      displayName: "Test User",
+      bio: "",
+      audioTitle: "",
+      theme: "normal",
+      sns: [
+        {
+          id: "link-active",
+          profileId: "profile-1",
+          service: "youtube",
+          url: "https://youtube.com/@first-correction",
+          label: "YouTube",
+          sortOrder: 0,
+          status: "active",
+        },
+      ],
+    };
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-link",
+      status: "postReviewPending",
+      reviewMode: "postReview",
+    });
+    mocks.moderationCaseUpdate.mockResolvedValueOnce({ id: "case-link" });
+    mocks.moderationSnapshotFindFirst.mockResolvedValueOnce({
+      id: "snapshot-reported",
+    });
+
+    const response = await POST(
+      postRequest({
+        userId: "testuser",
+        displayName: "Test User",
+        sns: [
+          {
+            id: "link-active",
+            service: "youtube",
+            url: "https://youtube.com/@second-correction",
+            label: "YouTube",
+          },
+        ],
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-link",
+        kind: "corrected",
+        content: {
+          service: "youtube",
+          url: "https://youtube.com/@second-correction",
+          label: "YouTube",
+        },
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        previousStatus: "postReviewPending",
+        newStatus: "postReviewPending",
+      }),
     });
   });
 

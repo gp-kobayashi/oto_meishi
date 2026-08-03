@@ -165,6 +165,7 @@ export async function POST(request: NextRequest) {
         accountModerationStatus: true,
         audioStatus: true,
         audioKey: true,
+        audioContentHash: true,
         audioUrl: true,
         moderationCases: {
           where: {
@@ -286,7 +287,7 @@ export async function POST(request: NextRequest) {
       const previousContentHash =
         profile.moderationCases[0]?.snapshots[0]?.contentHash;
       if (
-        profile.audioStatus !== "active" &&
+        profile.moderationCases[0] &&
         previousContentHash &&
         compareModeratedContentHashes(previousContentHash, contentHash) ===
           "same"
@@ -310,7 +311,8 @@ export async function POST(request: NextRequest) {
           const existingCase = profile.moderationCases[0];
           const reviewMode = existingCase?.reviewMode ?? "postReview";
           const pendingStatus = getPendingStatusForReviewMode(reviewMode);
-          const isModeratedReplacement = profile.audioStatus !== "active";
+          const isModeratedReplacement =
+            Boolean(existingCase) || profile.audioStatus !== "active";
 
           await tx.profile.update({
             where: {
@@ -320,6 +322,7 @@ export async function POST(request: NextRequest) {
             },
             data: {
               audioKey,
+              audioContentHash: contentHash,
               audioUrl: "",
               audioStatus:
                 isModeratedReplacement && reviewMode === "preReview"

@@ -5,6 +5,9 @@ import { createHash } from "node:crypto";
 const TEMP_DIR = path.join(process.cwd(), ".tmp", "upload-123");
 const INPUT_PATH = path.join(TEMP_DIR, "input.bin");
 const OUTPUT_PATH = path.join(TEMP_DIR, "output.m4a");
+const CONVERTED_AUDIO_HASH = createHash("sha256")
+  .update("converted audio")
+  .digest("hex");
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {
@@ -431,6 +434,7 @@ describe("/api/audio/upload route", () => {
         accountModerationStatus: true,
         audioStatus: true,
         audioKey: true,
+        audioContentHash: true,
         audioUrl: true,
         moderationCases: {
           where: {
@@ -626,6 +630,7 @@ describe("/api/audio/upload route", () => {
       },
       data: {
         audioKey: "audio/testuser/voice-123.m4a",
+        audioContentHash: CONVERTED_AUDIO_HASH,
         audioUrl: "",
         audioStatus: "active",
       },
@@ -633,6 +638,54 @@ describe("/api/audio/upload route", () => {
     expect(mocks.rm).toHaveBeenCalledWith(TEMP_DIR, {
       recursive: true,
       force: true,
+    });
+  });
+
+  it("公開中の音声を審査待ち中に再編集すると最新内容を記録する", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "active",
+      accountModerationStatus: "active",
+      audioStatus: "active",
+      audioKey: "audio/testuser/reviewed.m4a",
+      audioContentHash: "current-hash",
+      audioUrl: "",
+      moderationCases: [
+        {
+          id: "case-1",
+          status: "postReviewPending",
+          reviewMode: "postReview",
+          snapshots: [{ contentHash: "reported-hash" }],
+        },
+      ],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: expect.objectContaining({
+        status: "postReviewPending",
+        resolvedAt: null,
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        kind: "corrected",
+        contentHash: CONVERTED_AUDIO_HASH,
+      }),
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        eventType: "contentChanged",
+        previousStatus: "postReviewPending",
+        newStatus: "postReviewPending",
+      }),
     });
   });
 
@@ -665,6 +718,7 @@ describe("/api/audio/upload route", () => {
       },
       data: {
         audioKey: "audio/testuser/voice-123.m4a",
+        audioContentHash: CONVERTED_AUDIO_HASH,
         audioUrl: "",
         audioStatus: "active",
       },
@@ -726,6 +780,7 @@ describe("/api/audio/upload route", () => {
       },
       data: {
         audioKey: "audio/testuser/voice-123.m4a",
+        audioContentHash: CONVERTED_AUDIO_HASH,
         audioUrl: "",
         audioStatus: "active",
       },
@@ -770,6 +825,7 @@ describe("/api/audio/upload route", () => {
       },
       data: {
         audioKey: "audio/testuser/voice-123.m4a",
+        audioContentHash: CONVERTED_AUDIO_HASH,
         audioUrl: "",
         audioStatus: "hidden",
       },

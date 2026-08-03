@@ -152,6 +152,8 @@ async function recordModeratedLinkCorrection({
     },
     select: { id: true, status: true, reviewMode: true },
   });
+  if (!existingCase && link.status !== "hidden") return null;
+
   const reviewMode = existingCase?.reviewMode ?? "postReview";
   const pendingStatus = getPendingStatusForReviewMode(reviewMode);
   const moderationCase = existingCase
@@ -701,16 +703,13 @@ export async function POST(request: Request) {
           bio,
           theme,
         };
-        const profileCorrection =
-          existingProfile.status === "hidden"
-            ? await recordModeratedProfileCorrection({
-                transaction,
-                profileId: existingProfile.id,
-                reportedContent: reportedProfileContent,
-                correctedContent: correctedProfileContent,
-                actorId: supabaseUser.id,
-              })
-            : null;
+        const profileCorrection = await recordModeratedProfileCorrection({
+          transaction,
+          profileId: existingProfile.id,
+          reportedContent: reportedProfileContent,
+          correctedContent: correctedProfileContent,
+          actorId: supabaseUser.id,
+        });
         await transaction.profile.update({
           where: { userId },
           data: {
@@ -770,10 +769,7 @@ export async function POST(request: Request) {
         }
 
         let nextStatus = existingLink.status;
-        if (
-          existingLink.status === "hidden" &&
-          !isSocialLinkContentUnchanged(existingLink, requestedLink)
-        ) {
+        if (!isSocialLinkContentUnchanged(existingLink, requestedLink)) {
           const correction = await recordModeratedLinkCorrection({
             transaction,
             profileId,
@@ -782,8 +778,10 @@ export async function POST(request: Request) {
             actorId: supabaseUser.id,
             deleted: false,
           });
-          nextStatus =
-            correction.reviewMode === "postReview" ? "active" : "hidden";
+          if (correction) {
+            nextStatus =
+              correction.reviewMode === "postReview" ? "active" : "hidden";
+          }
         }
 
         await transaction.socialLink.update({
@@ -801,15 +799,13 @@ export async function POST(request: Request) {
       for (const existingLink of existingLinks) {
         if (retainedLinkIds.has(existingLink.id)) continue;
 
-        if (existingLink.status === "hidden") {
-          await recordModeratedLinkCorrection({
-            transaction,
-            profileId,
-            link: existingLink,
-            actorId: supabaseUser.id,
-            deleted: true,
-          });
-        }
+        await recordModeratedLinkCorrection({
+          transaction,
+          profileId,
+          link: existingLink,
+          actorId: supabaseUser.id,
+          deleted: true,
+        });
         await transaction.socialLink.delete({ where: { id: existingLink.id } });
       }
 
