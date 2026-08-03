@@ -146,6 +146,109 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     expect(mocks.notificationCreate).toHaveBeenCalled();
   });
 
+  it("プロフィールの修正をケース審査から承認して再公開する", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      targetType: "profile",
+      targetId: "profile-1",
+      snapshots: [
+        {
+          id: "snapshot-profile",
+          content: {
+            displayName: "表示名",
+            bio: "自己紹介",
+            theme: "normal",
+          },
+          contentHash: null,
+        },
+      ],
+      profile: { ...pendingCase.profile, status: "hidden" },
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正を確認しました。",
+        reviewedSnapshotId: "snapshot-profile",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { status: "active" },
+    });
+    expect(mocks.caseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+    });
+    expect(mocks.actionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "restore", newStatus: "active" }),
+      select: { id: true },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("音声の修正をケース審査から承認して再公開する", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      targetType: "audio",
+      targetId: "profile-1",
+      snapshots: [
+        {
+          id: "snapshot-audio",
+          content: { audioKey: "audio/current.m4a" },
+          contentHash: "a".repeat(64),
+        },
+      ],
+      profile: { ...pendingCase.profile, audioStatus: "hidden" },
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "音声の修正を確認しました。",
+        reviewedSnapshotId: "snapshot-audio",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { audioStatus: "active" },
+    });
+    expect(mocks.caseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+    });
+    expect(mocks.actionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "restore", newStatus: "active" }),
+      select: { id: true },
+    });
+  });
+
+  it("審査トランザクションの書き込みに失敗した場合は成功を返さない", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.notificationCreate.mockRejectedValueOnce(new Error("write failed"));
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正を確認しました。",
+        reviewedSnapshotId: "snapshot-latest",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({
+      error: "審査結果を保存できませんでした。",
+    });
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+  });
+
   it("事前確認で追加修正を依頼して非公開を継続する", async () => {
     const response = await PATCH(
       request({
