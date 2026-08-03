@@ -4,6 +4,7 @@ import {
   compareModeratedContentHashes,
   compareModeratedUrls,
   createModerationContentHash,
+  getChangedModeratedProfileFields,
   getModerationDeadline,
   getPendingStatusForReviewMode,
   isPublishedWhilePending,
@@ -42,6 +43,40 @@ describe("モデレーション是正ルール", () => {
     expect(
       getModerationDeadline(new Date("2026-07-30T00:00:00.000Z")),
     ).toEqual(new Date("2026-09-28T00:00:00.000Z"));
+  });
+});
+
+describe("プロフィール本体の変更判定", () => {
+  const reported = {
+    displayName: "変更前の名前",
+    bio: "変更前の自己紹介",
+    theme: "normal",
+  };
+
+  it("変更された項目だけを返す", () => {
+    expect(
+      getChangedModeratedProfileFields(reported, {
+        displayName: "変更後の名前",
+        bio: "変更前の自己紹介",
+        theme: "dark",
+      }),
+    ).toEqual(["displayName", "theme"]);
+  });
+
+  it("内容が同じ場合は変更項目を返さない", () => {
+    expect(getChangedModeratedProfileFields(reported, { ...reported })).toEqual(
+      [],
+    );
+  });
+
+  it("表示名・自己紹介・テーマのすべてを判定する", () => {
+    expect(
+      getChangedModeratedProfileFields(reported, {
+        displayName: "変更後の名前",
+        bio: "変更後の自己紹介",
+        theme: "colorful",
+      }),
+    ).toEqual(["displayName", "bio", "theme"]);
   });
 });
 

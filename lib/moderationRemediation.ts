@@ -16,6 +16,13 @@ export type ModerationPendingStatus =
   | "postReviewPending"
   | "preReviewPending";
 export type ModeratedUrlComparison = "same" | "changed" | "invalid";
+export const MODERATED_PROFILE_FIELDS = [
+  "displayName",
+  "bio",
+  "theme",
+] as const;
+export type ModeratedProfileField = (typeof MODERATED_PROFILE_FIELDS)[number];
+export type ModeratedProfileContent = Record<ModeratedProfileField, string>;
 
 const PRE_REVIEW_REASONS = new Set<ModerationReasonCode>([
   "harassment",
@@ -61,6 +68,15 @@ export function getModerationDeadline(from: Date = new Date()): Date {
   const deadline = new Date(from);
   deadline.setUTCDate(deadline.getUTCDate() + MODERATION_REVIEW_PERIOD_DAYS);
   return deadline;
+}
+
+export function getChangedModeratedProfileFields(
+  reported: ModeratedProfileContent,
+  corrected: ModeratedProfileContent,
+): ModeratedProfileField[] {
+  return MODERATED_PROFILE_FIELDS.filter(
+    (field) => reported[field] !== corrected[field],
+  );
 }
 
 /**
