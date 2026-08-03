@@ -30,7 +30,7 @@ describe("AdminModerationDetail", () => {
             bio: "自己紹介です",
             theme: "normal",
             status: "active",
-            hasAudio: false,
+            hasAudio: true,
             audioTitle: "",
             audioStatus: "removed",
             deletedAudio: {
@@ -138,6 +138,41 @@ describe("AdminModerationDetail", () => {
                 ],
               },
               {
+                id: "case-audio",
+                targetType: "audio",
+                targetId: "profile-1",
+                reasonCode: "inappropriateAudio",
+                status: "confirmed",
+                reviewMode: "postReview",
+                userMessage: "音声の修正が必要です",
+                reviewDueAt: "2026-09-15T00:00:00.000Z",
+                retentionExpiresAt: "2026-09-15T00:00:00.000Z",
+                resolvedAt: null,
+                createdAt: "2026-07-17T01:00:00.000Z",
+                updatedAt: "2026-07-17T04:00:00.000Z",
+                snapshots: [
+                  {
+                    id: "snapshot-audio-reported",
+                    kind: "reported",
+                    content: { audioTitle: "変更前の音声" },
+                    contentHash: "old-audio-hash",
+                    hasStoredAudio: true,
+                    expiresAt: "2026-09-15T00:00:00.000Z",
+                    createdAt: "2026-07-17T01:00:00.000Z",
+                  },
+                  {
+                    id: "snapshot-audio-corrected",
+                    kind: "corrected",
+                    content: { audioTitle: "修正後の音声" },
+                    contentHash: "new-audio-hash",
+                    hasStoredAudio: false,
+                    expiresAt: "2026-09-15T00:00:00.000Z",
+                    createdAt: "2026-07-17T04:00:00.000Z",
+                  },
+                ],
+                events: [],
+              },
+              {
                 id: "case-profile",
                 targetType: "profile",
                 targetId: "profile-1",
@@ -225,7 +260,9 @@ describe("AdminModerationDetail", () => {
     expect(await screen.findByRole("heading", { name: "サンプル" })).toBeDefined();
     expect(screen.getByText("自己紹介音声")).toBeDefined();
     expect(screen.getByText("削除済み音声の対応状況")).toBeDefined();
-    expect(screen.getByText("事後確認待ち（公開中）")).toBeDefined();
+    expect(
+      screen.getAllByText("事後確認待ち（公開中）").length,
+    ).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("hidden")).toBeDefined();
     expect(screen.getAllByText("user / auth-use")).toHaveLength(3);
     expect(
@@ -261,6 +298,12 @@ describe("AdminModerationDetail", () => {
     );
     expect(screen.getByText(/displayName: 変更前の名前/)).toBeDefined();
     expect(screen.getByText(/displayName: 修正後の名前/)).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "非公開時の音声を確認" }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "修正後の音声を確認" }),
+    ).toBeDefined();
 
     const approveCaseButton = screen.getByRole("button", {
       name: "修正を承認",

@@ -817,10 +817,15 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                   {formatDate(latestCorrected.createdAt)}
                                 </time>
                                 {moderationCase.targetType === "audio" &&
-                                latestCorrected.hasStoredAudio ? (
+                                (latestCorrected.hasStoredAudio ||
+                                  data.profile.hasAudio) ? (
                                   <AdminAudioPlayer
                                     profileId={data.profile.id}
-                                    snapshotId={latestCorrected.id}
+                                    snapshotId={
+                                      latestCorrected.hasStoredAudio
+                                        ? latestCorrected.id
+                                        : undefined
+                                    }
                                     label="修正後の音声を確認"
                                   />
                                 ) : null}
