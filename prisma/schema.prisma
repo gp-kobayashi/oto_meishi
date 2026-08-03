@@ -304,7 +304,7 @@ model UserNotification {
   moderationAction   ModerationAction @relation(fields: [moderationActionId], references: [id], onDelete: Cascade)
   moderationActionId String           @unique @db.Uuid
   title              String           @db.VarChar(100)
-  message            String           @db.VarChar(300)
+  message            String           @db.VarChar(500)
   readAt             DateTime?
   createdAt          DateTime         @default(now())
 
