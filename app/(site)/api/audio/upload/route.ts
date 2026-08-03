@@ -32,6 +32,10 @@ import {
   getModerationDeadline,
   getPendingStatusForReviewMode,
 } from "@/lib/moderationRemediation";
+import {
+  canDeleteAudioObject,
+  getAudioObjectReferenceState,
+} from "@/lib/moderationAudioEvidence";
 
 // os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
 // プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
@@ -417,9 +421,18 @@ export async function POST(request: NextRequest) {
         (profile.audioUrl ? extractKeyFromUrl(profile.audioUrl) : "");
       if (oldAudioKey && oldAudioKey !== audioKey) {
         try {
-          await deleteFromR2(oldAudioKey);
+          const referenceState = await getAudioObjectReferenceState(
+            prisma,
+            oldAudioKey,
+          );
+          if (canDeleteAudioObject(referenceState)) {
+            await deleteFromR2(oldAudioKey);
+          }
         } catch (cleanupError) {
-          console.error("Failed to delete replaced audio file:", cleanupError);
+          console.error(
+            "Failed to safely delete replaced audio file:",
+            cleanupError,
+          );
         }
       }
 
