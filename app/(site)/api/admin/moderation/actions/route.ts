@@ -279,6 +279,47 @@ export async function PATCH(request: Request) {
         },
         select: { id: true },
       });
+      if (targetType === "profile" && action === "restore") {
+        const openCases = await tx.moderationCase.findMany({
+          where: {
+            profileId,
+            targetType: "profile",
+            targetId,
+            status: {
+              in: [
+                "correctionRequired",
+                "postReviewPending",
+                "preReviewPending",
+              ],
+            },
+          },
+          select: { id: true, status: true },
+        });
+        const resolvedAt = new Date();
+
+        for (const moderationCase of openCases) {
+          await tx.moderationCase.update({
+            where: { id: moderationCase.id },
+            data: { status: "confirmed", resolvedAt },
+          });
+          await tx.moderationCaseEvent.create({
+            data: {
+              moderationCaseId: moderationCase.id,
+              eventType: "reviewApproved",
+              actorType: "admin",
+              actorId: authorization.admin.id,
+              previousStatus: moderationCase.status,
+              newStatus: "confirmed",
+              details: {
+                targetType,
+                targetId,
+                reason,
+                source: "directRestore",
+              },
+            },
+          });
+        }
+      }
       if (action === "hide") {
         const reviewMode = resolveModerationReviewMode(reasonCode);
         const deadline = getModerationDeadline();

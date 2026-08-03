@@ -11,6 +11,8 @@ const { mocks } = vi.hoisted(() => ({
     actionCreate: vi.fn(),
     notificationCreate: vi.fn(),
     moderationCaseCreate: vi.fn(),
+    moderationCaseFindMany: vi.fn(),
+    moderationCaseUpdate: vi.fn(),
     moderationSnapshotCreate: vi.fn(),
     moderationCaseEventCreate: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
@@ -40,7 +42,11 @@ const tx = {
     update: mocks.socialLinkUpdate,
   },
   moderationAction: { create: mocks.actionCreate },
-  moderationCase: { create: mocks.moderationCaseCreate },
+  moderationCase: {
+    create: mocks.moderationCaseCreate,
+    findMany: mocks.moderationCaseFindMany,
+    update: mocks.moderationCaseUpdate,
+  },
   moderationSnapshot: { create: mocks.moderationSnapshotCreate },
   moderationCaseEvent: { create: mocks.moderationCaseEventCreate },
   userNotification: { create: mocks.notificationCreate },
@@ -73,6 +79,8 @@ describe("PATCH /api/admin/moderation/actions", () => {
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
     mocks.moderationCaseCreate.mockResolvedValue({ id: "case-1" });
+    mocks.moderationCaseFindMany.mockResolvedValue([]);
+    mocks.moderationCaseUpdate.mockResolvedValue({});
     mocks.consumeAdminActionRateLimit.mockReturnValue({
       allowed: true,
       limit: 60,
@@ -176,6 +184,77 @@ describe("PATCH /api/admin/moderation/actions", () => {
       }),
       select: { id: true },
     });
+  });
+
+  it("プロフィールを直接復旧すると未完了の是正ケースも確認済みにする", async () => {
+    mocks.profileFindUnique.mockResolvedValue({
+      id: "profile-1",
+      status: "hidden",
+      accountModerationStatus: "active",
+      displayName: "修正後の名前",
+      bio: "修正後の自己紹介",
+      theme: "normal",
+    });
+    mocks.moderationCaseFindMany.mockResolvedValue([
+      { id: "case-1", status: "correctionRequired" },
+      { id: "case-2", status: "preReviewPending" },
+    ]);
+
+    const response = await PATCH(
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "restore",
+        reason: "修正内容を確認したため再公開",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { status: "active" },
+    });
+    expect(mocks.moderationCaseFindMany).toHaveBeenCalledWith({
+      where: {
+        profileId: "profile-1",
+        targetType: "profile",
+        targetId: "profile-1",
+        status: {
+          in: [
+            "correctionRequired",
+            "postReviewPending",
+            "preReviewPending",
+          ],
+        },
+      },
+      select: { id: true, status: true },
+    });
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledTimes(2);
+    expect(mocks.moderationCaseUpdate).toHaveBeenNthCalledWith(1, {
+      where: { id: "case-1" },
+      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+    });
+    expect(mocks.moderationCaseUpdate).toHaveBeenNthCalledWith(2, {
+      where: { id: "case-2" },
+      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenNthCalledWith(1, {
+      data: {
+        moderationCaseId: "case-1",
+        eventType: "reviewApproved",
+        actorType: "admin",
+        actorId: "admin-1",
+        previousStatus: "correctionRequired",
+        newStatus: "confirmed",
+        details: {
+          targetType: "profile",
+          targetId: "profile-1",
+          reason: "修正内容を確認したため再公開",
+          source: "directRestore",
+        },
+      },
+    });
+    expect(mocks.moderationCaseCreate).not.toHaveBeenCalled();
   });
 
   it("理由が空の場合は400を返す", async () => {
