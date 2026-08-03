@@ -255,7 +255,10 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("変更された項目")).toBeDefined();
     expect(screen.getByText("表示名")).toBeDefined();
     expect(screen.getAllByText("自己紹介").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText(/変更日時:.*2026\/07\/17.*13:30/)).toBeDefined();
+    const changedAt = screen.getByText(/変更日時:/);
+    expect(changedAt.getAttribute("datetime")).toBe(
+      "2026-07-17T04:30:00.000Z",
+    );
     expect(screen.getByText(/displayName: 変更前の名前/)).toBeDefined();
     expect(screen.getByText(/displayName: 修正後の名前/)).toBeDefined();
 
