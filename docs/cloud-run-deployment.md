@@ -21,7 +21,7 @@ gcloud config set project YOUR_PROJECT_ID
 ## 2. APIを有効化する
 
 ```powershell
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
+gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com cloudscheduler.googleapis.com iam.googleapis.com cloudresourcemanager.googleapis.com
 ```
 
 ## 3. Artifact Registryを作成する
@@ -44,7 +44,7 @@ gcloud iam service-accounts create oto-meishi-runner --display-name="oto_meishi 
 
 ## 5. Secret Managerへ秘密値を登録する
 
-Google Cloud Consoleの「Secret Manager」で以下の5件を作成し、初期バージョンを`1`として値を登録します。
+Google Cloud Consoleの「Secret Manager」で以下の6件を作成し、初期バージョンを`1`として値を登録します。
 
 | Secret名 | 設定する値 |
 | --- | --- |
@@ -53,6 +53,7 @@ Google Cloud Consoleの「Secret Manager」で以下の5件を作成し、初期
 | `oto-meishi-r2-account-id` | CloudflareアカウントID |
 | `oto-meishi-r2-access-key-id` | R2 APIトークンのAccess Key ID |
 | `oto-meishi-r2-secret-access-key` | R2 APIトークンのSecret Access Key |
+| `oto-meishi-moderation-cleanup-secret` | 32文字以上のランダムな定期削除API用Bearerトークン |
 
 各Secretに対して、Cloud Run実行アカウントへ「Secret Managerのシークレットアクセサー」権限を付与します。
 
@@ -64,7 +65,8 @@ $SECRETS = @(
   "oto-meishi-supabase-service-role-key",
   "oto-meishi-r2-account-id",
   "oto-meishi-r2-access-key-id",
-  "oto-meishi-r2-secret-access-key"
+  "oto-meishi-r2-secret-access-key",
+  "oto-meishi-moderation-cleanup-secret"
 )
 
 foreach ($SECRET in $SECRETS) {
@@ -152,7 +154,38 @@ gcloud run services logs read oto-meishi --region=asia-northeast1 --limit=100
 
 Google・Facebook側のOAuth設定にも、Supabase Dashboardに表示されるコールバックURLを登録してください。
 
-## 10. 費用を確認する
+## 10. 審査用音声の定期削除を設定する
+
+モデレーション証拠の保持期限を過ぎた音声を、1日1回Cloud Schedulerから削除します。`CLEANUP_SECRET`にはSecret Managerの`oto-meishi-moderation-cleanup-secret`と同じ値を一時的に設定してください。
+
+```powershell
+$SERVICE_URL = gcloud run services describe oto-meishi --region=asia-northeast1 --format="value(status.url)"
+$CLEANUP_SECRET = Read-Host "MODERATION_CLEANUP_SECRET"
+
+gcloud scheduler jobs create http oto-meishi-audio-evidence-cleanup `
+  --location=asia-northeast1 `
+  --schedule="0 3 * * *" `
+  --time-zone="Asia/Tokyo" `
+  --uri="$SERVICE_URL/api/internal/moderation/audio-evidence/cleanup" `
+  --http-method=POST `
+  --headers="Authorization=Bearer $CLEANUP_SECRET" `
+  --attempt-deadline=120s `
+  --max-retry-attempts=3 `
+  --min-backoff=60s
+
+Remove-Variable CLEANUP_SECRET
+```
+
+このAPIは`MODERATION_CLEANUP_SECRET`が未設定、またはBearerトークンが一致しない場合は`401`を返します。Cloud Schedulerジョブを閲覧・変更できる権限は、運用に必要な管理者だけへ付与してください。シークレットを更新した場合は、Cloud RunのSecret参照とSchedulerのヘッダーを同じ値へ更新します。
+
+初回は手動実行し、結果とCloud Runログを確認します。
+
+```powershell
+gcloud scheduler jobs run oto-meishi-audio-evidence-cleanup --location=asia-northeast1
+gcloud run services logs read oto-meishi --region=asia-northeast1 --limit=100
+```
+
+## 11. 費用を確認する
 
 Cloud Runはアクセスがないとき0インスタンスまで縮小するため、最初のアクセスにはコールドスタートが発生します。
 

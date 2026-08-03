@@ -36,7 +36,7 @@
 - 変換処理は同時実行数を制限し、一時ファイルを処理後に削除
 - 音声は非公開のCloudflare R2バケットへ保存
 - 再生時のみ短時間（既定60秒、最大300秒）の署名付きURLを発行
-- 音声差し替え時に古いR2オブジェクトを削除
+- 音声差し替え時、審査証拠として参照中の旧音声は最大60日保持し、それ以外は削除
 
 ## 使用技術
 
@@ -121,6 +121,7 @@ cp .env.example .env.local
 | `R2_ACCOUNT_ID` | サーバーのみ | 必須 | CloudflareアカウントID |
 | `R2_ACCESS_KEY_ID` | サーバーのみ | 必須 | R2 APIトークンのAccess Key ID |
 | `R2_SECRET_ACCESS_KEY` | サーバーのみ | 必須 | R2 APIトークンのSecret Access Key |
+| `MODERATION_CLEANUP_SECRET` | サーバーのみ | 必須（本番） | 期限切れの審査用音声を削除する内部APIのBearer認証用ランダム値 |
 | `R2_BUCKET` | サーバーのみ | 必須 | 非公開R2バケット名 |
 | `R2_REGION` | サーバーのみ | 必須 | 通常は`auto` |
 | `R2_PUBLIC_URL` | サーバーのみ | 任意 | 過去の公開R2 URLをオブジェクトキーへ移行するときだけ使用 |
@@ -138,12 +139,13 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 R2_ACCOUNT_ID=your-account-id
 R2_ACCESS_KEY_ID=your-access-key-id
 R2_SECRET_ACCESS_KEY=your-secret-access-key
+MODERATION_CLEANUP_SECRET=replace-with-at-least-32-random-characters
 R2_BUCKET=your-private-bucket
 R2_REGION=auto
 R2_PUBLIC_URL=
 ```
 
-`.env.local`は`.gitignore`の対象です。`DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2の認証情報をGitへコミットしたり、`NEXT_PUBLIC_`を付けたりしないでください。`NEXT_PUBLIC_`付きの値はブラウザへ含まれるため、秘密情報には使用できません。
+`.env.local`は`.gitignore`の対象です。`DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2の認証情報、`MODERATION_CLEANUP_SECRET`をGitへコミットしたり、`NEXT_PUBLIC_`を付けたりしないでください。`NEXT_PUBLIC_`付きの値はブラウザへ含まれるため、秘密情報には使用できません。
 
 `NEXT_PUBLIC_SITE_URL`はパスや末尾スラッシュを含まないオリジンを設定します。ローカル開発では`http://localhost:3000`、本番環境では次の値を使用します。
 
@@ -181,6 +183,8 @@ Supabase AuthではEmail認証を有効にし、Site URLとRedirect URLへロー
 3. アカウントID、Access Key ID、Secret Access Key、バケット名を`.env.local`へ設定する
 
 音声の公開URLをDBへ保存する構成ではありません。DBにはR2のオブジェクトキーを保存し、再生APIが認可・公開状態を確認してから署名付きURLを返します。
+
+モデレーションで非公開にした音声は、修正前後を管理者が比較できるよう、スナップショットの期限（原則60日）までR2へ保持します。期限切れ音声は内部APIによる定期処理で削除します。現在のプロフィールまたは期限内スナップショットから参照されている音声は削除されません。R2削除に失敗した場合はDBの保存キーを残し、次回の定期処理で再試行します。
 
 ### 5. Prisma Clientを生成
 
@@ -365,7 +369,7 @@ GitHub
 本番環境では、公開値と秘密値を分けて設定してください。
 
 - Dockerビルド時と実行時の公開値: `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXT_PUBLIC_SITE_URL`
-- Secret Manager: `DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2認証情報
+- Secret Manager: `DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2認証情報、`MODERATION_CLEANUP_SECRET`
 - Cloud Runの通常環境変数: `R2_BUCKET`、`R2_REGION`
 
 Google CloudのAPI有効化、Artifact Registry、実行サービスアカウント、Secret Manager、Cloud Buildの権限、デプロイコマンドについては[Cloud Runデプロイ手順](docs/cloud-run-deployment.md)を参照してください。
