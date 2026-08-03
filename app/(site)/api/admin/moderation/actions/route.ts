@@ -166,6 +166,7 @@ export async function PATCH(request: Request) {
       let reportedContent: Prisma.InputJsonObject = {};
       let reportedContentHash: string | null = null;
       let reportedStorageObjectKey: string | null = null;
+      let accountModerationStatus: "active" | "suspended" | null = null;
 
       if (targetType === "profile") {
         const target = await tx.profile.findUnique({
@@ -181,6 +182,7 @@ export async function PATCH(request: Request) {
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
+        accountModerationStatus = target.accountModerationStatus;
         previousStatus = target.status;
         reportedContent = {
           displayName: target.displayName ?? "",
@@ -191,26 +193,6 @@ export async function PATCH(request: Request) {
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
-        const suspensionAppealDueAt =
-          action === "suspend" ? getModerationDeadline() : null;
-        await tx.profile.update({
-          where: { id: target.id },
-          data: {
-            status: nextStatus as "active" | "hidden" | "suspended",
-            ...(action === "suspend"
-              ? {
-                  accountModerationStatus: "suspended" as const,
-                  suspensionAppealDueAt,
-                }
-              : action === "restore" &&
-                  target.accountModerationStatus !== "active"
-                ? {
-                    accountModerationStatus: "active" as const,
-                    suspensionAppealDueAt: null,
-                  }
-                : {}),
-          },
-        });
       } else if (targetType === "audio") {
         const target = await tx.profile.findUnique({
           where: { id: targetId },
@@ -236,10 +218,6 @@ export async function PATCH(request: Request) {
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
-        await tx.profile.update({
-          where: { id: target.id },
-          data: { audioStatus: nextStatus as "active" | "hidden" },
-        });
       } else {
         const target = await tx.socialLink.findUnique({
           where: { id: targetId },
@@ -265,8 +243,60 @@ export async function PATCH(request: Request) {
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
         }
+      }
+
+      if (action === "restore") {
+        const openCase = await tx.moderationCase.findFirst({
+          where: {
+            profileId,
+            targetType,
+            targetId,
+            status: {
+              in: [
+                "correctionRequired",
+                "postReviewPending",
+                "preReviewPending",
+              ],
+            },
+          },
+          select: { id: true },
+        });
+        if (openCase) {
+          return {
+            error: "未完了の審査ケースがあるため、ケースの審査操作から再公開してください。",
+            status: 409,
+          } as const;
+        }
+      }
+
+      if (targetType === "profile") {
+        const suspensionAppealDueAt =
+          action === "suspend" ? getModerationDeadline() : null;
+        await tx.profile.update({
+          where: { id: targetId },
+          data: {
+            status: nextStatus as "active" | "hidden" | "suspended",
+            ...(action === "suspend"
+              ? {
+                  accountModerationStatus: "suspended" as const,
+                  suspensionAppealDueAt,
+                }
+              : action === "restore" && accountModerationStatus !== "active"
+                ? {
+                    accountModerationStatus: "active" as const,
+                    suspensionAppealDueAt: null,
+                  }
+                : {}),
+          },
+        });
+      } else if (targetType === "audio") {
+        await tx.profile.update({
+          where: { id: targetId },
+          data: { audioStatus: nextStatus as "active" | "hidden" },
+        });
+      } else {
         await tx.socialLink.update({
-          where: { id: target.id },
+          where: { id: targetId },
           data: { status: nextStatus as "active" | "hidden" },
         });
       }
@@ -284,47 +314,6 @@ export async function PATCH(request: Request) {
         },
         select: { id: true },
       });
-      if (targetType === "profile" && action === "restore") {
-        const openCases = await tx.moderationCase.findMany({
-          where: {
-            profileId,
-            targetType: "profile",
-            targetId,
-            status: {
-              in: [
-                "correctionRequired",
-                "postReviewPending",
-                "preReviewPending",
-              ],
-            },
-          },
-          select: { id: true, status: true },
-        });
-        const resolvedAt = new Date();
-
-        for (const moderationCase of openCases) {
-          await tx.moderationCase.update({
-            where: { id: moderationCase.id },
-            data: { status: "confirmed", resolvedAt },
-          });
-          await tx.moderationCaseEvent.create({
-            data: {
-              moderationCaseId: moderationCase.id,
-              eventType: "reviewApproved",
-              actorType: "admin",
-              actorId: authorization.admin.id,
-              previousStatus: moderationCase.status,
-              newStatus: "confirmed",
-              details: {
-                targetType,
-                targetId,
-                reason,
-                source: "directRestore",
-              },
-            },
-          });
-        }
-      }
       if (action === "hide") {
         const reviewMode = resolveModerationReviewMode(reasonCode);
         const deadline = getModerationDeadline();
