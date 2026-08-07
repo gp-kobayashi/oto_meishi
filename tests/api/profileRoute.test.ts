@@ -338,6 +338,7 @@ describe("/api/profile route", () => {
       id: "profile-1",
       userId: "testuser",
       status: "active",
+      accountModerationStatus: "active",
       audioUrl: "https://example.com/audio.m4a",
       audioKey: "audio/testuser/audio.m4a",
       audioTitle: "音声",
@@ -380,12 +381,29 @@ describe("/api/profile route", () => {
     expect(response.status).toBe(404);
   });
 
+  it("利用停止中のプロフィールは公開取得で404を返す", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      status: "active",
+      accountModerationStatus: "suspended",
+      sns: [],
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/profile?userId=testuser"),
+    );
+
+    expect(response.status).toBe(404);
+  });
+
   it("公開中の音声は保存先を隠して存在だけを返す", async () => {
     mocks.profileFindUnique.mockResolvedValueOnce({
       id: "profile-1",
       userId: "testuser",
       authId: "auth-user-1",
       status: "active",
+      accountModerationStatus: "active",
       theme: "normal",
       displayName: "Test",
       bio: "",

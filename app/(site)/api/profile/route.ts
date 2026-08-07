@@ -472,7 +472,11 @@ export async function GET(request: Request) {
       include: { sns: true },
     });
 
-    if (!profile || (profile.status ?? "active") !== "active") {
+    if (
+      !profile ||
+      (profile.status ?? "active") !== "active" ||
+      (profile.accountModerationStatus ?? "active") !== "active"
+    ) {
       return NextResponse.json({ error: "profile not found" }, { status: 404 });
     }
 
