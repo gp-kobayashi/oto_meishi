@@ -17,7 +17,11 @@ const UserIdPage = async ({
     include: { sns: true },
   });
 
-  if (!profile || profile.status !== "active") {
+  if (
+    !profile ||
+    profile.status !== "active" ||
+    profile.accountModerationStatus !== "active"
+  ) {
     notFound();
   }
 
