@@ -1,6 +1,7 @@
 import { authorizeAdminRequest } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
+import { getActiveViolationEvents } from "@/lib/moderationViolation";
 
 export async function GET(
   request: Request,
@@ -129,6 +130,21 @@ export async function GET(
             },
           },
         },
+        violationEvents: {
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          select: {
+            id: true,
+            moderationCaseId: true,
+            eventType: true,
+            reasonCode: true,
+            originalViolationEventId: true,
+            suspensionTriggered: true,
+            note: true,
+            adminAuthId: true,
+            adminRole: true,
+            createdAt: true,
+          },
+        },
       },
     });
 
@@ -168,6 +184,19 @@ export async function GET(
     const reportedAudio = deletedAudioCase?.snapshots.findLast(
       (snapshot) => snapshot.kind === "reported",
     )?.content;
+    const activeViolationEvents = getActiveViolationEvents(
+      profile.violationEvents,
+    );
+    const activeViolationIds = new Set(
+      activeViolationEvents.map((event) => event.id),
+    );
+    const countsByReason = activeViolationEvents.reduce<Record<string, number>>(
+      (counts, event) => {
+        counts[event.reasonCode] = (counts[event.reasonCode] ?? 0) + 1;
+        return counts;
+      },
+      {},
+    );
 
     return Response.json(
       {
@@ -266,6 +295,23 @@ export async function GET(
               actorId: undefined,
               createdAt: event.createdAt.toISOString(),
             })),
+          })),
+          violationSummary: {
+            activeCount: activeViolationEvents.length,
+            countsByReason,
+          },
+          violationEvents: profile.violationEvents.map((event) => ({
+            id: event.id,
+            moderationCaseId: event.moderationCaseId,
+            eventType: event.eventType,
+            reasonCode: event.reasonCode,
+            originalViolationEventId: event.originalViolationEventId,
+            suspensionTriggered: event.suspensionTriggered,
+            note: event.note,
+            isActive: activeViolationIds.has(event.id),
+            adminIdentifier: event.adminAuthId?.slice(0, 8) ?? null,
+            adminRole: event.adminRole,
+            createdAt: event.createdAt.toISOString(),
           })),
           history: history.map((entry) => ({
             id: entry.id,

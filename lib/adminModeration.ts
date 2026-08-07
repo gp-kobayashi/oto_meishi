@@ -179,6 +179,33 @@ export type ModerationDetailResponse = {
         createdAt: string;
       }[];
     }[];
+    violationSummary: {
+      activeCount: number;
+      countsByReason: Record<string, number>;
+    };
+    violationEvents: {
+      id: string;
+      moderationCaseId: string;
+      eventType: "confirmed" | "revoked";
+      reasonCode:
+        | "inappropriateContent"
+        | "copyrightConcern"
+        | "harassment"
+        | "unsafeLink"
+        | "serviceMismatch"
+        | "impersonation"
+        | "threatOrPersonalData"
+        | "unofficialThirdPartyProfile"
+        | "politicalReligiousPromotion"
+        | "other";
+      originalViolationEventId: string | null;
+      suspensionTriggered: boolean;
+      note: string;
+      isActive: boolean;
+      adminIdentifier: string | null;
+      adminRole: "moderator" | "admin" | null;
+      createdAt: string;
+    }[];
     history: {
       id: string;
       targetType: "profile" | "audio" | "socialLink";
