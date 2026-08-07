@@ -28,12 +28,6 @@ export const MODERATED_PROFILE_FIELDS = [
 export type ModeratedProfileField = (typeof MODERATED_PROFILE_FIELDS)[number];
 export type ModeratedProfileContent = Record<ModeratedProfileField, string>;
 
-const PRE_REVIEW_REASONS = new Set<ModerationReasonCode>([
-  "harassment",
-  "impersonation",
-  "other",
-]);
-
 export function isModerationReasonCode(
   value: string,
 ): value is ModerationReasonCode {
@@ -41,8 +35,7 @@ export function isModerationReasonCode(
 }
 
 /**
- * 誹謗中傷・なりすまし・分類不能な案件は公開前に確認する。
- * 未知の理由も安全側に倒し、公開前確認として扱う。
+ * 理由にかかわらず、修正内容は管理者が確認するまで公開しない。
  */
 export function resolveModerationReviewMode(
   reasonCode: string,
@@ -51,7 +44,7 @@ export function resolveModerationReviewMode(
     return "preReview";
   }
 
-  return PRE_REVIEW_REASONS.has(reasonCode) ? "preReview" : "postReview";
+  return "preReview";
 }
 
 export function getPendingStatusForReviewMode(

@@ -18,13 +18,13 @@ describe("モデレーション是正ルール", () => {
   it.each([
     "inappropriateContent",
     "copyrightConcern",
+    "harassment",
     "unsafeLink",
     "serviceMismatch",
-  ])("%sは公開後の事後確認にする", (reasonCode) => {
-    expect(resolveModerationReviewMode(reasonCode)).toBe("postReview");
-  });
-
-  it.each(["harassment", "impersonation", "other", "unknown"])(
+    "impersonation",
+    "other",
+    "unknown",
+  ])(
     "%sは管理者確認まで非公開にする",
     (reasonCode) => {
       expect(resolveModerationReviewMode(reasonCode)).toBe("preReview");
