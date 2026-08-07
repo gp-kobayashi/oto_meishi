@@ -840,7 +840,7 @@ describe("/api/profile route", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("非公開プロフィール本体を修正すると事後確認待ちとして公開する", async () => {
+  it("非公開プロフィール本体を修正すると管理者確認待ちのまま非公開を維持する", async () => {
     const existingProfile = {
       id: "profile-1",
       userId: "testuser",
@@ -856,7 +856,7 @@ describe("/api/profile route", () => {
     mocks.profileFindUnique.mockResolvedValueOnce(existingProfile);
     mocks.profileFindUnique.mockResolvedValueOnce({
       ...existingProfile,
-      status: "active",
+      status: "hidden",
       displayName: "変更後の名前",
       theme: "dark",
     });
@@ -883,14 +883,15 @@ describe("/api/profile route", () => {
         bio: "変更前の自己紹介",
         audioTitle: "",
         theme: "dark",
-        status: "active",
+        status: "hidden",
       },
       include: { sns: true },
     });
     expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
       where: { id: "case-profile" },
       data: expect.objectContaining({
-        status: "postReviewPending",
+        reviewMode: "preReview",
+        status: "preReviewPending",
         resolvedAt: null,
       }),
       select: { id: true },
@@ -910,7 +911,7 @@ describe("/api/profile route", () => {
       data: expect.objectContaining({
         eventType: "contentChanged",
         previousStatus: "correctionRequired",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
         details: {
           targetType: "profile",
           targetId: "profile-1",
@@ -966,7 +967,7 @@ describe("/api/profile route", () => {
     });
   });
 
-  it("公開中のプロフィール本体を審査待ち中に再編集すると最新内容を記録する", async () => {
+  it("旧事後確認待ちのプロフィール本体を再編集すると非公開の事前確認へ移行する", async () => {
     const existingProfile = {
       id: "profile-1",
       userId: "testuser",
@@ -1000,6 +1001,19 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "hidden" }),
+      }),
+    );
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-profile" },
+      data: expect.objectContaining({
+        reviewMode: "preReview",
+        status: "preReviewPending",
+      }),
+      select: { id: true },
+    });
     expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         moderationCaseId: "case-profile",
@@ -1014,7 +1028,7 @@ describe("/api/profile route", () => {
     expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         previousStatus: "postReviewPending",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
         details: expect.objectContaining({ changedFields: ["displayName"] }),
       }),
     });
@@ -1051,7 +1065,7 @@ describe("/api/profile route", () => {
     expect(mocks.moderationCaseEventCreate).not.toHaveBeenCalled();
   });
 
-  it("非公開リンクを変更すると事後確認待ちとして公開する", async () => {
+  it("非公開リンクを変更すると管理者確認待ちのまま非公開を維持する", async () => {
     const existingProfile = {
       id: "profile-1",
       userId: "testuser",
@@ -1082,7 +1096,7 @@ describe("/api/profile route", () => {
         {
           ...existingProfile.sns[0],
           url: "https://youtube.com/@after",
-          status: "active",
+          status: "hidden",
         },
       ],
     };
@@ -1121,13 +1135,14 @@ describe("/api/profile route", () => {
         url: "https://youtube.com/@after",
         label: "YouTube",
         sortOrder: 0,
-        status: "active",
+        status: "hidden",
       },
     });
     expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
       where: { id: "case-link" },
       data: expect.objectContaining({
-        status: "postReviewPending",
+        reviewMode: "preReview",
+        status: "preReviewPending",
         resolvedAt: null,
       }),
       select: { id: true },
@@ -1147,7 +1162,7 @@ describe("/api/profile route", () => {
       data: expect.objectContaining({
         eventType: "contentChanged",
         previousStatus: "correctionRequired",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
       }),
     });
   });
@@ -1315,7 +1330,7 @@ describe("/api/profile route", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("公開中のリンクを審査待ち中に再編集すると最新内容を記録する", async () => {
+  it("旧事後確認待ちのリンクを再編集すると非公開の事前確認へ移行する", async () => {
     const existingProfile = {
       id: "profile-1",
       userId: "testuser",
@@ -1366,6 +1381,19 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mocks.socialLinkUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "hidden" }),
+      }),
+    );
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-link" },
+      data: expect.objectContaining({
+        reviewMode: "preReview",
+        status: "preReviewPending",
+      }),
+      select: { id: true },
+    });
     expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         moderationCaseId: "case-link",
@@ -1380,7 +1408,7 @@ describe("/api/profile route", () => {
     expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         previousStatus: "postReviewPending",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
       }),
     });
   });
@@ -1447,7 +1475,7 @@ describe("/api/profile route", () => {
     expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         eventType: "contentDeleted",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
       }),
     });
   });

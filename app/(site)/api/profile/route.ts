@@ -14,7 +14,6 @@ import {
   createModeratedUrlHash,
   getChangedModeratedProfileFields,
   getModerationDeadline,
-  getPendingStatusForReviewMode,
   type ModeratedProfileContent,
 } from "@/lib/moderationRemediation";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -192,12 +191,13 @@ async function recordModeratedLinkCorrection({
   });
   if (!existingCase && link.status !== "hidden") return null;
 
-  const reviewMode = existingCase?.reviewMode ?? "postReview";
-  const pendingStatus = getPendingStatusForReviewMode(reviewMode);
+  const reviewMode = "preReview" as const;
+  const pendingStatus = "preReviewPending" as const;
   const moderationCase = existingCase
     ? await transaction.moderationCase.update({
         where: { id: existingCase.id },
         data: {
+          reviewMode,
           status: pendingStatus,
           reviewDueAt: deadline,
           retentionExpiresAt: deadline,
@@ -303,10 +303,12 @@ async function recordModeratedProfileCorrection({
   if (!existingCase) return null;
 
   const deadline = getModerationDeadline();
-  const pendingStatus = getPendingStatusForReviewMode(existingCase.reviewMode);
+  const reviewMode = "preReview" as const;
+  const pendingStatus = "preReviewPending" as const;
   await transaction.moderationCase.update({
     where: { id: existingCase.id },
     data: {
+      reviewMode,
       status: pendingStatus,
       reviewDueAt: deadline,
       retentionExpiresAt: deadline,
@@ -339,10 +341,9 @@ async function recordModeratedProfileCorrection({
   });
 
   return {
-    reviewMode: existingCase.reviewMode,
+    reviewMode,
     pendingStatus,
-    profileStatus:
-      existingCase.reviewMode === "postReview" ? "active" : "hidden",
+    profileStatus: "hidden",
   } as const;
 }
 
@@ -852,8 +853,7 @@ export async function POST(request: Request) {
             deleted: false,
           });
           if (correction) {
-            nextStatus =
-              correction.reviewMode === "postReview" ? "active" : "hidden";
+            nextStatus = "hidden";
           }
         }
 
