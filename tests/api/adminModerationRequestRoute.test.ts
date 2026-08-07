@@ -6,6 +6,7 @@ const { mocks } = vi.hoisted(() => ({
     transaction: vi.fn(),
     requestFindUnique: vi.fn(),
     requestUpdate: vi.fn(),
+    caseCount: vi.fn(),
     profileUpdate: vi.fn(),
     actionCreate: vi.fn(),
     userRateLimit: vi.fn(),
@@ -60,6 +61,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
           findUnique: mocks.requestFindUnique,
           update: mocks.requestUpdate,
         },
+        moderationCase: { count: mocks.caseCount },
         profile: { update: mocks.profileUpdate },
         moderationAction: { create: mocks.actionCreate },
       }),
@@ -75,6 +77,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
       },
     });
     mocks.requestUpdate.mockResolvedValue({});
+    mocks.caseCount.mockResolvedValue(0);
     mocks.profileUpdate.mockResolvedValue({});
     mocks.actionCreate.mockResolvedValue({});
   });
@@ -125,6 +128,38 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+  });
+
+  it("未完了ケースがある解除申請の承認を拒否する", async () => {
+    mocks.caseCount.mockResolvedValueOnce(1);
+
+    const response = await PATCH(
+      request({
+        status: "resolved",
+        responseMessage: "修正内容を確認したため解除しました。",
+      }),
+      { params: Promise.resolve({ requestId: "request-1" }) },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "未完了のモデレーションケースがあるため解除できません。",
+    });
+    expect(mocks.caseCount).toHaveBeenCalledWith({
+      where: {
+        profileId: "profile-1",
+        status: {
+          in: [
+            "correctionRequired",
+            "postReviewPending",
+            "preReviewPending",
+          ],
+        },
+      },
+    });
+    expect(mocks.requestUpdate).not.toHaveBeenCalled();
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
     expect(mocks.actionCreate).not.toHaveBeenCalled();
   });

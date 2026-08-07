@@ -119,6 +119,30 @@ export async function PATCH(
         } as const;
       }
 
+      if (
+        moderationRequest.kind === "accountAppeal" &&
+        status === "resolved"
+      ) {
+        const incompleteCaseCount = await tx.moderationCase.count({
+          where: {
+            profileId: moderationRequest.profileId,
+            status: {
+              in: [
+                "correctionRequired",
+                "postReviewPending",
+                "preReviewPending",
+              ],
+            },
+          },
+        });
+        if (incompleteCaseCount > 0) {
+          return {
+            error: "未完了のモデレーションケースがあるため解除できません。",
+            httpStatus: 409,
+          } as const;
+        }
+      }
+
       const resolvedAt = new Date();
       await tx.moderationRequest.update({
         where: { id: requestId },
