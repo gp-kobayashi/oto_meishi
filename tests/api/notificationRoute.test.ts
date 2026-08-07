@@ -101,7 +101,7 @@ describe("GET /api/notifications", () => {
           actionLabel: "非公開",
           reason: "不適切な表現が含まれています。",
           guidance:
-            "音声を修正すると公開され、管理者が事後確認を行います。",
+            "音声を修正しても、管理者の確認が完了するまで公開されません。",
           actionUrl: "/profile/edit",
           actionLinkLabel: "音声を修正",
           handledAt: "2026-07-21T05:55:00.000Z",
