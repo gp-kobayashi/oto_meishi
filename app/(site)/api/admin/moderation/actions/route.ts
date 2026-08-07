@@ -318,7 +318,7 @@ export async function PATCH(request: Request) {
         },
         select: { id: true },
       });
-      if (action === "hide") {
+      if (action === "hide" || action === "suspend") {
         const reviewMode = resolveModerationReviewMode(reasonCode);
         const deadline = getModerationDeadline();
         const moderationCase = await tx.moderationCase.create({
@@ -355,6 +355,20 @@ export async function PATCH(request: Request) {
             newStatus: "correctionRequired",
             details: { targetType, targetId, reasonCode },
           },
+        });
+        await tx.moderationViolationEvent.create({
+          data: {
+            profileId,
+            moderationCaseId: moderationCase.id,
+            adminUserId: authorization.admin.id,
+            adminAuthId: authorization.admin.authId,
+            adminRole: authorization.admin.role,
+            eventType: "confirmed",
+            reasonCode,
+            suspensionTriggered: action === "suspend",
+            note: reason,
+          },
+          select: { id: true },
         });
       }
       const notification = getModerationNotification(targetType, action);

@@ -16,6 +16,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseUpdate: vi.fn(),
     moderationSnapshotCreate: vi.fn(),
     moderationCaseEventCreate: vi.fn(),
+    moderationViolationEventCreate: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
   },
@@ -51,6 +52,9 @@ const tx = {
   },
   moderationSnapshot: { create: mocks.moderationSnapshotCreate },
   moderationCaseEvent: { create: mocks.moderationCaseEventCreate },
+  moderationViolationEvent: {
+    create: mocks.moderationViolationEventCreate,
+  },
   userNotification: { create: mocks.notificationCreate },
 };
 
@@ -84,6 +88,9 @@ describe("PATCH /api/admin/moderation/actions", () => {
     mocks.moderationCaseFindFirst.mockResolvedValue(null);
     mocks.moderationCaseFindMany.mockResolvedValue([]);
     mocks.moderationCaseUpdate.mockResolvedValue({});
+    mocks.moderationViolationEventCreate.mockResolvedValue({
+      id: "violation-event-1",
+    });
     mocks.consumeAdminActionRateLimit.mockReturnValue({
       allowed: true,
       limit: 60,
@@ -145,6 +152,20 @@ describe("PATCH /api/admin/moderation/actions", () => {
         status: "correctionRequired",
         userMessage: "不適切な内容のため",
       }),
+      select: { id: true },
+    });
+    expect(mocks.moderationViolationEventCreate).toHaveBeenCalledWith({
+      data: {
+        profileId: "profile-1",
+        moderationCaseId: "case-1",
+        adminUserId: "admin-1",
+        adminAuthId: "auth-1",
+        adminRole: "admin",
+        eventType: "confirmed",
+        reasonCode: "harassment",
+        suspensionTriggered: false,
+        note: "不適切な内容のため",
+      },
       select: { id: true },
     });
     expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
@@ -297,6 +318,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(mocks.moderationCaseEventCreate).not.toHaveBeenCalled();
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
     expect(mocks.moderationCaseCreate).not.toHaveBeenCalled();
+    expect(mocks.moderationViolationEventCreate).not.toHaveBeenCalled();
   });
 
   it("未完了の音声審査ケースがある場合は直接復旧を拒否する", async () => {
@@ -400,7 +422,25 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(update.data.suspensionAppealDueAt.getTime()).toBeGreaterThanOrEqual(
       before + 59 * 24 * 60 * 60 * 1000,
     );
-    expect(mocks.moderationCaseCreate).not.toHaveBeenCalled();
+    expect(mocks.moderationCaseCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        profileId: "profile-1",
+        targetType: "profile",
+        targetId: "profile-1",
+        reasonCode: "other",
+        status: "correctionRequired",
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationViolationEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationCaseId: "case-1",
+        eventType: "confirmed",
+        reasonCode: "other",
+        suspensionTriggered: true,
+      }),
+      select: { id: true },
+    });
   });
 
   it("管理操作JSONが16KBを超える場合は413を返す", async () => {
