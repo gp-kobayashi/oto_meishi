@@ -54,6 +54,20 @@ export async function GET(
             reviewedByAdminUser: {
               select: { authId: true, role: true },
             },
+            statusEvents: {
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              take: 50,
+              select: {
+                id: true,
+                previousStatus: true,
+                newStatus: true,
+                note: true,
+                isBackfilled: true,
+                adminAuthId: true,
+                adminRole: true,
+                createdAt: true,
+              },
+            },
             createdAt: true,
             updatedAt: true,
           },
@@ -203,6 +217,16 @@ export async function GET(
             reviewedAt: report.reviewedAt?.toISOString() ?? null,
             createdAt: report.createdAt.toISOString(),
             updatedAt: report.updatedAt.toISOString(),
+            statusEvents: report.statusEvents.map((event) => ({
+              id: event.id,
+              previousStatus: event.previousStatus,
+              newStatus: event.newStatus,
+              note: event.note,
+              isBackfilled: event.isBackfilled,
+              adminIdentifier: event.adminAuthId?.slice(0, 8) ?? null,
+              adminRole: event.adminRole,
+              createdAt: event.createdAt.toISOString(),
+            })),
           })),
           moderationRequests: profile.moderationRequests.map(
             (moderationRequest) => ({

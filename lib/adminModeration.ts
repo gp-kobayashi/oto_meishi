@@ -85,6 +85,21 @@ export type ModerationDetailResponse = {
       reviewedAt: string | null;
       createdAt: string;
       updatedAt: string;
+      statusEvents: {
+        id: string;
+        previousStatus:
+          | "pending"
+          | "reviewed"
+          | "resolved"
+          | "dismissed"
+          | null;
+        newStatus: "pending" | "reviewed" | "resolved" | "dismissed";
+        note: string;
+        isBackfilled: boolean;
+        adminIdentifier: string | null;
+        adminRole: "moderator" | "admin" | null;
+        createdAt: string;
+      }[];
     }[];
     moderationRequests: {
       id: string;

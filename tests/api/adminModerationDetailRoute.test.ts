@@ -69,6 +69,18 @@ describe("GET /api/admin/moderation/[profileId]", () => {
           reviewNote: "リンクを確認",
           reviewedAt: null,
           reviewedByAdminUser: null,
+          statusEvents: [
+            {
+              id: "report-event-1",
+              previousStatus: "pending",
+              newStatus: "reviewed",
+              note: "リンクを確認",
+              isBackfilled: false,
+              adminAuthId: "auth-admin-123456",
+              adminRole: "admin",
+              createdAt: new Date("2026-07-17T03:00:00.000Z"),
+            },
+          ],
           createdAt: new Date("2026-07-17T02:00:00.000Z"),
           updatedAt: new Date("2026-07-17T02:00:00.000Z"),
         },
@@ -177,6 +189,18 @@ describe("GET /api/admin/moderation/[profileId]", () => {
           reviewerRole: null,
           reviewedAt: null,
           createdAt: "2026-07-17T02:00:00.000Z",
+          statusEvents: [
+            {
+              id: "report-event-1",
+              previousStatus: "pending",
+              newStatus: "reviewed",
+              note: "リンクを確認",
+              isBackfilled: false,
+              adminIdentifier: "auth-adm",
+              adminRole: "admin",
+              createdAt: "2026-07-17T03:00:00.000Z",
+            },
+          ],
         },
       ],
       moderationRequests: [
