@@ -68,6 +68,18 @@ describe("AdminModerationDetail", () => {
                 reviewedAt: "2026-07-17T03:00:00.000Z",
                 createdAt: "2026-07-17T02:00:00.000Z",
                 updatedAt: "2026-07-17T02:00:00.000Z",
+                statusEvents: [
+                  {
+                    id: "report-event-1",
+                    previousStatus: "pending",
+                    newStatus: "reviewed",
+                    note: "最初の確認記録",
+                    isBackfilled: false,
+                    adminIdentifier: "auth-adm",
+                    adminRole: "admin",
+                    createdAt: "2026-07-17T03:00:00.000Z",
+                  },
+                ],
               },
             ],
             moderationRequests: [
@@ -289,6 +301,10 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("未確認")).toBeDefined();
     expect(screen.getByText(/最終変更:.*admin.*auth-adm/)).toBeDefined();
     expect(screen.getByText(/対応メモ: リンク先を確認しました/)).toBeDefined();
+    expect(screen.getByRole("heading", { name: "対応履歴" })).toBeDefined();
+    expect(screen.getByText("未確認 → 確認済み")).toBeDefined();
+    expect(screen.getByText("最初の確認記録")).toBeDefined();
+    expect(screen.getByText(/担当者: admin \/ auth-adm/)).toBeDefined();
     expect(
       screen.getByRole("heading", { name: "修正内容と審査状況" }),
     ).toBeDefined();

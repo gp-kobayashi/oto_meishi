@@ -1154,6 +1154,40 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                           対応メモ: {report.reviewNote}
                         </p>
                       ) : null}
+                      {report.statusEvents.length ? (
+                        <section
+                          className={styles.reportStatusHistory}
+                          aria-label="通報対応履歴"
+                        >
+                          <h3>対応履歴</h3>
+                          <ol>
+                            {report.statusEvents.map((event) => (
+                              <li key={event.id}>
+                                <div className={styles.reportHistoryHeader}>
+                                  <strong>
+                                    {event.previousStatus
+                                      ? reportStatusLabels[
+                                          event.previousStatus
+                                        ]
+                                      : "移行時点"}
+                                    {" → "}
+                                    {reportStatusLabels[event.newStatus]}
+                                  </strong>
+                                  <time dateTime={event.createdAt}>
+                                    {formatDate(event.createdAt)}
+                                  </time>
+                                </div>
+                                <p>{event.note || "対応メモなし"}</p>
+                                <span>
+                                  担当者: {event.adminRole ?? "不明"} /{" "}
+                                  {event.adminIdentifier ?? "記録なし"}
+                                  {event.isBackfilled ? "（既存記録）" : ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ol>
+                        </section>
+                      ) : null}
                       {report.status === "pending" || report.status === "reviewed" ? (
                         <div className={styles.reportActions}>
                           {report.status === "pending" ? (

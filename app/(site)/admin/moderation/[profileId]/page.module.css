@@ -396,7 +396,7 @@
   list-style: none;
 }
 
-.reportList li {
+.reportList > li {
   padding: 16px;
   border: 1px solid #fecaca;
   border-radius: 10px;
@@ -467,6 +467,53 @@
   font-size: 13px;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.reportStatusHistory {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #fecaca;
+}
+
+.reportStatusHistory h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.reportStatusHistory ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reportStatusHistory li {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #fff7ed;
+}
+
+.reportHistoryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reportHistoryHeader time {
+  margin: 0;
+}
+
+.reportStatusHistory p {
+  margin: 7px 0;
+  color: #334155;
+  white-space: pre-wrap;
+}
+
+.reportStatusHistory span {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .reportActions {
