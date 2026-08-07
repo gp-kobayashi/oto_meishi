@@ -190,6 +190,53 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
   });
 
+  it("利用停止中のケースを承認してもアカウント停止を解除しない", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      targetType: "profile",
+      targetId: "profile-1",
+      snapshots: [
+        {
+          id: "snapshot-profile",
+          content: {
+            displayName: "表示名",
+            bio: "自己紹介",
+            theme: "normal",
+          },
+          contentHash: null,
+        },
+      ],
+      profile: {
+        ...pendingCase.profile,
+        status: "suspended",
+        accountModerationStatus: "suspended",
+      },
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正内容のみを確認しました。",
+        reviewedSnapshotId: "snapshot-profile",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.caseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+    });
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { status: "active" },
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: expect.objectContaining({ accountModerationStatus: "active" }),
+    });
+  });
+
   it("音声の修正をケース審査から承認して再公開する", async () => {
     mocks.caseFindUnique.mockResolvedValueOnce({
       ...pendingCase,
