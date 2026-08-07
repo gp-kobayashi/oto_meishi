@@ -77,4 +77,26 @@ describe("Supabase migrations", () => {
     expect(sql).toContain('insert into public."ContentReportStatusEvent"');
     expect(sql).toContain('"isBackfilled"');
   });
+
+  it("通報状態履歴の更新と削除をDBトリガーで禁止する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_make_content_report_status_events_immutable.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain(
+      "create trigger prevent_content_report_status_event_update_or_delete",
+    );
+    expect(sql).toContain(
+      'before update or delete on public."ContentReportStatusEvent"',
+    );
+    expect(sql).toContain(
+      "execute function public.prevent_moderation_action_mutation()",
+    );
+  });
 });
