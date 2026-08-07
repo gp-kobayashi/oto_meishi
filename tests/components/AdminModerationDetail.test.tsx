@@ -242,6 +242,38 @@ describe("AdminModerationDetail", () => {
                 ],
               },
             ],
+            violationSummary: {
+              activeCount: 1,
+              countsByReason: { unsafeLink: 1 },
+            },
+            violationEvents: [
+              {
+                id: "violation-1",
+                moderationCaseId: "case-1",
+                eventType: "confirmed",
+                reasonCode: "unsafeLink",
+                originalViolationEventId: null,
+                suspensionTriggered: true,
+                note: "危険なリンクを確認",
+                isActive: true,
+                adminIdentifier: "auth-adm",
+                adminRole: "admin",
+                createdAt: "2026-07-17T01:00:00.000Z",
+              },
+              {
+                id: "revocation-1",
+                moderationCaseId: "case-profile",
+                eventType: "revoked",
+                reasonCode: "harassment",
+                originalViolationEventId: "old-violation",
+                suspensionTriggered: false,
+                note: "本人確認により取り消し",
+                isActive: false,
+                adminIdentifier: "auth-adm",
+                adminRole: "admin",
+                createdAt: "2026-07-18T01:00:00.000Z",
+              },
+            ],
             history: [
               {
                 id: "action-1",
@@ -294,6 +326,11 @@ describe("AdminModerationDetail", () => {
       ),
     ).toBeDefined();
     expect(screen.getByRole("heading", { name: "管理操作履歴" })).toBeDefined();
+    expect(screen.getByRole("heading", { name: "違反履歴" })).toBeDefined();
+    expect(screen.getByText("有効 1件")).toBeDefined();
+    expect(screen.getByText("この違反確定により利用停止")).toBeDefined();
+    expect(screen.getByText("違反回数の取り消し")).toBeDefined();
+    expect(screen.getByText("本人確認により取り消し")).toBeDefined();
     expect(screen.getByText("危険なリンクのため")).toBeDefined();
     expect(screen.getByRole("heading", { name: "通報" })).toBeDefined();
     expect(screen.getByText("危険または不正なリンク")).toBeDefined();
@@ -304,11 +341,15 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByRole("heading", { name: "対応履歴" })).toBeDefined();
     expect(screen.getByText("未確認 → 確認済み")).toBeDefined();
     expect(screen.getByText("最初の確認記録")).toBeDefined();
-    expect(screen.getByText(/担当者: admin \/ auth-adm/)).toBeDefined();
+    expect(
+      screen.getAllByText(/担当者: admin \/ auth-adm/).length,
+    ).toBeGreaterThanOrEqual(1);
     expect(
       screen.getByRole("heading", { name: "修正内容と審査状況" }),
     ).toBeDefined();
-    expect(screen.getByText("安全でないリンク")).toBeDefined();
+    expect(screen.getAllByText("安全でないリンク").length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(screen.getByText(/url: https:\/\/unsafe\.example/)).toBeDefined();
     expect(
       screen.getByText(/url: https:\/\/youtube\.com\/example/),
