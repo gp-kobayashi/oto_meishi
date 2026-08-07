@@ -6,8 +6,10 @@ const { mocks } = vi.hoisted(() => ({
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
     getClientIp: vi.fn(),
+    transaction: vi.fn(),
     findUnique: vi.fn(),
-    update: vi.fn(),
+    updateMany: vi.fn(),
+    eventCreate: vi.fn(),
   },
 }));
 
@@ -21,7 +23,7 @@ vi.mock("@/lib/adminActionRateLimit", () => ({
 vi.mock("@/lib/clientIp", () => ({ getClientIp: mocks.getClientIp }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    contentReport: { findUnique: mocks.findUnique, update: mocks.update },
+    $transaction: mocks.transaction,
   },
 }));
 
@@ -51,7 +53,17 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     mocks.consumeAdminActionIpRateLimit.mockReturnValue({ allowed: true });
     mocks.getClientIp.mockReturnValue("127.0.0.1");
     mocks.findUnique.mockResolvedValue({ id: "report-1", status: "pending" });
-    mocks.update.mockResolvedValue({ id: "report-1" });
+    mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.eventCreate.mockResolvedValue({ id: "event-1" });
+    mocks.transaction.mockImplementation(async (callback) =>
+      callback({
+        contentReport: {
+          findUnique: mocks.findUnique,
+          updateMany: mocks.updateMany,
+        },
+        contentReportStatusEvent: { create: mocks.eventCreate },
+      }),
+    );
   });
 
   it("管理者が通報状態を変更できる", async () => {
@@ -62,16 +74,31 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(mocks.update).toHaveBeenCalledWith({
-      where: { id: "report-1" },
+    expect(mocks.updateMany).toHaveBeenCalledWith({
+      where: { id: "report-1", status: "pending" },
       data: {
         status: "reviewed",
         reviewedByAdminUserId: "admin-1",
         reviewedAt: expect.any(Date),
         reviewNote: "内容を確認しました",
       },
+    });
+    expect(mocks.eventCreate).toHaveBeenCalledWith({
+      data: {
+        reportId: "report-1",
+        adminUserId: "admin-1",
+        adminAuthId: "auth-1",
+        adminRole: "admin",
+        previousStatus: "pending",
+        newStatus: "reviewed",
+        note: "内容を確認しました",
+        createdAt: expect.any(Date),
+      },
       select: { id: true },
     });
+    expect(mocks.eventCreate.mock.calls[0][0].data.createdAt).toBe(
+      mocks.updateMany.mock.calls[0][0].data.reviewedAt,
+    );
   });
 
   it("確認済みの通報を対応完了へ進められる", async () => {
@@ -86,7 +113,7 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.update).toHaveBeenCalledWith(
+    expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: "resolved" }),
       }),
@@ -110,9 +137,24 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
       await expect(response.json()).resolves.toEqual({
         error: "完了した通報の状態は変更できません。",
       });
-      expect(mocks.update).not.toHaveBeenCalled();
+      expect(mocks.updateMany).not.toHaveBeenCalled();
     },
   );
+
+  it("同時操作で状態が変わった場合は履歴を追加せず再読み込みを求める", async () => {
+    mocks.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    const response = await PATCH(
+      request({ status: "reviewed", note: "内容を確認しました" }),
+      context(),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "通報状態が更新されています。再読み込みしてください。",
+    });
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+  });
 
   it("許可されていない状態は拒否する", async () => {
     const response = await PATCH(
@@ -121,7 +163,7 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.updateMany).not.toHaveBeenCalled();
   });
 
   it("権限がなければDBへ問い合わせない", async () => {
@@ -146,6 +188,6 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.updateMany).not.toHaveBeenCalled();
   });
 });

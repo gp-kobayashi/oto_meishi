@@ -109,46 +109,71 @@ export async function PATCH(
       );
     }
 
-    const report = await prisma.contentReport.findUnique({
-      where: { id: reportId },
-      select: { id: true, status: true },
-    });
-    if (!report) {
-      return Response.json(
-        { error: "通報が見つかりません。" },
-        { status: 404, headers: PRIVATE_NO_STORE_HEADERS },
-      );
-    }
-    if (report.status === body.status) {
-      return Response.json(
-        { error: "通報状態はすでに変更されています。" },
-        { status: 409, headers: PRIVATE_NO_STORE_HEADERS },
-      );
-    }
-    if (
-      !allowedReportStatusTransitions[report.status].includes(body.status)
-    ) {
-      return Response.json(
-        { error: "完了した通報の状態は変更できません。" },
-        { status: 409, headers: PRIVATE_NO_STORE_HEADERS },
-      );
-    }
+    const nextStatus = body.status;
+    const result = await prisma.$transaction(async (transaction) => {
+      const report = await transaction.contentReport.findUnique({
+        where: { id: reportId },
+        select: { id: true, status: true },
+      });
+      if (!report) {
+        return { error: "通報が見つかりません。", httpStatus: 404 } as const;
+      }
+      if (report.status === nextStatus) {
+        return {
+          error: "通報状態はすでに変更されています。",
+          httpStatus: 409,
+        } as const;
+      }
+      if (
+        !allowedReportStatusTransitions[report.status].includes(nextStatus)
+      ) {
+        return {
+          error: "完了した通報の状態は変更できません。",
+          httpStatus: 409,
+        } as const;
+      }
 
-    await prisma.contentReport.update({
-      where: { id: report.id },
-      data: {
-        status: body.status,
-        reviewedByAdminUserId: authorization.admin.id,
-        reviewedAt: new Date(),
-        reviewNote: note,
-      },
-      select: { id: true },
+      const reviewedAt = new Date();
+      const updateResult = await transaction.contentReport.updateMany({
+        where: { id: report.id, status: report.status },
+        data: {
+          status: nextStatus,
+          reviewedByAdminUserId: authorization.admin.id,
+          reviewedAt,
+          reviewNote: note,
+        },
+      });
+      if (updateResult.count !== 1) {
+        return {
+          error: "通報状態が更新されています。再読み込みしてください。",
+          httpStatus: 409,
+        } as const;
+      }
+
+      await transaction.contentReportStatusEvent.create({
+        data: {
+          reportId: report.id,
+          adminUserId: authorization.admin.id,
+          adminAuthId: authorization.admin.authId,
+          adminRole: authorization.admin.role,
+          previousStatus: report.status,
+          newStatus: nextStatus,
+          note,
+          createdAt: reviewedAt,
+        },
+        select: { id: true },
+      });
+
+      return { success: true, status: nextStatus } as const;
     });
 
-    return Response.json(
-      { success: true, status: body.status },
-      { headers: PRIVATE_NO_STORE_HEADERS },
-    );
+    if ("error" in result) {
+      return Response.json(
+        { error: result.error },
+        { status: result.httpStatus, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
+    return Response.json(result, { headers: PRIVATE_NO_STORE_HEADERS });
   } catch (error) {
     console.error("Failed to update report status", error);
     return Response.json(
