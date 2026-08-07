@@ -175,8 +175,8 @@ describe("DELETE /api/audio", () => {
         profileId: "profile-1",
         targetType: "audio",
         targetId: "profile-1",
-        reviewMode: "postReview",
-        status: "postReviewPending",
+        reviewMode: "preReview",
+        status: "preReviewPending",
       }),
       select: { id: true },
     });
@@ -194,7 +194,42 @@ describe("DELETE /api/audio", () => {
         eventType: "contentDeleted",
         actorType: "user",
         actorId: "auth-user-1",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
+      }),
+    });
+  });
+
+  it("旧事後確認待ちの音声を削除すると非公開の事前確認へ移行する", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      audioUrl: "https://r2.example/audio/test/hidden.m4a",
+      audioKey: "audio/test/hidden.m4a",
+      audioContentHash: "b".repeat(64),
+      id: "profile-1",
+      audioTitle: "非公開音声",
+      audioStatus: "hidden",
+    });
+    mocks.moderationCaseFindFirst.mockResolvedValueOnce({
+      id: "case-legacy",
+      status: "postReviewPending",
+    });
+
+    const response = await DELETE(request());
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationCaseCreate).not.toHaveBeenCalled();
+    expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-legacy" },
+      data: expect.objectContaining({
+        reviewMode: "preReview",
+        status: "preReviewPending",
+        resolvedAt: null,
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationCaseEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        previousStatus: "postReviewPending",
+        newStatus: "preReviewPending",
       }),
     });
   });

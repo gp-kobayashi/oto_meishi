@@ -222,8 +222,8 @@ async function recordModeratedAudioDeletion({
     ? await tx.moderationCase.update({
         where: { id: existingCase.id },
         data: {
-          reviewMode: "postReview",
-          status: "postReviewPending",
+          reviewMode: "preReview",
+          status: "preReviewPending",
           reviewDueAt: deadline,
           retentionExpiresAt: deadline,
           resolvedAt: null,
@@ -236,8 +236,8 @@ async function recordModeratedAudioDeletion({
           targetType: "audio",
           targetId: profile.id,
           reasonCode: "other",
-          reviewMode: "postReview",
-          status: "postReviewPending",
+          reviewMode: "preReview",
+          status: "preReviewPending",
           userMessage: "非公開音声が削除されました。",
           reviewDueAt: deadline,
           retentionExpiresAt: deadline,
@@ -284,7 +284,7 @@ async function recordModeratedAudioDeletion({
       actorType: "user",
       actorId,
       previousStatus: existingCase?.status ?? "correctionRequired",
-      newStatus: "postReviewPending",
+      newStatus: "preReviewPending",
       details: { targetType: "audio" },
     },
   });
