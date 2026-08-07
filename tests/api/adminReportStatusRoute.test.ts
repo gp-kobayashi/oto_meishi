@@ -74,6 +74,46 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     });
   });
 
+  it("確認済みの通報を対応完了へ進められる", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      id: "report-1",
+      status: "reviewed",
+    });
+
+    const response = await PATCH(
+      request({ status: "resolved", note: "違反対応が完了しました" }),
+      context(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "resolved" }),
+      }),
+    );
+  });
+
+  it.each(["resolved", "dismissed"] as const)(
+    "終了済み状態%sからの再変更を拒否する",
+    async (currentStatus) => {
+      mocks.findUnique.mockResolvedValueOnce({
+        id: "report-1",
+        status: currentStatus,
+      });
+
+      const response = await PATCH(
+        request({ status: "reviewed", note: "再確認します" }),
+        context(),
+      );
+
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        error: "完了した通報の状態は変更できません。",
+      });
+      expect(mocks.update).not.toHaveBeenCalled();
+    },
+  );
+
   it("許可されていない状態は拒否する", async () => {
     const response = await PATCH(
       request({ status: "pending", note: "確認" }),

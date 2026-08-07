@@ -13,7 +13,18 @@ const MAX_REPORT_STATUS_BODY_BYTES = 4 * 1024;
 const reportStatuses = ["reviewed", "resolved", "dismissed"] as const;
 
 type ReportStatus = (typeof reportStatuses)[number];
+type CurrentReportStatus = "pending" | ReportStatus;
 type ReportStatusRequest = { status?: unknown; note?: unknown };
+
+const allowedReportStatusTransitions: Record<
+  CurrentReportStatus,
+  readonly ReportStatus[]
+> = {
+  pending: ["reviewed", "resolved", "dismissed"],
+  reviewed: ["resolved", "dismissed"],
+  resolved: [],
+  dismissed: [],
+};
 
 const isReportStatus = (value: unknown): value is ReportStatus =>
   typeof value === "string" && reportStatuses.includes(value as ReportStatus);
@@ -111,6 +122,14 @@ export async function PATCH(
     if (report.status === body.status) {
       return Response.json(
         { error: "通報状態はすでに変更されています。" },
+        { status: 409, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
+    if (
+      !allowedReportStatusTransitions[report.status].includes(body.status)
+    ) {
+      return Response.json(
+        { error: "完了した通報の状態は変更できません。" },
         { status: 409, headers: PRIVATE_NO_STORE_HEADERS },
       );
     }
