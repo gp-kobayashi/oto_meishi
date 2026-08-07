@@ -75,6 +75,9 @@ const moderationReasonLabels: Record<ModerationCase["reasonCode"], string> = {
   unsafeLink: "安全でないリンク",
   serviceMismatch: "選択したサービスとURLの不一致",
   impersonation: "なりすまし",
+  threatOrPersonalData: "脅迫・第三者の個人情報",
+  unofficialThirdPartyProfile: "他人を主体としたプロフィール",
+  politicalReligiousPromotion: "政治・宗教への勧誘・宣伝",
   other: "その他の問題",
 };
 
