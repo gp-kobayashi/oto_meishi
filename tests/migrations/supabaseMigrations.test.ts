@@ -99,4 +99,34 @@ describe("Supabase migrations", () => {
       "execute function public.prevent_moderation_action_mutation()",
     );
   });
+
+  it("確定した違反と取り消しを外部非公開の履歴として保存する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_create_moderation_violation_events.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain('create table public."ModerationViolationEvent"');
+    expect(sql).toContain("'confirmed', 'revoked'");
+    expect(sql).toContain(
+      'constraint "ModerationViolationEvent_shape_check"',
+    );
+    expect(sql).toContain(
+      'create unique index "ModerationViolationEvent_case_confirmed_key"',
+    );
+    expect(sql).toContain(
+      'create unique index "ModerationViolationEvent_original_revoked_key"',
+    );
+    expect(sql).toContain(
+      'alter table public."ModerationViolationEvent" enable row level security',
+    );
+    expect(sql).toContain(
+      'revoke all on table public."ModerationViolationEvent" from anon, authenticated',
+    );
+  });
 });

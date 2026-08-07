@@ -147,6 +147,11 @@ enum ReportStatus {
   dismissed
 }
 
+enum ModerationViolationEventType {
+  confirmed
+  revoked
+}
+
 model AdminUser {
   id                 String                     @id @default(uuid()) @db.Uuid
   authId             String                     @unique
@@ -155,6 +160,7 @@ model AdminUser {
   moderationActions  ModerationAction[]
   reviewedReports    ContentReport[]            @relation("ReportReviewer")
   reportStatusEvents ContentReportStatusEvent[]
+  violationEvents    ModerationViolationEvent[]
   createdAt          DateTime                   @default(now())
   updatedAt          DateTime                   @updatedAt
 }
@@ -179,27 +185,53 @@ model ModerationAction {
 }
 
 model ModerationCase {
-  id                 String                @id @default(uuid()) @db.Uuid
-  profile            Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id                 String                     @id @default(uuid()) @db.Uuid
+  profile            Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId          String
   targetType         ModerationTargetType
   targetId           String
   reasonCode         ModerationReasonCode
   reviewMode         ModerationReviewMode
-  status             ModerationCaseStatus  @default(correctionRequired)
-  userMessage        String                @db.VarChar(500)
-  reviewDueAt        DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
-  retentionExpiresAt DateTime              @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
+  status             ModerationCaseStatus       @default(correctionRequired)
+  userMessage        String                     @db.VarChar(500)
+  reviewDueAt        DateTime                   @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
+  retentionExpiresAt DateTime                   @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
   resolvedAt         DateTime?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
   snapshots          ModerationSnapshot[]
   events             ModerationCaseEvent[]
+  violationEvents    ModerationViolationEvent[]
 
   @@index([profileId, status, createdAt])
   @@index([status, reviewDueAt])
   @@index([retentionExpiresAt])
   @@index([targetType, targetId, createdAt])
+}
+
+model ModerationViolationEvent {
+  id                       String                       @id @default(uuid()) @db.Uuid
+  profile                  Profile                      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId                String
+  moderationCase           ModerationCase               @relation(fields: [moderationCaseId], references: [id], onDelete: Cascade)
+  moderationCaseId         String                       @db.Uuid
+  adminUser                AdminUser?                   @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  adminUserId              String?                      @db.Uuid
+  adminAuthId              String?                      @db.VarChar(128)
+  adminRole                AdminRole?
+  eventType                ModerationViolationEventType
+  reasonCode               ModerationReasonCode
+  originalViolationEvent   ModerationViolationEvent?    @relation("ViolationRevocation", fields: [originalViolationEventId], references: [id], onDelete: Cascade)
+  originalViolationEventId String?                      @db.Uuid
+  revocationEvents         ModerationViolationEvent[]   @relation("ViolationRevocation")
+  suspensionTriggered      Boolean                      @default(false)
+  note                     String                       @db.VarChar(500)
+  createdAt                DateTime                     @default(now())
+
+  @@index([profileId, reasonCode, eventType, createdAt], map: "ViolationEvent_profile_reason_type_created_idx")
+  @@index([moderationCaseId, createdAt], map: "ViolationEvent_case_created_idx")
+  @@index([originalViolationEventId], map: "ViolationEvent_original_idx")
+  @@index([adminUserId, createdAt], map: "ViolationEvent_admin_created_idx")
 }
 
 model ModerationSnapshot {
@@ -272,28 +304,29 @@ model ContentReportStatusEvent {
 }
 
 model Profile {
-  id                      String                  @id @default(uuid())
-  userId                  String                  @unique
-  authId                  String?                 @unique
-  status                  ProfileStatus           @default(active)
-  accountModerationStatus AccountModerationStatus @default(active)
+  id                      String                     @id @default(uuid())
+  userId                  String                     @unique
+  authId                  String?                    @unique
+  status                  ProfileStatus              @default(active)
+  accountModerationStatus AccountModerationStatus    @default(active)
   suspensionAppealDueAt   DateTime?
   deletionScheduledAt     DateTime?
-  theme                   Theme                   @default(normal)
+  theme                   Theme                      @default(normal)
   displayName             String
   bio                     String
   audioUrl                String
-  audioKey                String                  @default("")
-  audioContentHash        String?                 @db.VarChar(64)
+  audioKey                String                     @default("")
+  audioContentHash        String?                    @db.VarChar(64)
   audioTitle              String
-  audioStatus             AudioModerationStatus   @default(active)
+  audioStatus             AudioModerationStatus      @default(active)
   sns                     SocialLink[]
   reports                 ContentReport[]
   notifications           UserNotification[]
   moderationCases         ModerationCase[]
+  violationEvents         ModerationViolationEvent[]
   moderationRequests      ModerationRequest[]
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
 
   @@index([status])
   @@index([audioStatus])
