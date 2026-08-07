@@ -285,7 +285,7 @@ export async function PATCH(request: Request) {
       let effectiveNextStatus = nextStatus;
       let profileStatusBeforeAutomaticSuspension: string | null = null;
       if (action === "hide") {
-        await tx.$queryRawUnsafe(
+        await tx.$executeRawUnsafe(
           "select pg_advisory_xact_lock(hashtextextended($1, 0))",
           profileId,
         );

@@ -7,7 +7,7 @@ const { mocks } = vi.hoisted(() => ({
     consumeAdminActionIpRateLimit: vi.fn(),
     getClientIp: vi.fn(),
     transaction: vi.fn(),
-    queryRawUnsafe: vi.fn(),
+    executeRawUnsafe: vi.fn(),
     findUnique: vi.fn(),
     findFirst: vi.fn(),
     create: vi.fn(),
@@ -52,7 +52,7 @@ describe("PATCH /api/admin/moderation/violations/[violationId]", () => {
     mocks.consumeAdminActionRateLimit.mockReturnValue({ allowed: true });
     mocks.consumeAdminActionIpRateLimit.mockReturnValue({ allowed: true });
     mocks.getClientIp.mockReturnValue(null);
-    mocks.queryRawUnsafe.mockResolvedValue([{ pg_advisory_xact_lock: null }]);
+    mocks.executeRawUnsafe.mockResolvedValue(0);
     mocks.findUnique.mockResolvedValue({
       id: "violation-1",
       profileId: "profile-1",
@@ -64,7 +64,7 @@ describe("PATCH /api/admin/moderation/violations/[violationId]", () => {
     mocks.create.mockResolvedValue({ id: "revocation-1" });
     mocks.transaction.mockImplementation((callback) =>
       callback({
-        $queryRawUnsafe: mocks.queryRawUnsafe,
+        $executeRawUnsafe: mocks.executeRawUnsafe,
         moderationViolationEvent: {
           findUnique: mocks.findUnique,
           findFirst: mocks.findFirst,

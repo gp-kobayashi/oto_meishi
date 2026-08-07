@@ -18,7 +18,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseEventCreate: vi.fn(),
     moderationViolationEventCreate: vi.fn(),
     moderationViolationEventFindMany: vi.fn(),
-    queryRawUnsafe: vi.fn(),
+    executeRawUnsafe: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
   },
@@ -40,7 +40,7 @@ vi.mock("@/lib/adminActionRateLimit", () => ({
 import { PATCH } from "@/app/(site)/api/admin/moderation/actions/route";
 
 const tx = {
-  $queryRawUnsafe: mocks.queryRawUnsafe,
+  $executeRawUnsafe: mocks.executeRawUnsafe,
   profile: { findUnique: mocks.profileFindUnique, update: mocks.profileUpdate },
   socialLink: {
     findUnique: mocks.socialLinkFindUnique,
@@ -96,7 +96,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
       id: "violation-event-1",
     });
     mocks.moderationViolationEventFindMany.mockResolvedValue([]);
-    mocks.queryRawUnsafe.mockResolvedValue([{ pg_advisory_xact_lock: null }]);
+    mocks.executeRawUnsafe.mockResolvedValue(0);
     mocks.consumeAdminActionRateLimit.mockReturnValue({
       allowed: true,
       limit: 60,
@@ -217,7 +217,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.queryRawUnsafe).toHaveBeenCalledWith(
+    expect(mocks.executeRawUnsafe).toHaveBeenCalledWith(
       "select pg_advisory_xact_lock(hashtextextended($1, 0))",
       "profile-1",
     );

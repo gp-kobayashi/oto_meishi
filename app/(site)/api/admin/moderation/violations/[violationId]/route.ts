@@ -89,7 +89,7 @@ export async function PATCH(
     }
 
     const result = await prisma.$transaction(async (transaction) => {
-      await transaction.$queryRawUnsafe(
+      await transaction.$executeRawUnsafe(
         "select pg_advisory_xact_lock(hashtextextended($1, 0))",
         violationId,
       );
