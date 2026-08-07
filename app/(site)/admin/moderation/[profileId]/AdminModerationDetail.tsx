@@ -47,6 +47,9 @@ const moderationReasonLabels = {
   unsafeLink: "安全でないリンク",
   serviceMismatch: "選択サービスとURLの不一致",
   impersonation: "なりすまし",
+  threatOrPersonalData: "脅迫・第三者の個人情報",
+  unofficialThirdPartyProfile: "他人を主体としたプロフィール",
+  politicalReligiousPromotion: "政治・宗教への勧誘・宣伝",
   other: "その他",
 };
 
@@ -89,6 +92,15 @@ const moderationReasonOptions = [
   { value: "unsafeLink", label: "安全でないリンク" },
   { value: "serviceMismatch", label: "選択サービスとURLの不一致" },
   { value: "impersonation", label: "なりすまし" },
+  { value: "threatOrPersonalData", label: "脅迫・第三者の個人情報" },
+  {
+    value: "unofficialThirdPartyProfile",
+    label: "他人を主体としたプロフィール",
+  },
+  {
+    value: "politicalReligiousPromotion",
+    label: "政治・宗教への勧誘・宣伝",
+  },
   { value: "other", label: "その他" },
 ] as const;
 

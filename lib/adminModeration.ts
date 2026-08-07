@@ -122,6 +122,9 @@ export type ModerationDetailResponse = {
         | "unsafeLink"
         | "serviceMismatch"
         | "impersonation"
+        | "threatOrPersonalData"
+        | "unofficialThirdPartyProfile"
+        | "politicalReligiousPromotion"
         | "other";
       status:
         | "correctionRequired"

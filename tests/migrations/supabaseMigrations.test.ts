@@ -129,4 +129,20 @@ describe("Supabase migrations", () => {
       'revoke all on table public."ModerationViolationEvent" from anon, authenticated',
     );
   });
+
+  it("issue #102で定めた違反分類を追加する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_add_moderation_reason_codes.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain("'threatOrPersonalData'");
+    expect(sql).toContain("'unofficialThirdPartyProfile'");
+    expect(sql).toContain("'politicalReligiousPromotion'");
+  });
 });

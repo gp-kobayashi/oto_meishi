@@ -33,6 +33,9 @@ type ModerationCase = {
     | "unsafeLink"
     | "serviceMismatch"
     | "impersonation"
+    | "threatOrPersonalData"
+    | "unofficialThirdPartyProfile"
+    | "politicalReligiousPromotion"
     | "other";
   reviewMode: "postReview" | "preReview";
   status:

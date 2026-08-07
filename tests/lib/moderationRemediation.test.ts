@@ -22,6 +22,9 @@ describe("モデレーション是正ルール", () => {
     "unsafeLink",
     "serviceMismatch",
     "impersonation",
+    "threatOrPersonalData",
+    "unofficialThirdPartyProfile",
+    "politicalReligiousPromotion",
     "other",
     "unknown",
   ])(

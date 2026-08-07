@@ -7,6 +7,9 @@ export const MODERATION_REASON_CODES = [
   "unsafeLink",
   "serviceMismatch",
   "impersonation",
+  "threatOrPersonalData",
+  "unofficialThirdPartyProfile",
+  "politicalReligiousPromotion",
   "other",
 ] as const;
 

@@ -81,6 +81,9 @@ enum ModerationReasonCode {
   unsafeLink
   serviceMismatch
   impersonation
+  threatOrPersonalData
+  unofficialThirdPartyProfile
+  politicalReligiousPromotion
   other
 }
 
