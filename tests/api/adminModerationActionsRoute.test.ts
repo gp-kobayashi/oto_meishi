@@ -17,6 +17,8 @@ const { mocks } = vi.hoisted(() => ({
     moderationSnapshotCreate: vi.fn(),
     moderationCaseEventCreate: vi.fn(),
     moderationViolationEventCreate: vi.fn(),
+    moderationViolationEventFindMany: vi.fn(),
+    queryRawUnsafe: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
   },
@@ -38,6 +40,7 @@ vi.mock("@/lib/adminActionRateLimit", () => ({
 import { PATCH } from "@/app/(site)/api/admin/moderation/actions/route";
 
 const tx = {
+  $queryRawUnsafe: mocks.queryRawUnsafe,
   profile: { findUnique: mocks.profileFindUnique, update: mocks.profileUpdate },
   socialLink: {
     findUnique: mocks.socialLinkFindUnique,
@@ -54,6 +57,7 @@ const tx = {
   moderationCaseEvent: { create: mocks.moderationCaseEventCreate },
   moderationViolationEvent: {
     create: mocks.moderationViolationEventCreate,
+    findMany: mocks.moderationViolationEventFindMany,
   },
   userNotification: { create: mocks.notificationCreate },
 };
@@ -91,6 +95,8 @@ describe("PATCH /api/admin/moderation/actions", () => {
     mocks.moderationViolationEventCreate.mockResolvedValue({
       id: "violation-event-1",
     });
+    mocks.moderationViolationEventFindMany.mockResolvedValue([]);
+    mocks.queryRawUnsafe.mockResolvedValue([{ pg_advisory_xact_lock: null }]);
     mocks.consumeAdminActionRateLimit.mockReturnValue({
       allowed: true,
       limit: 60,
@@ -187,6 +193,135 @@ describe("PATCH /api/admin/moderation/actions", () => {
         actorType: "admin",
         newStatus: "correctionRequired",
       }),
+    });
+  });
+
+  it("同種の確定違反が2回目になるとアカウントを利用停止する", async () => {
+    mocks.moderationViolationEventFindMany.mockResolvedValue([
+      {
+        id: "previous-violation",
+        eventType: "confirmed",
+        reasonCode: "harassment",
+        originalViolationEventId: null,
+      },
+    ]);
+
+    const response = await PATCH(
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "hide",
+        reason: "同種の違反を再度確認しました",
+        reasonCode: "harassment",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.queryRawUnsafe).toHaveBeenCalledWith(
+      "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+      "profile-1",
+    );
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: expect.objectContaining({
+        status: "suspended",
+        accountModerationStatus: "suspended",
+        suspensionAppealDueAt: expect.any(Date),
+      }),
+    });
+    expect(mocks.actionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "suspend",
+        previousStatus: "active",
+        newStatus: "suspended",
+      }),
+      select: { id: true },
+    });
+    expect(mocks.moderationViolationEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ suspensionTriggered: true }),
+      select: { id: true },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        title: "プロフィールの利用停止について",
+      }),
+    });
+  });
+
+  it("音声違反で停止基準に達した場合は音声非公開とアカウント停止を両方記録する", async () => {
+    mocks.profileFindUnique
+      .mockResolvedValueOnce({
+        id: "profile-1",
+        audioKey: "audio/user/voice.m4a",
+        audioContentHash: "audio-hash",
+        audioUrl: "",
+        audioTitle: "自己紹介音声",
+        audioStatus: "active",
+        status: "active",
+        accountModerationStatus: "active",
+      });
+    mocks.moderationViolationEventFindMany.mockResolvedValue([
+      {
+        id: "violation-1",
+        eventType: "confirmed",
+        reasonCode: "unsafeLink",
+        originalViolationEventId: null,
+      },
+      {
+        id: "violation-2",
+        eventType: "confirmed",
+        reasonCode: "harassment",
+        originalViolationEventId: null,
+      },
+    ]);
+    mocks.actionCreate
+      .mockResolvedValueOnce({ id: "suspension-action" })
+      .mockResolvedValueOnce({ id: "audio-action" });
+
+    const response = await PATCH(
+      request({
+        targetType: "audio",
+        targetId: "profile-1",
+        action: "hide",
+        reason: "不適切な音声を確認しました",
+        reasonCode: "inappropriateContent",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenNthCalledWith(1, {
+      where: { id: "profile-1" },
+      data: { audioStatus: "hidden" },
+    });
+    expect(mocks.profileUpdate).toHaveBeenNthCalledWith(2, {
+      where: { id: "profile-1" },
+      data: expect.objectContaining({
+        status: "suspended",
+        accountModerationStatus: "suspended",
+      }),
+    });
+    expect(mocks.actionCreate).toHaveBeenNthCalledWith(1, {
+      data: expect.objectContaining({
+        targetType: "profile",
+        action: "suspend",
+        previousStatus: "active",
+        newStatus: "suspended",
+      }),
+      select: { id: true },
+    });
+    expect(mocks.actionCreate).toHaveBeenNthCalledWith(2, {
+      data: expect.objectContaining({
+        targetType: "audio",
+        action: "hide",
+        previousStatus: "active",
+        newStatus: "hidden",
+      }),
+      select: { id: true },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.moderationViolationEventCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ suspensionTriggered: true }),
+      select: { id: true },
     });
   });
 

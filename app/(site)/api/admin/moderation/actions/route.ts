@@ -10,6 +10,7 @@ import {
 } from "@/lib/adminActionRateLimit";
 import { getClientIp } from "@/lib/clientIp";
 import { getModerationNotification } from "@/lib/moderationNotification";
+import { decideViolationSuspension } from "@/lib/moderationViolation";
 import {
   createModeratedUrlHash,
   getModerationDeadline,
@@ -171,6 +172,7 @@ export async function PATCH(request: Request) {
         | "suspended"
         | "deletionPending"
         | null = null;
+      let profileStatus: string | null = null;
 
       if (targetType === "profile") {
         const target = await tx.profile.findUnique({
@@ -187,6 +189,7 @@ export async function PATCH(request: Request) {
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
         accountModerationStatus = target.accountModerationStatus;
+        profileStatus = target.status;
         previousStatus = target.status;
         reportedContent = {
           displayName: target.displayName ?? "",
@@ -207,10 +210,14 @@ export async function PATCH(request: Request) {
             audioUrl: true,
             audioTitle: true,
             audioStatus: true,
+            status: true,
+            accountModerationStatus: true,
           },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
+        profileStatus = target.status;
+        accountModerationStatus = target.accountModerationStatus;
         previousStatus = target.audioStatus;
         reportedContent = {
           audioTitle: target.audioTitle ?? "",
@@ -273,14 +280,58 @@ export async function PATCH(request: Request) {
         }
       }
 
+      let suspensionTriggered = action === "suspend";
+      let effectiveAction: ActionType = action;
+      let effectiveNextStatus = nextStatus;
+      let profileStatusBeforeAutomaticSuspension: string | null = null;
+      if (action === "hide") {
+        await tx.$queryRawUnsafe(
+          "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+          profileId,
+        );
+        const violationEvents = await tx.moderationViolationEvent.findMany({
+          where: { profileId },
+          select: {
+            id: true,
+            eventType: true,
+            reasonCode: true,
+            originalViolationEventId: true,
+          },
+        });
+        const decision = decideViolationSuspension(
+          violationEvents,
+          reasonCode,
+        );
+        if (targetType === "socialLink") {
+          const profile = await tx.profile.findUnique({
+            where: { id: profileId },
+            select: { status: true, accountModerationStatus: true },
+          });
+          if (!profile) {
+            return { error: "対象が見つかりません。", status: 404 } as const;
+          }
+          profileStatus = profile.status;
+          accountModerationStatus = profile.accountModerationStatus;
+        }
+        suspensionTriggered =
+          decision.shouldSuspend && accountModerationStatus === "active";
+
+        if (suspensionTriggered && targetType === "profile") {
+          effectiveAction = "suspend";
+          effectiveNextStatus = "suspended";
+        } else if (suspensionTriggered) {
+          profileStatusBeforeAutomaticSuspension = profileStatus;
+        }
+      }
+
       if (targetType === "profile") {
         const suspensionAppealDueAt =
-          action === "suspend" ? getModerationDeadline() : null;
+          effectiveAction === "suspend" ? getModerationDeadline() : null;
         await tx.profile.update({
           where: { id: targetId },
           data: {
-            status: nextStatus as "active" | "hidden" | "suspended",
-            ...(action === "suspend"
+            status: effectiveNextStatus as "active" | "hidden" | "suspended",
+            ...(effectiveAction === "suspend"
               ? {
                   accountModerationStatus: "suspended" as const,
                   suspensionAppealDueAt,
@@ -305,15 +356,46 @@ export async function PATCH(request: Request) {
         });
       }
 
+      let automaticSuspensionActionId: string | null = null;
+      if (
+        suspensionTriggered &&
+        action === "hide" &&
+        targetType !== "profile"
+      ) {
+        const suspensionAppealDueAt = getModerationDeadline();
+        await tx.profile.update({
+          where: { id: profileId },
+          data: {
+            status: "suspended",
+            accountModerationStatus: "suspended",
+            suspensionAppealDueAt,
+          },
+        });
+        const suspensionAction = await tx.moderationAction.create({
+          data: {
+            adminUserId: authorization.admin.id,
+            profileId,
+            targetType: "profile",
+            targetId: profileId,
+            action: "suspend",
+            previousStatus: profileStatusBeforeAutomaticSuspension ?? "active",
+            newStatus: "suspended",
+            reason,
+          },
+          select: { id: true },
+        });
+        automaticSuspensionActionId = suspensionAction.id;
+      }
+
       const moderationAction = await tx.moderationAction.create({
         data: {
           adminUserId: authorization.admin.id,
           profileId,
           targetType,
           targetId,
-          action,
+          action: effectiveAction,
           previousStatus,
-          newStatus: nextStatus,
+          newStatus: effectiveNextStatus,
           reason,
         },
         select: { id: true },
@@ -365,13 +447,13 @@ export async function PATCH(request: Request) {
             adminRole: authorization.admin.role,
             eventType: "confirmed",
             reasonCode,
-            suspensionTriggered: action === "suspend",
+            suspensionTriggered,
             note: reason,
           },
           select: { id: true },
         });
       }
-      const notification = getModerationNotification(targetType, action);
+      const notification = getModerationNotification(targetType, effectiveAction);
       await tx.userNotification.create({
         data: {
           profileId,
@@ -381,7 +463,26 @@ export async function PATCH(request: Request) {
         },
       });
 
-      return { previousStatus, newStatus: nextStatus } as const;
+      if (automaticSuspensionActionId) {
+        const suspensionNotification = getModerationNotification(
+          "profile",
+          "suspend",
+        );
+        await tx.userNotification.create({
+          data: {
+            profileId,
+            moderationActionId: automaticSuspensionActionId,
+            title: suspensionNotification.title,
+            message: suspensionNotification.message,
+          },
+        });
+      }
+
+      return {
+        previousStatus,
+        newStatus: effectiveNextStatus,
+        accountSuspended: suspensionTriggered,
+      } as const;
     });
 
     if ("error" in result) {
