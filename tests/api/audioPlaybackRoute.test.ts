@@ -45,6 +45,7 @@ describe("GET /api/audio/playback", () => {
   it("公開中の音声に5分間有効な署名URLを返す", async () => {
     mocks.findUnique.mockResolvedValue({
       status: "active",
+      accountModerationStatus: "active",
       audioStatus: "active",
       audioKey: "audio/testuser/voice.m4a",
       audioUrl: "",
@@ -61,6 +62,21 @@ describe("GET /api/audio/playback", () => {
       "audio/testuser/voice.m4a",
       300,
     );
+  });
+
+  it("アカウントが利用停止中なら公開状態の音声にも署名URLを発行しない", async () => {
+    mocks.findUnique.mockResolvedValue({
+      status: "active",
+      accountModerationStatus: "suspended",
+      audioStatus: "active",
+      audioKey: "audio/testuser/voice.m4a",
+      audioUrl: "",
+    });
+
+    const response = await GET(request("testuser"));
+
+    expect(response.status).toBe(404);
+    expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -84,6 +100,7 @@ describe("GET /api/audio/playback", () => {
   it("旧データでは公開URLからオブジェクトキーを抽出する", async () => {
     mocks.findUnique.mockResolvedValue({
       status: "active",
+      accountModerationStatus: "active",
       audioStatus: "active",
       audioKey: "",
       audioUrl: "https://r2.example/audio/testuser/legacy.m4a",
@@ -141,6 +158,7 @@ describe("GET /api/audio/playback", () => {
   it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
     mocks.findUnique.mockResolvedValue({
       status: "active",
+      accountModerationStatus: "active",
       audioStatus: "active",
       audioKey: "audio/testuser/voice.m4a",
       audioUrl: "",

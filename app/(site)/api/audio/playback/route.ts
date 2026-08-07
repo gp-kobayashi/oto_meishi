@@ -40,6 +40,7 @@ export async function GET(request: Request) {
     where: { userId },
     select: {
       status: true,
+      accountModerationStatus: true,
       audioStatus: true,
       audioKey: true,
       audioUrl: true,
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
   if (
     !profile ||
     profile.status !== "active" ||
+    profile.accountModerationStatus !== "active" ||
     profile.audioStatus !== "active" ||
     (!profile.audioKey && !profile.audioUrl)
   ) {
