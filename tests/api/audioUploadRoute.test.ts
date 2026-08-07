@@ -459,11 +459,10 @@ describe("/api/audio/upload route", () => {
             ],
           },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: {
-              id: true,
-              status: true,
-              reviewMode: true,
-              snapshots: {
+              select: {
+                id: true,
+                status: true,
+                snapshots: {
               where: { kind: "reported" },
               orderBy: [{ createdAt: "desc" }, { id: "desc" }],
               take: 1,
@@ -651,7 +650,7 @@ describe("/api/audio/upload route", () => {
     });
   });
 
-  it("公開中の音声を審査待ち中に再編集すると最新内容を記録する", async () => {
+  it("旧事後確認待ちの音声を再編集すると非公開の事前確認へ移行する", async () => {
     mocks.findUniqueProfile.mockResolvedValueOnce({
       id: "profile-1",
       authId: "auth-user-1",
@@ -674,10 +673,16 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(200);
+    expect(mocks.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ audioStatus: "hidden" }),
+      }),
+    );
     expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
       data: expect.objectContaining({
-        status: "postReviewPending",
+        reviewMode: "preReview",
+        status: "preReviewPending",
         resolvedAt: null,
       }),
       select: { id: true },
@@ -694,12 +699,12 @@ describe("/api/audio/upload route", () => {
         moderationCaseId: "case-1",
         eventType: "contentChanged",
         previousStatus: "postReviewPending",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
       }),
     });
   });
 
-  it("削除済み音声を再登録して事後確認待ちへ更新する", async () => {
+  it("削除済み音声を再登録して非公開の事前確認待ちへ更新する", async () => {
     mocks.findUniqueProfile.mockResolvedValueOnce({
       id: "profile-1",
       authId: "auth-user-1",
@@ -730,14 +735,14 @@ describe("/api/audio/upload route", () => {
         audioKey: "audio/testuser/voice-123.m4a",
         audioContentHash: CONVERTED_AUDIO_HASH,
         audioUrl: "",
-        audioStatus: "active",
+        audioStatus: "hidden",
       },
     });
     expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
       data: expect.objectContaining({
-        reviewMode: "postReview",
-        status: "postReviewPending",
+        reviewMode: "preReview",
+        status: "preReviewPending",
         resolvedAt: null,
       }),
       select: { id: true },
@@ -755,12 +760,12 @@ describe("/api/audio/upload route", () => {
         eventType: "contentChanged",
         actorType: "user",
         actorId: "auth-user-1",
-        newStatus: "postReviewPending",
+        newStatus: "preReviewPending",
       }),
     });
   });
 
-  it("通常違反の非公開音声を変更すると公開して事後確認待ちにする", async () => {
+  it("通常違反の非公開音声を変更しても管理者確認まで非公開を維持する", async () => {
     mocks.findUniqueProfile.mockResolvedValueOnce({
       id: "profile-1",
       authId: "auth-user-1",
@@ -792,14 +797,14 @@ describe("/api/audio/upload route", () => {
         audioKey: "audio/testuser/voice-123.m4a",
         audioContentHash: CONVERTED_AUDIO_HASH,
         audioUrl: "",
-        audioStatus: "active",
+        audioStatus: "hidden",
       },
     });
     expect(mocks.moderationCaseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
       data: expect.objectContaining({
-        reviewMode: "postReview",
-        status: "postReviewPending",
+        reviewMode: "preReview",
+        status: "preReviewPending",
       }),
       select: { id: true },
     });

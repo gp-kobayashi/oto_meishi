@@ -30,7 +30,6 @@ import {
   compareModeratedContentHashes,
   createModerationContentHash,
   getModerationDeadline,
-  getPendingStatusForReviewMode,
 } from "@/lib/moderationRemediation";
 import {
   canDeleteAudioObject,
@@ -191,7 +190,6 @@ export async function POST(request: NextRequest) {
           select: {
             id: true,
             status: true,
-            reviewMode: true,
             snapshots: {
               where: { kind: "reported" },
               orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -328,8 +326,8 @@ export async function POST(request: NextRequest) {
               moderationCase.status === "postReviewPending" ||
               moderationCase.status === "preReviewPending",
           );
-          const reviewMode = existingCase?.reviewMode ?? "postReview";
-          const pendingStatus = getPendingStatusForReviewMode(reviewMode);
+          const reviewMode = "preReview" as const;
+          const pendingStatus = "preReviewPending" as const;
           const isModeratedReplacement =
             Boolean(existingCase) || profile.audioStatus !== "active";
 
@@ -343,10 +341,7 @@ export async function POST(request: NextRequest) {
               audioKey,
               audioContentHash: contentHash,
               audioUrl: "",
-              audioStatus:
-                isModeratedReplacement && reviewMode === "preReview"
-                  ? "hidden"
-                  : "active",
+              audioStatus: isModeratedReplacement ? "hidden" : "active",
             },
           });
 
