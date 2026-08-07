@@ -255,6 +255,7 @@ flowchart TD
 - 未完了ケースがある間は解除申請を承認しない。
 - 違反理由にかかわらず、修正・削除後は`preReviewPending`として対象の非公開を維持する。
 - 旧`postReviewPending`ケースは次回修正時に`preReviewPending`へ移行する。
+- 既存の`postReviewPending`ケースはDBマイグレーションで対象を非公開にし、`preReviewPending`へ一括移行する。
 - 審査の差し戻しだけを理由にアカウントを自動停止しない。
 - ユーザー画面、通知、管理画面で公開前確認の案内を表示する。
 
@@ -360,7 +361,6 @@ flowchart TD
 
 - 通報APIは終了済み状態から別の終了状態・確認済み状態へ遷移でき、対応情報を上書きする。
 - 審査中であっても期限切れの旧音声が削除される可能性がある。
-- 既存の`postReviewPending`データを一括で非公開・`preReviewPending`へ変換する移行処理は未実装で、修正されるまでは保存済みの公開状態が残る可能性がある。
 
 これらは[issue #102](https://github.com/gp-kobayashi/oto_meishi/issues/102)の関連PRで修正します。修正が完了するまで、管理者は通報状態の再変更と審査証拠の保持期限を慎重に確認する必要があります。
 

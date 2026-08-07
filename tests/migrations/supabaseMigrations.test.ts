@@ -28,4 +28,26 @@ describe("Supabase migrations", () => {
       expect(sql).not.toMatch(/\bcreate\s+type\s+if\s+not\s+exists\b/i);
     },
   );
+
+  it("旧事後確認ケースを対象別に非公開化して事前確認へ移行する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_migrate_post_review_cases_to_pre_review.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain('set "status" = \'hidden\'');
+    expect(sql).toContain('profile."status" = \'active\'');
+    expect(sql).toContain('set "audioStatus" = \'hidden\'');
+    expect(sql).toContain('profile."audioStatus" = \'active\'');
+    expect(sql).toContain('update public."SocialLink"');
+    expect(sql).toContain('insert into public."ModerationCaseEvent"');
+    expect(sql).toContain('"reviewMode" = \'preReview\'');
+    expect(sql).toContain('"status" = \'preReviewPending\'');
+    expect(sql).toContain('where "status" = \'postReviewPending\'');
+  });
 });
