@@ -10,7 +10,6 @@ import {
   compareModeratedContentHashes,
   compareModeratedUrls,
   compareModerationSnapshotVersions,
-  getModerationDeadline,
 } from "@/lib/moderationRemediation";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/requestJson";
@@ -142,7 +141,7 @@ export async function PATCH(
       const correctedContent = moderationCase.snapshots[0]?.content;
       const targetWasDeleted =
         isRecord(correctedContent) && correctedContent.deleted === true;
-      let previousTargetStatus = getCurrentTargetStatus(moderationCase);
+      const previousTargetStatus = getCurrentTargetStatus(moderationCase);
       let newTargetStatus = previousTargetStatus;
       let action: "hide" | "restore" | "suspend" | "remove";
 
@@ -186,22 +185,9 @@ export async function PATCH(
           },
         });
       } else {
-        const shouldSuspend =
-          moderationCase.reviewMode === "postReview";
-        action = shouldSuspend ? "suspend" : "hide";
-        newTargetStatus = shouldSuspend ? "suspended" : "hidden";
+        action = "hide";
+        newTargetStatus = "hidden";
         await updateTargetStatus(tx, moderationCase, "hidden");
-        if (shouldSuspend) {
-          previousTargetStatus = moderationCase.profile.status;
-          await tx.profile.update({
-            where: { id: moderationCase.profileId },
-            data: {
-              status: "suspended",
-              accountModerationStatus: "suspended",
-              suspensionAppealDueAt: getModerationDeadline(),
-            },
-          });
-        }
         await tx.moderationCase.update({
           where: { id: moderationCase.id },
           data: {
@@ -218,7 +204,7 @@ export async function PATCH(
             actorId: authorization.admin.id,
             previousStatus: moderationCase.status,
             newStatus: "correctionRequired",
-            details: { reason, decision, accountSuspended: shouldSuspend },
+            details: { reason, decision, accountSuspended: false },
           },
         });
       }
@@ -254,9 +240,7 @@ export async function PATCH(
         success: true,
         decision,
         status: decision === "approve" ? "confirmed" : "correctionRequired",
-        accountSuspended:
-          decision !== "approve" &&
-          moderationCase.reviewMode === "postReview",
+        accountSuspended: false,
       } as const;
     });
 

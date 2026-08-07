@@ -261,7 +261,7 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("自己紹介音声")).toBeDefined();
     expect(screen.getByText("削除済み音声の対応状況")).toBeDefined();
     expect(
-      screen.getAllByText("事後確認待ち（公開中）").length,
+      screen.getAllByText("管理者確認待ち（非公開）").length,
     ).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("hidden")).toBeDefined();
     expect(screen.getAllByText("user / auth-use")).toHaveLength(3);
@@ -406,7 +406,7 @@ describe("AdminModerationDetail", () => {
     ).toBe("inappropriateContent");
     expect(
       screen.getByText(
-        "誹謗中傷・なりすまし・その他は確認完了まで非公開、それ以外は修正後に公開して事後確認します。",
+        "すべての対象は、修正後も管理者の確認が完了するまで非公開です。",
       ),
     ).toBeDefined();
 

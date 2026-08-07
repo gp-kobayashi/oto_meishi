@@ -362,7 +362,7 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
   });
 
-  it("事後確認で問題が残る場合はアカウントを利用停止にする", async () => {
+  it("旧事後確認ケースで問題が残っても対象だけを非公開にする", async () => {
     mocks.caseFindUnique.mockResolvedValueOnce({
       ...pendingCase,
       targetType: "audio",
@@ -381,17 +381,13 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     const result = await response.json();
 
     expect(response.status).toBe(200);
-    expect(result.accountSuspended).toBe(true);
+    expect(result.accountSuspended).toBe(false);
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { id: "profile-1" },
-      data: expect.objectContaining({
-        status: "suspended",
-        accountModerationStatus: "suspended",
-        suspensionAppealDueAt: expect.any(Date),
-      }),
+      data: { audioStatus: "hidden" },
     });
     expect(mocks.actionCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({ action: "suspend" }),
+      data: expect.objectContaining({ action: "hide" }),
       select: { id: true },
     });
   });

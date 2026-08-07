@@ -21,7 +21,7 @@ const audioStatusLabels = {
 
 const moderationCaseStatusLabels = {
   correctionRequired: "修正待ち",
-  postReviewPending: "事後確認待ち（公開中）",
+  postReviewPending: "管理者確認待ち（非公開）",
   preReviewPending: "管理者確認待ち（非公開）",
   confirmed: "確認済み",
 };
@@ -941,11 +941,6 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                                 }))
                               }
                             />
-                            {moderationCase.reviewMode === "postReview" ? (
-                              <p className={styles.reviewWarning}>
-                                事後確認で非公開継続または追加修正を選ぶと、アカウントを利用停止します。
-                              </p>
-                            ) : null}
                             <div className={styles.reportActions}>
                               <button
                                 type="button"
@@ -1291,7 +1286,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                           ))}
                         </select>
                         <p className={styles.reviewModeHelp}>
-                          誹謗中傷・なりすまし・その他は確認完了まで非公開、それ以外は修正後に公開して事後確認します。
+                          すべての対象は、修正後も管理者の確認が完了するまで非公開です。
                         </p>
                       </>
                     ) : null}
