@@ -244,17 +244,17 @@ describe("AdminModerationDetail", () => {
             ],
             violationSummary: {
               activeCount: 1,
-              countsByReason: { unsafeLink: 1 },
+              countsByReason: { impersonation: 1 },
             },
             violationEvents: [
               {
                 id: "violation-1",
                 moderationCaseId: "case-1",
                 eventType: "confirmed",
-                reasonCode: "unsafeLink",
+                reasonCode: "impersonation",
                 originalViolationEventId: null,
                 suspensionTriggered: true,
-                note: "危険なリンクを確認",
+                note: "なりすましを確認",
                 isActive: true,
                 adminIdentifier: "auth-adm",
                 adminRole: "admin",
@@ -331,6 +331,34 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("この違反確定により利用停止")).toBeDefined();
     expect(screen.getByText("違反回数の取り消し")).toBeDefined();
     expect(screen.getByText("本人確認により取り消し")).toBeDefined();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "本人確認により回数を取り消す",
+      }),
+    );
+    const revokeButton = screen.getByRole("button", {
+      name: "記録して取り消す",
+    }) as HTMLButtonElement;
+    expect(revokeButton.disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("本人確認の記録（必須）"), {
+      target: { value: "SNS投稿で本人と確認しました。" },
+    });
+    fireEvent.click(revokeButton);
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/moderation/violations/violation-1",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer admin-token",
+          },
+          body: JSON.stringify({
+            note: "SNS投稿で本人と確認しました。",
+          }),
+        },
+      );
+    });
     expect(screen.getByText("危険なリンクのため")).toBeDefined();
     expect(screen.getByRole("heading", { name: "通報" })).toBeDefined();
     expect(screen.getByText("危険または不正なリンク")).toBeDefined();

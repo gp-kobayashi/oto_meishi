@@ -216,6 +216,10 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   );
   const [updatingCaseId, setUpdatingCaseId] = useState("");
   const [caseError, setCaseError] = useState("");
+  const [pendingViolationId, setPendingViolationId] = useState("");
+  const [violationNote, setViolationNote] = useState("");
+  const [violationError, setViolationError] = useState("");
+  const [updatingViolation, setUpdatingViolation] = useState(false);
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -361,6 +365,56 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
       );
     } finally {
       setUpdatingReportId("");
+    }
+  };
+
+  const revokeViolation = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!pendingViolationId || !violationNote.trim() || updatingViolation) {
+      return;
+    }
+
+    setUpdatingViolation(true);
+    setViolationError("");
+    try {
+      if (!supabase) {
+        throw new Error("認証クライアントが初期化されていません。");
+      }
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("管理者アカウントでログインしてください。");
+      }
+
+      const response = await fetch(
+        `/api/admin/moderation/violations/${encodeURIComponent(pendingViolationId)}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ note: violationNote.trim() }),
+        },
+      );
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "違反回数を取り消せませんでした。");
+      }
+
+      setPendingViolationId("");
+      setViolationNote("");
+      await loadDetail();
+      setActionMessage("本人確認によりなりすましの違反回数を取り消しました。");
+    } catch (updateError) {
+      setViolationError(
+        updateError instanceof Error
+          ? updateError.message
+          : "違反回数を取り消せませんでした。",
+      );
+    } finally {
+      setUpdatingViolation(false);
     }
   };
 
@@ -1326,6 +1380,23 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                         担当者: {event.adminRole ?? "不明"} /{" "}
                         {event.adminIdentifier ?? "記録なし"}
                       </p>
+                      {event.eventType === "confirmed" &&
+                      event.isActive &&
+                      event.reasonCode === "impersonation" ? (
+                        <div className={styles.reportActions}>
+                          <button
+                            type="button"
+                            disabled={updatingViolation}
+                            onClick={() => {
+                              setPendingViolationId(event.id);
+                              setViolationNote("");
+                              setViolationError("");
+                            }}
+                          >
+                            本人確認により回数を取り消す
+                          </button>
+                        </div>
+                      ) : null}
                     </li>
                   ))}
                 </ol>
@@ -1505,6 +1576,65 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                         disabled={!reportNote.trim() || Boolean(updatingReportId)}
                       >
                         {updatingReportId ? "変更中..." : "メモを記録して変更"}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              </div>
+            ) : null}
+            {pendingViolationId ? (
+              <div className={styles.modalBackdrop}>
+                <section
+                  className={styles.actionDialog}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="violation-revocation-dialog-title"
+                >
+                  <p className={styles.dialogEyebrow}>違反回数の取り消し</p>
+                  <h2 id="violation-revocation-dialog-title">
+                    なりすましの違反回数を取り消します
+                  </h2>
+                  <p>
+                    SNSへの事前申請と投稿を確認した根拠を記録してください。この操作だけで利用停止は解除されません。
+                  </p>
+                  <form onSubmit={revokeViolation}>
+                    <label htmlFor="violation-revocation-note">
+                      本人確認の記録（必須）
+                    </label>
+                    <textarea
+                      id="violation-revocation-note"
+                      value={violationNote}
+                      maxLength={500}
+                      rows={5}
+                      autoFocus
+                      onChange={(event) => setViolationNote(event.target.value)}
+                    />
+                    <p className={styles.characterCount}>
+                      {violationNote.length} / 500
+                    </p>
+                    {violationError ? (
+                      <p className={styles.actionError} role="alert">
+                        {violationError}
+                      </p>
+                    ) : null}
+                    <div className={styles.dialogActions}>
+                      <button
+                        type="button"
+                        disabled={updatingViolation}
+                        onClick={() => {
+                          setPendingViolationId("");
+                          setViolationNote("");
+                          setViolationError("");
+                        }}
+                      >
+                        キャンセル
+                      </button>
+                      <button
+                        type="submit"
+                        className={styles.confirmButton}
+                        disabled={!violationNote.trim() || updatingViolation}
+                      >
+                        {updatingViolation ? "取消中..." : "記録して取り消す"}
                       </button>
                     </div>
                   </form>
