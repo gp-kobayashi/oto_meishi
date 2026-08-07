@@ -27,12 +27,12 @@ describe("getModerationNotification", () => {
     });
   });
 
-  it("事後確認では修正後に公開される案内を返す", () => {
+  it("旧事後確認方式の通知も管理者確認まで非公開の案内を返す", () => {
     expect(
       getModerationNotificationGuidance("audio", "hide", "postReview"),
     ).toEqual({
       actionLabel: "非公開",
-      guidance: "音声を修正すると公開され、管理者が事後確認を行います。",
+      guidance: "音声を修正しても、管理者の確認が完了するまで公開されません。",
       actionUrl: "/profile/edit",
       actionLinkLabel: "音声を修正",
     });

@@ -46,6 +46,7 @@ export function getModerationNotificationGuidance(
   action: NotificationAction,
   reviewMode: NotificationReviewMode,
 ) {
+  void reviewMode;
   if (action === "restore") {
     return {
       actionLabel: actionLabels[action],
@@ -66,26 +67,9 @@ export function getModerationNotificationGuidance(
   }
 
   const targetLabel = targetLabels[targetType];
-  if (reviewMode === "postReview") {
-    return {
-      actionLabel: actionLabels[action],
-      guidance: `${targetLabel}を修正すると公開され、管理者が事後確認を行います。`,
-      actionUrl: "/profile/edit",
-      actionLinkLabel: `${targetLabel}を修正`,
-    };
-  }
-  if (reviewMode === "preReview") {
-    return {
-      actionLabel: actionLabels[action],
-      guidance: `${targetLabel}を修正しても、管理者の確認が完了するまで公開されません。`,
-      actionUrl: "/profile/edit",
-      actionLinkLabel: `${targetLabel}を修正`,
-    };
-  }
-
   return {
     actionLabel: actionLabels[action],
-    guidance: `${targetLabel}を修正してください。変更内容は管理者が確認します。`,
+    guidance: `${targetLabel}を修正しても、管理者の確認が完了するまで公開されません。`,
     actionUrl: "/profile/edit",
     actionLinkLabel: `${targetLabel}を修正`,
   };

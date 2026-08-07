@@ -80,20 +80,16 @@ const moderationReasonLabels: Record<ModerationCase["reasonCode"], string> = {
 
 const moderationStatusLabels: Record<ModerationCase["status"], string> = {
   correctionRequired: "非公開・修正が必要",
-  postReviewPending: "管理者確認待ち（公開中）",
+  postReviewPending: "管理者確認待ち（非公開）",
   preReviewPending: "管理者確認待ち（非公開）",
   confirmed: "確認済み",
 };
 
 function ModerationNotice({ moderationCase }: { moderationCase: ModerationCase }) {
   const guidance =
-    moderationCase.status === "postReviewPending"
-      ? "変更内容は公開されています。管理者が事後確認を行います。"
-      : moderationCase.status === "preReviewPending"
-        ? "変更内容は管理者の確認が完了するまで公開されません。"
-        : moderationCase.reviewMode === "postReview"
-          ? "問題の箇所を変更すると公開され、管理者が事後確認を行います。"
-          : "問題の箇所を変更しても、管理者の確認が完了するまで公開されません。";
+    moderationCase.status === "confirmed"
+      ? "管理者による確認は完了しています。"
+      : "問題の箇所を変更しても、管理者の確認が完了するまで公開されません。";
 
   return (
     <aside className={styles.moderationNotice} role="status">

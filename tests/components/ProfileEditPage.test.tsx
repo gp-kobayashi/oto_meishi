@@ -350,19 +350,15 @@ describe("ProfileEditPage", () => {
     });
 
     expect(screen.getByText("著作権に関する問題")).toBeDefined();
-    expect(screen.getByText("管理者確認待ち（公開中）")).toBeDefined();
     expect(
-      screen.getByText(
-        "変更内容は公開されています。管理者が事後確認を行います。",
-      ),
-    ).toBeDefined();
+      screen.getAllByText("管理者確認待ち（非公開）"),
+    ).toHaveLength(2);
     expect(screen.getByText("なりすまし")).toBeDefined();
-    expect(screen.getByText("管理者確認待ち（非公開）")).toBeDefined();
     expect(
-      screen.getByText(
-        "変更内容は管理者の確認が完了するまで公開されません。",
+      screen.getAllByText(
+        "問題の箇所を変更しても、管理者の確認が完了するまで公開されません。",
       ),
-    ).toBeDefined();
+    ).toHaveLength(2);
   });
 
   it("音声とリンクが非公開でも対象外のプロフィール項目を保存できる", async () => {
