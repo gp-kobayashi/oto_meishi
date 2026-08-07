@@ -50,4 +50,31 @@ describe("Supabase migrations", () => {
     expect(sql).toContain('"status" = \'preReviewPending\'');
     expect(sql).toContain('where "status" = \'postReviewPending\'');
   });
+
+  it("通報状態履歴を外部非公開かつ前方向遷移だけで保存する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_create_content_report_status_events.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain('create table public."ContentReportStatusEvent"');
+    expect(sql).toContain(
+      'alter table public."ContentReportStatusEvent" enable row level security',
+    );
+    expect(sql).toContain(
+      'revoke all on table public."ContentReportStatusEvent" from anon, authenticated',
+    );
+    expect(sql).toContain(
+      'constraint "ContentReportStatusEvent_transition_check"',
+    );
+    expect(sql).toContain('"previousStatus" = \'pending\'');
+    expect(sql).toContain('"previousStatus" = \'reviewed\'');
+    expect(sql).toContain('insert into public."ContentReportStatusEvent"');
+    expect(sql).toContain('"isBackfilled"');
+  });
 });

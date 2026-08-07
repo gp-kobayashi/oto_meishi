@@ -148,14 +148,15 @@ enum ReportStatus {
 }
 
 model AdminUser {
-  id                String             @id @default(uuid()) @db.Uuid
-  authId            String             @unique
-  role              AdminRole          @default(moderator)
-  isActive          Boolean            @default(true)
-  moderationActions ModerationAction[]
-  reviewedReports   ContentReport[]    @relation("ReportReviewer")
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  id                 String                     @id @default(uuid()) @db.Uuid
+  authId             String                     @unique
+  role               AdminRole                  @default(moderator)
+  isActive           Boolean                    @default(true)
+  moderationActions  ModerationAction[]
+  reviewedReports    ContentReport[]            @relation("ReportReviewer")
+  reportStatusEvents ContentReportStatusEvent[]
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
 }
 
 model ModerationAction {
@@ -233,22 +234,41 @@ model ModerationCaseEvent {
 }
 
 model ContentReport {
-  id                    String       @id @default(uuid()) @db.Uuid
-  profile               Profile      @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  id                    String                     @id @default(uuid()) @db.Uuid
+  profile               Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId             String
   reason                ReportReason
-  details               String       @default("") @db.VarChar(500)
-  status                ReportStatus @default(pending)
-  reviewedByAdminUser   AdminUser?   @relation("ReportReviewer", fields: [reviewedByAdminUserId], references: [id], onDelete: SetNull)
-  reviewedByAdminUserId String?      @db.Uuid
+  details               String                     @default("") @db.VarChar(500)
+  status                ReportStatus               @default(pending)
+  reviewedByAdminUser   AdminUser?                 @relation("ReportReviewer", fields: [reviewedByAdminUserId], references: [id], onDelete: SetNull)
+  reviewedByAdminUserId String?                    @db.Uuid
   reviewedAt            DateTime?
-  reviewNote            String       @default("") @db.VarChar(500)
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
+  reviewNote            String                     @default("") @db.VarChar(500)
+  statusEvents          ContentReportStatusEvent[]
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
 
   @@index([status, createdAt])
   @@index([profileId, createdAt])
   @@index([reviewedByAdminUserId])
+}
+
+model ContentReportStatusEvent {
+  id             String        @id @default(uuid()) @db.Uuid
+  report         ContentReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  reportId       String        @db.Uuid
+  adminUser      AdminUser?    @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  adminUserId    String?       @db.Uuid
+  adminAuthId    String?       @db.VarChar(128)
+  adminRole      AdminRole?
+  previousStatus ReportStatus?
+  newStatus      ReportStatus
+  note           String        @db.VarChar(500)
+  isBackfilled   Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+
+  @@index([reportId, createdAt(sort: Desc)])
+  @@index([adminUserId, createdAt(sort: Desc)])
 }
 
 model Profile {
