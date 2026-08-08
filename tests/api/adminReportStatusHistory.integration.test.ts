@@ -29,6 +29,7 @@ describe("通報状態と対応履歴のトランザクション統合テスト"
   let adminUserId = "";
   let successReportId = "";
   let rollbackReportId = "";
+  let protectedReportId = "";
 
   const request = (reportId: string, note: string) =>
     PATCH(
@@ -68,7 +69,7 @@ describe("通報状態と対応履歴のトランザクション統合テスト"
     profileId = profile.id;
 
     const reports = await Promise.all(
-      ["success", "rollback"].map((label) =>
+      ["success", "rollback", "protected"].map((label) =>
         prisma.contentReport.create({
           data: {
             profileId,
@@ -81,6 +82,7 @@ describe("通報状態と対応履歴のトランザクション統合テスト"
     );
     successReportId = reports[0].id;
     rollbackReportId = reports[1].id;
+    protectedReportId = reports[2].id;
   });
 
   afterAll(async () => {
@@ -192,5 +194,26 @@ describe("通報状態と対応履歴のトランザクション統合テスト"
       reviewNote: "",
     });
     expect(eventCount).toBe(0);
+  });
+
+  it("終了済み通報をDBの直接更新でも再オープンできない", async () => {
+    await prisma.contentReport.update({
+      where: { id: protectedReportId },
+      data: { status: "resolved" },
+    });
+
+    await expect(
+      prisma.contentReport.update({
+        where: { id: protectedReportId },
+        data: { status: "reviewed" },
+      }),
+    ).rejects.toThrow("Invalid ContentReport status transition");
+
+    await expect(
+      prisma.contentReport.findUnique({
+        where: { id: protectedReportId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "resolved" });
   });
 });

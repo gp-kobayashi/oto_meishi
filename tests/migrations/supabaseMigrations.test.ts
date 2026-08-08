@@ -261,4 +261,27 @@ describe("Supabase migrations", () => {
     expect(sql).toContain('"status" = \'confirmed\'');
     expect(sql).toContain("interval '60 days'");
   });
+
+  it("終了済み通報を含む状態の逆遷移をDBで禁止する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_enforce_content_report_status_transitions.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain(
+      "create trigger prevent_invalid_content_report_status_transition",
+    );
+    expect(sql).toContain('before update of "status" on public."ContentReport"');
+    expect(sql).toContain("old.\"status\" = 'pending'");
+    expect(sql).toContain("old.\"status\" = 'reviewed'");
+    expect(sql).toContain("errcode = 'check_violation'");
+    expect(sql).toContain(
+      "revoke all on function public.prevent_invalid_content_report_status_transition()",
+    );
+  });
 });
