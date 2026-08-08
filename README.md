@@ -281,8 +281,9 @@ cp .env.integration.example .env.integration.local
 | `INTEGRATION_SUPABASE_ANON_KEY` | ローカルSupabaseのanon key |
 | `INTEGRATION_DATABASE_URL` | ローカルPostgresの接続文字列 |
 | `INTEGRATION_SUPABASE_SERVICE_ROLE_KEY` | テスト用Authユーザーを削除するためのローカルservice role key |
+| `INTEGRATION_ACCOUNT_BAN_HASH_SECRET` | 再登録禁止の照合テストだけに使う32文字以上の任意の秘密値 |
 
-ホストされたSupabaseプロジェクトのURLやキーは設定しないでください。`.env.integration.local`はGitの管理対象外です。
+`INTEGRATION_ACCOUNT_BAN_HASH_SECRET`には本番の秘密値を流用せず、ローカル統合テスト専用の値を設定してください。ホストされたSupabaseプロジェクトのURLやキーは設定しないでください。`.env.integration.local`はGitの管理対象外です。
 
 #### 3. ローカルDBを再作成
 
