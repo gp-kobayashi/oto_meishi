@@ -165,4 +165,28 @@ describe("Supabase migrations", () => {
     expect(sql).toContain("\"actorType\" = 'system'");
     expect(sql).toContain("on delete set null");
   });
+
+  it("完全削除後の最小記録と復元困難な再登録照合値を外部非公開で保持する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_create_registration_bans.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain('create table public."AccountDeletionRecord"');
+    expect(sql).toContain('create table public."RegistrationBanIdentifier"');
+    expect(sql).toContain('"formerAuthId" uuid not null unique');
+    expect(sql).toContain('"fingerprint" char(64) not null unique');
+    expect(sql).toContain('constraint "RegistrationBanIdentifier_provider_check"');
+    expect(sql).toContain(
+      'alter table public."AccountDeletionRecord" enable row level security',
+    );
+    expect(sql).toContain(
+      'revoke all on table public."RegistrationBanIdentifier" from anon, authenticated',
+    );
+  });
 });

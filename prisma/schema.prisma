@@ -75,6 +75,16 @@ enum AccountModerationStatus {
   deletionPending
 }
 
+enum RegistrationBanStatus {
+  active
+  revoked
+}
+
+enum RegistrationBanIdentifierType {
+  email
+  providerIdentity
+}
+
 enum ModerationReasonCode {
   inappropriateContent
   copyrightConcern
@@ -337,6 +347,31 @@ model Profile {
   @@index([audioStatus])
   @@index([accountModerationStatus, suspensionAppealDueAt])
   @@index([deletionScheduledAt])
+}
+
+model AccountDeletionRecord {
+  id                String                      @id @default(uuid()) @db.Uuid
+  formerAuthId      String                      @unique @db.Uuid
+  reason            String                      @db.VarChar(500)
+  deletedAt         DateTime                    @default(now())
+  banStatus         RegistrationBanStatus       @default(active)
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
+  bannedIdentifiers RegistrationBanIdentifier[]
+
+  @@index([banStatus, deletedAt])
+}
+
+model RegistrationBanIdentifier {
+  id                      String                        @id @default(uuid()) @db.Uuid
+  accountDeletionRecord   AccountDeletionRecord         @relation(fields: [accountDeletionRecordId], references: [id], onDelete: Cascade)
+  accountDeletionRecordId String                        @db.Uuid
+  identifierType          RegistrationBanIdentifierType
+  provider                String?                       @db.VarChar(64)
+  fingerprint             String                        @unique @db.Char(64)
+  createdAt               DateTime                      @default(now())
+
+  @@index([accountDeletionRecordId, createdAt])
 }
 
 model ModerationRequest {
