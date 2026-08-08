@@ -319,34 +319,36 @@ model ContentReportStatusEvent {
 }
 
 model Profile {
-  id                      String                     @id @default(uuid())
-  userId                  String                     @unique
-  authId                  String?                    @unique
-  status                  ProfileStatus              @default(active)
-  accountModerationStatus AccountModerationStatus    @default(active)
-  suspensionAppealDueAt   DateTime?
-  deletionScheduledAt     DateTime?
-  theme                   Theme                      @default(normal)
-  displayName             String
-  bio                     String
-  audioUrl                String
-  audioKey                String                     @default("")
-  audioContentHash        String?                    @db.VarChar(64)
-  audioTitle              String
-  audioStatus             AudioModerationStatus      @default(active)
-  sns                     SocialLink[]
-  reports                 ContentReport[]
-  notifications           UserNotification[]
-  moderationCases         ModerationCase[]
-  violationEvents         ModerationViolationEvent[]
-  moderationRequests      ModerationRequest[]
-  createdAt               DateTime                   @default(now())
-  updatedAt               DateTime                   @updatedAt
+  id                          String                     @id @default(uuid())
+  userId                      String                     @unique
+  authId                      String?                    @unique
+  status                      ProfileStatus              @default(active)
+  accountModerationStatus     AccountModerationStatus    @default(active)
+  suspensionAppealDueAt       DateTime?
+  deletionScheduledAt         DateTime?
+  deletionProcessingStartedAt DateTime?
+  theme                       Theme                      @default(normal)
+  displayName                 String
+  bio                         String
+  audioUrl                    String
+  audioKey                    String                     @default("")
+  audioContentHash            String?                    @db.VarChar(64)
+  audioTitle                  String
+  audioStatus                 AudioModerationStatus      @default(active)
+  sns                         SocialLink[]
+  reports                     ContentReport[]
+  notifications               UserNotification[]
+  moderationCases             ModerationCase[]
+  violationEvents             ModerationViolationEvent[]
+  moderationRequests          ModerationRequest[]
+  createdAt                   DateTime                   @default(now())
+  updatedAt                   DateTime                   @updatedAt
 
   @@index([status])
   @@index([audioStatus])
   @@index([accountModerationStatus, suspensionAppealDueAt])
   @@index([deletionScheduledAt])
+  @@index([accountModerationStatus, deletionProcessingStartedAt])
 }
 
 model AccountDeletionRecord {

@@ -227,4 +227,21 @@ describe("Supabase migrations", () => {
     expect(sql).toContain('alter column "deletedAt" drop default');
     expect(sql).toContain('alter column "deletedAt" drop not null');
   });
+
+  it("完全削除の重複実行を防ぐ一時的な取得日時を追加する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_add_account_deletion_claim.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain('add column "deletionProcessingStartedAt"');
+    expect(sql).toContain(
+      'create index "Profile_accountStatus_deletionProcessingStartedAt_idx"',
+    );
+  });
 });
