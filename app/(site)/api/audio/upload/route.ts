@@ -212,15 +212,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (profile.accountModerationStatus === "deletionPending") {
+      return NextResponse.json(
+        { error: "削除手続き中のため、音声をアップロードできません。" },
+        { status: 403 },
+      );
+    }
+
     if (
-      profile.status === "suspended" ||
-      (profile.accountModerationStatus ?? "active") !== "active" ||
       !["active", "hidden", "removed"].includes(
         profile.audioStatus ?? "active",
       )
     ) {
       return NextResponse.json(
-        { error: "管理対応中のため、音声をアップロードできません。" },
+        { error: "音声の状態が不正なため、音声をアップロードできません。" },
         { status: 403 },
       );
     }

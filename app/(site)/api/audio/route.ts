@@ -37,11 +37,19 @@ export async function DELETE(request: Request) {
       audioContentHash: true,
       audioTitle: true,
       audioStatus: true,
+      accountModerationStatus: true,
     },
   });
 
   if (!profile) {
     return NextResponse.json({ error: "profile not found" }, { status: 404 });
+  }
+
+  if (profile.accountModerationStatus === "deletionPending") {
+    return NextResponse.json(
+      { error: "削除手続き中のため、音声を削除できません。" },
+      { status: 403 },
+    );
   }
 
   if (!profile.audioKey && !profile.audioUrl) {

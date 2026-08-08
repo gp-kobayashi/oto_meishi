@@ -56,6 +56,7 @@ describe("DELETE /api/audio", () => {
       audioContentHash: "a".repeat(64),
       audioTitle: "古い音声",
       audioStatus: "active",
+      accountModerationStatus: "active",
     });
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
@@ -99,6 +100,7 @@ describe("DELETE /api/audio", () => {
         audioContentHash: true,
         audioTitle: true,
         audioStatus: true,
+        accountModerationStatus: true,
       },
     });
     expect(mocks.updateMany).toHaveBeenCalledWith({
@@ -134,6 +136,27 @@ describe("DELETE /api/audio", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+  });
+
+  it("削除手続き中のアカウントは音声を削除できない", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      audioUrl: "https://r2.example/audio/test/old.m4a",
+      audioKey: "audio/test/old.m4a",
+      audioContentHash: "a".repeat(64),
+      audioTitle: "古い音声",
+      audioStatus: "active",
+      accountModerationStatus: "deletionPending",
+    });
+
+    const response = await DELETE(request());
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "削除手続き中のため、音声を削除できません。",
+    });
     expect(mocks.updateMany).not.toHaveBeenCalled();
     expect(mocks.deleteFromR2).not.toHaveBeenCalled();
   });

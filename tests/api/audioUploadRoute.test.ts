@@ -861,11 +861,11 @@ describe("/api/audio/upload route", () => {
     });
   });
 
-  it("利用停止中のアカウントは音声を変更できない", async () => {
+  it("利用停止中でも音声を非公開のまま変更できる", async () => {
     mocks.findUniqueProfile.mockResolvedValueOnce({
       id: "profile-1",
       authId: "auth-user-1",
-      status: "active",
+      status: "suspended",
       accountModerationStatus: "suspended",
       audioStatus: "hidden",
       audioKey: "",
@@ -875,7 +875,29 @@ describe("/api/audio/upload route", () => {
 
     const response = await POST(uploadRequest(formDataWithFile()));
 
+    expect(response.status).toBe(200);
+    expect(mocks.convertToAac).toHaveBeenCalled();
+    expect(mocks.uploadToR2).toHaveBeenCalled();
+  });
+
+  it("削除手続き中のアカウントは音声を変更できない", async () => {
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      id: "profile-1",
+      authId: "auth-user-1",
+      status: "suspended",
+      accountModerationStatus: "deletionPending",
+      audioStatus: "hidden",
+      audioKey: "",
+      audioUrl: "",
+      moderationCases: [],
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
     expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: "削除手続き中のため、音声をアップロードできません。",
+    });
     expect(mocks.convertToAac).not.toHaveBeenCalled();
     expect(mocks.uploadToR2).not.toHaveBeenCalled();
   });
