@@ -60,9 +60,9 @@ export function getModerationNotificationGuidance(
     return {
       actionLabel: actionLabels[action],
       guidance:
-        "利用停止中は通常の編集を行えません。対応方法を確認してください。",
-      actionUrl: "/support",
-      actionLinkLabel: "解除申請を確認",
+        "利用停止中も登録内容は非公開のまま修正できます。すべて修正したうえで、解除申請に修正内容と申請理由を記載してください。",
+      actionUrl: "/profile/edit",
+      actionLinkLabel: "プロフィールを修正",
     };
   }
 

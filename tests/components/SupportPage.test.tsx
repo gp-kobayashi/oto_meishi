@@ -38,7 +38,12 @@ describe("SupportPage", () => {
       await screen.findByRole("heading", { name: "利用停止の解除申請" }),
     ).toBeDefined();
     expect(screen.getByText(/申請期限：/)).toBeDefined();
-    expect(screen.getByLabelText("申請内容（必須）")).toBeDefined();
+    expect(screen.getByLabelText("修正内容・申請理由（必須）")).toBeDefined();
+    expect(
+      screen
+        .getByRole("link", { name: "プロフィールを修正する" })
+        .getAttribute("href"),
+    ).toBe("/profile/edit");
     expect(
       screen.getByRole<HTMLButtonElement>("button", { name: "申請を送信" })
         .disabled,
@@ -66,7 +71,7 @@ describe("SupportPage", () => {
       }),
     ).toBeDefined();
     expect(screen.getByText(/削除予定日：/)).toBeDefined();
-    expect(screen.queryByLabelText("申請内容（必須）")).toBeNull();
+    expect(screen.queryByLabelText("修正内容・申請理由（必須）")).toBeNull();
   });
 
   it("確認中の同種申請がある場合はフォームを表示しない", async () => {
@@ -98,7 +103,7 @@ describe("SupportPage", () => {
         "同じ種類の申請を確認中です。回答が届くまで重複して送信できません。",
       ),
     ).toBeDefined();
-    expect(screen.queryByLabelText("申請内容（必須）")).toBeNull();
+    expect(screen.queryByLabelText("修正内容・申請理由（必須）")).toBeNull();
     expect(screen.getByText("確認中")).toBeDefined();
   });
 
@@ -148,7 +153,7 @@ describe("SupportPage", () => {
     );
 
     render(<SupportPage />);
-    const textarea = await screen.findByLabelText("申請内容（必須）");
+    const textarea = await screen.findByLabelText("修正内容・申請理由（必須）");
     fireEvent.change(textarea, { target: { value: "問い合わせ内容" } });
     fireEvent.click(screen.getByRole("button", { name: "申請を送信" }));
 

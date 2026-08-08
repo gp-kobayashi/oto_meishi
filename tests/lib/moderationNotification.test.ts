@@ -50,15 +50,15 @@ describe("getModerationNotification", () => {
     });
   });
 
-  it("利用停止通知は解除申請画面への導線を返す", () => {
+  it("利用停止通知は非公開の修正と解除申請を案内する", () => {
     expect(
       getModerationNotificationGuidance("profile", "suspend", null),
     ).toEqual({
       actionLabel: "利用停止",
       guidance:
-        "利用停止中は通常の編集を行えません。対応方法を確認してください。",
-      actionUrl: "/support",
-      actionLinkLabel: "解除申請を確認",
+        "利用停止中も登録内容は非公開のまま修正できます。すべて修正したうえで、解除申請に修正内容と申請理由を記載してください。",
+      actionUrl: "/profile/edit",
+      actionLinkLabel: "プロフィールを修正",
     });
   });
 });

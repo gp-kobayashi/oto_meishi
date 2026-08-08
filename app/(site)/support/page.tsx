@@ -205,8 +205,12 @@ export default function SupportPage() {
             ) : eligibility?.kind === "accountAppeal" ? (
               <>
                 <p>
-                  問題だと思われる箇所を確認し、対応した内容を具体的に記載してください。
-                  内容を理解していない、または問題が継続していると判断した場合は解除されません。
+                  利用停止中も、プロフィール編集画面で登録内容を非公開のまま修正できます。
+                  すべての問題箇所を修正したうえで、修正内容と申請理由を具体的に記載してください。
+                  問題が継続している、または対応内容を理解していないと判断した場合は解除されません。
+                </p>
+                <p>
+                  <Link href="/profile/edit">プロフィールを修正する</Link>
                 </p>
                 {eligibility.suspensionAppealDueAt ? (
                   <p className={styles.deadline}>
@@ -235,12 +239,13 @@ export default function SupportPage() {
 
             {canSubmit ? (
               <form onSubmit={submitRequest}>
-                <label htmlFor="support-message">申請内容（必須）</label>
+                <label htmlFor="support-message">修正内容・申請理由（必須）</label>
                 <textarea
                   id="support-message"
                   value={message}
                   maxLength={500}
                   rows={7}
+                  placeholder="例：問題のリンクを削除しました。利用規約を確認し、今後同様の登録を行わないことを理解しています。"
                   onChange={(event) => setMessage(event.target.value)}
                 />
                 <div className={styles.formMeta}>
