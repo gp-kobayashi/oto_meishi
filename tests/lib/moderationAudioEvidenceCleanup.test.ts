@@ -56,6 +56,7 @@ describe("期限切れモデレーション音声の削除", () => {
       where: {
         storageObjectKey: "audio/user/expired.m4a",
         expiresAt: { lte: now },
+        moderationCase: { status: "confirmed" },
       },
       data: { storageObjectKey: null },
     });
@@ -89,5 +90,20 @@ describe("期限切れモデレーション音声の削除", () => {
       failed: 1,
     });
     expect(mocks.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("未完了ケースが同じ音声を参照中ならR2を削除しない", async () => {
+    mocks.snapshotFindFirst.mockResolvedValueOnce(null);
+    mocks.snapshotFindFirst.mockResolvedValueOnce({ id: "snapshot-open" });
+
+    await expect(
+      cleanupExpiredModerationAudioEvidence(now),
+    ).resolves.toEqual({
+      examined: 1,
+      deletedObjects: 0,
+      releasedReferences: 2,
+      failed: 0,
+    });
+    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
   });
 });

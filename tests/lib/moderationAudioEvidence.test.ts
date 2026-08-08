@@ -23,6 +23,7 @@ describe("モデレーション音声の参照判定", () => {
     const now = new Date("2026-08-03T00:00:00.000Z");
     profileFindFirst.mockResolvedValueOnce({ id: "profile-1" });
     snapshotFindFirst.mockResolvedValueOnce({ id: "snapshot-1" });
+    snapshotFindFirst.mockResolvedValueOnce({ id: "snapshot-2" });
 
     await expect(
       getAudioObjectReferenceState(
@@ -33,6 +34,7 @@ describe("モデレーション音声の参照判定", () => {
     ).resolves.toEqual({
       referencedByCurrentProfile: true,
       referencedByUnexpiredSnapshot: true,
+      referencedByUnresolvedCase: true,
     });
     expect(profileFindFirst).toHaveBeenCalledWith({
       where: {
@@ -50,6 +52,13 @@ describe("モデレーション音声の参照判定", () => {
       },
       select: { id: true },
     });
+    expect(snapshotFindFirst).toHaveBeenCalledWith({
+      where: {
+        storageObjectKey: "audio/testuser/reported.m4a",
+        moderationCase: { status: { not: "confirmed" } },
+      },
+      select: { id: true },
+    });
   });
 
   it("どちらからも参照されていない音声だけ削除可能と判定する", async () => {
@@ -63,6 +72,14 @@ describe("モデレーション音声の参照判定", () => {
       canDeleteAudioObject({
         referencedByCurrentProfile: false,
         referencedByUnexpiredSnapshot: true,
+        referencedByUnresolvedCase: false,
+      }),
+    ).toBe(false);
+    expect(
+      canDeleteAudioObject({
+        referencedByCurrentProfile: false,
+        referencedByUnexpiredSnapshot: false,
+        referencedByUnresolvedCase: true,
       }),
     ).toBe(false);
   });
@@ -71,6 +88,7 @@ describe("モデレーション音声の参照判定", () => {
     await expect(getAudioObjectReferenceState(client, "  ")).resolves.toEqual({
       referencedByCurrentProfile: false,
       referencedByUnexpiredSnapshot: false,
+      referencedByUnresolvedCase: false,
     });
     expect(profileFindFirst).not.toHaveBeenCalled();
     expect(snapshotFindFirst).not.toHaveBeenCalled();

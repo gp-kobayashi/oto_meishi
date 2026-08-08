@@ -8,6 +8,7 @@ type AudioEvidenceReferenceClient = Pick<
 export type AudioObjectReferenceState = {
   referencedByCurrentProfile: boolean;
   referencedByUnexpiredSnapshot: boolean;
+  referencedByUnresolvedCase: boolean;
 };
 
 export async function getAudioObjectReferenceState(
@@ -20,10 +21,12 @@ export async function getAudioObjectReferenceState(
     return {
       referencedByCurrentProfile: false,
       referencedByUnexpiredSnapshot: false,
+      referencedByUnresolvedCase: false,
     };
   }
 
-  const [currentProfile, unexpiredSnapshot] = await Promise.all([
+  const [currentProfile, unexpiredSnapshot, unresolvedCaseSnapshot] =
+    await Promise.all([
     client.profile.findFirst({
       where: {
         OR: [
@@ -40,11 +43,19 @@ export async function getAudioObjectReferenceState(
       },
       select: { id: true },
     }),
-  ]);
+      client.moderationSnapshot.findFirst({
+        where: {
+          storageObjectKey: normalizedKey,
+          moderationCase: { status: { not: "confirmed" } },
+        },
+        select: { id: true },
+      }),
+    ]);
 
   return {
     referencedByCurrentProfile: currentProfile !== null,
     referencedByUnexpiredSnapshot: unexpiredSnapshot !== null,
+    referencedByUnresolvedCase: unresolvedCaseSnapshot !== null,
   };
 }
 
@@ -53,6 +64,7 @@ export function canDeleteAudioObject(
 ): boolean {
   return (
     !referenceState.referencedByCurrentProfile &&
-    !referenceState.referencedByUnexpiredSnapshot
+    !referenceState.referencedByUnexpiredSnapshot &&
+    !referenceState.referencedByUnresolvedCase
   );
 }

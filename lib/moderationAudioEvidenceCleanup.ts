@@ -27,6 +27,7 @@ export async function cleanupExpiredModerationAudioEvidence(
     where: {
       storageObjectKey: { not: null },
       expiresAt: { lte: now },
+      moderationCase: { status: "confirmed" },
     },
     select: { storageObjectKey: true },
     distinct: ["storageObjectKey"],
@@ -62,6 +63,7 @@ export async function cleanupExpiredModerationAudioEvidence(
         where: {
           storageObjectKey: objectKey,
           expiresAt: { lte: now },
+          moderationCase: { status: "confirmed" },
         },
         data: { storageObjectKey: null },
       });
