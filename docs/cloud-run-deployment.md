@@ -154,9 +154,9 @@ gcloud run services logs read oto-meishi --region=asia-northeast1 --limit=100
 
 Google・Facebook側のOAuth設定にも、Supabase Dashboardに表示されるコールバックURLを登録してください。
 
-## 10. 審査用音声の定期削除を設定する
+## 10. モデレーションの定期処理を設定する
 
-モデレーション証拠の保持期限を過ぎた音声を、1日1回Cloud Schedulerから削除します。`CLEANUP_SECRET`にはSecret Managerの`oto-meishi-moderation-cleanup-secret`と同じ値を一時的に設定してください。
+ユーザー対応期限の処理と、保持期限を過ぎた審査用音声の削除を、1日1回Cloud Schedulerから実行します。`CLEANUP_SECRET`にはSecret Managerの`oto-meishi-moderation-cleanup-secret`と同じ値を一時的に設定してください。
 
 ```powershell
 $SERVICE_URL = gcloud run services describe oto-meishi --region=asia-northeast1 --format="value(status.url)"
@@ -173,15 +173,31 @@ gcloud scheduler jobs create http oto-meishi-audio-evidence-cleanup `
   --max-retry-attempts=3 `
   --min-backoff=60s
 
+gcloud scheduler jobs create http oto-meishi-moderation-deadlines `
+  --location=asia-northeast1 `
+  --schedule="10 3 * * *" `
+  --time-zone="Asia/Tokyo" `
+  --uri="$SERVICE_URL/api/internal/moderation/deadlines" `
+  --http-method=POST `
+  --headers="Authorization=Bearer $CLEANUP_SECRET" `
+  --attempt-deadline=120s `
+  --max-retry-attempts=3 `
+  --min-backoff=60s
+
 Remove-Variable CLEANUP_SECRET
 ```
 
-このAPIは`MODERATION_CLEANUP_SECRET`が未設定、またはBearerトークンが一致しない場合は`401`を返します。Cloud Schedulerジョブを閲覧・変更できる権限は、運用に必要な管理者だけへ付与してください。シークレットを更新した場合は、Cloud RunのSecret参照とSchedulerのヘッダーを同じ値へ更新します。
+これらのAPIは`MODERATION_CLEANUP_SECRET`が未設定、またはBearerトークンが一致しない場合は`401`を返します。Cloud Schedulerジョブを閲覧・変更できる権限は、運用に必要な管理者だけへ付与してください。シークレットを更新した場合は、Cloud RunのSecret参照とSchedulerのヘッダーを同じ値へ更新します。
+
+期限処理は条件付き更新を使用し、Cloud Schedulerの再試行や重複実行で監査履歴と通知を二重作成しない設計です。2つの処理が同時にCloud Runへ到達しないよう、実行時刻を10分ずらしています。
+
+Cloud Schedulerは現在、請求先アカウントごとに月3ジョブまで無料です。この構成では2ジョブを使用します。料金は変更される可能性があるため、デプロイ時に[Cloud Schedulerの料金](https://cloud.google.com/scheduler/pricing)を確認してください。
 
 初回は手動実行し、結果とCloud Runログを確認します。
 
 ```powershell
 gcloud scheduler jobs run oto-meishi-audio-evidence-cleanup --location=asia-northeast1
+gcloud scheduler jobs run oto-meishi-moderation-deadlines --location=asia-northeast1
 gcloud run services logs read oto-meishi --region=asia-northeast1 --limit=100
 ```
 

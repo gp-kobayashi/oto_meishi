@@ -121,7 +121,7 @@ cp .env.example .env.local
 | `R2_ACCOUNT_ID` | サーバーのみ | 必須 | CloudflareアカウントID |
 | `R2_ACCESS_KEY_ID` | サーバーのみ | 必須 | R2 APIトークンのAccess Key ID |
 | `R2_SECRET_ACCESS_KEY` | サーバーのみ | 必須 | R2 APIトークンのSecret Access Key |
-| `MODERATION_CLEANUP_SECRET` | サーバーのみ | 必須（本番） | 期限切れの審査用音声を削除する内部APIのBearer認証用ランダム値 |
+| `MODERATION_CLEANUP_SECRET` | サーバーのみ | 必須（本番） | モデレーション期限処理と審査用音声削除の内部APIで使用するBearer認証用ランダム値 |
 | `R2_BUCKET` | サーバーのみ | 必須 | 非公開R2バケット名 |
 | `R2_REGION` | サーバーのみ | 必須 | 通常は`auto` |
 | `R2_PUBLIC_URL` | サーバーのみ | 任意 | 過去の公開R2 URLをオブジェクトキーへ移行するときだけ使用 |
