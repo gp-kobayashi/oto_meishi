@@ -74,6 +74,7 @@ const actionLabels = {
   hide: "非公開",
   restore: "復旧",
   suspend: "利用停止",
+  scheduleDeletion: "削除予定化",
   remove: "削除",
 };
 
@@ -1428,7 +1429,9 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                       </p>
                       <p className={styles.historyReason}>{entry.reason}</p>
                       <p className={styles.historyAdmin}>
-                        実行者: {entry.adminRole} / {entry.adminIdentifier}
+                        {entry.actorType === "system"
+                          ? "実行者: システム"
+                          : `実行者: ${entry.adminRole ?? "不明"} / ${entry.adminIdentifier ?? "記録なし"}`}
                       </p>
                     </li>
                   ))}

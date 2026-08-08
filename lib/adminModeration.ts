@@ -210,12 +210,13 @@ export type ModerationDetailResponse = {
       id: string;
       targetType: "profile" | "audio" | "socialLink";
       targetId: string;
-      action: "hide" | "restore" | "suspend" | "remove";
+      action: "hide" | "restore" | "suspend" | "scheduleDeletion" | "remove";
+      actorType: "admin" | "system";
       previousStatus: string;
       newStatus: string;
       reason: string;
-      adminIdentifier: string;
-      adminRole: "moderator" | "admin";
+      adminIdentifier: string | null;
+      adminRole: "moderator" | "admin" | null;
       createdAt: string;
     }[];
   };

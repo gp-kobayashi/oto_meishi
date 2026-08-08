@@ -184,11 +184,24 @@ describe("GET /api/admin/moderation/[profileId]", () => {
         targetType: "socialLink",
         targetId: "link-1",
         action: "hide",
+        actorType: "admin",
         previousStatus: "active",
         newStatus: "hidden",
         reason: "危険なリンクのため",
         createdAt: new Date("2026-07-17T01:00:00.000Z"),
         adminUser: { authId: "auth-admin-123456", role: "admin" },
+      },
+      {
+        id: "action-system-1",
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "scheduleDeletion",
+        actorType: "system",
+        previousStatus: "suspended",
+        newStatus: "deletionPending",
+        reason: "利用停止後60日間、解除申請がなかったため",
+        createdAt: new Date("2026-07-18T01:00:00.000Z"),
+        adminUser: null,
       },
     ]);
   });
@@ -321,8 +334,16 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       history: [
         {
           id: "action-1",
+          actorType: "admin",
           adminIdentifier: "auth-adm",
           reason: "危険なリンクのため",
+        },
+        {
+          id: "action-system-1",
+          action: "scheduleDeletion",
+          actorType: "system",
+          adminIdentifier: null,
+          adminRole: null,
         },
       ],
     });

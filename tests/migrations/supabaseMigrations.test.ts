@@ -145,4 +145,24 @@ describe("Supabase migrations", () => {
     expect(sql).toContain("'unofficialThirdPartyProfile'");
     expect(sql).toContain("'politicalReligiousPromotion'");
   });
+
+  it("期限処理を管理者操作と区別して監査履歴へ保存する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_support_system_moderation_actions.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain("'scheduleDeletion'");
+    expect(sql).toContain('add column "actorType" "ModerationActorType"');
+    expect(sql).toContain('alter column "adminUserId" drop not null');
+    expect(sql).toContain('constraint "ModerationAction_actor_check"');
+    expect(sql).toContain("\"actorType\" = 'admin'");
+    expect(sql).toContain("\"actorType\" = 'system'");
+    expect(sql).toContain("on delete set null");
+  });
 });

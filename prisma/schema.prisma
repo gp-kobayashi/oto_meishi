@@ -65,6 +65,7 @@ enum ModerationActionType {
   hide
   restore
   suspend
+  scheduleDeletion
   remove
 }
 
@@ -170,8 +171,9 @@ model AdminUser {
 
 model ModerationAction {
   id             String               @id @default(uuid()) @db.Uuid
-  adminUser      AdminUser            @relation(fields: [adminUserId], references: [id])
-  adminUserId    String               @db.Uuid
+  adminUser      AdminUser?           @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  adminUserId    String?              @db.Uuid
+  actorType      ModerationActorType  @default(admin)
   profileId      String
   targetType     ModerationTargetType
   targetId       String

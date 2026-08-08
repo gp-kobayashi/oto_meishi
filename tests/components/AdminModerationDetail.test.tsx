@@ -280,12 +280,26 @@ describe("AdminModerationDetail", () => {
                 targetType: "socialLink",
                 targetId: "link-1",
                 action: "hide",
+                actorType: "admin",
                 previousStatus: "active",
                 newStatus: "hidden",
                 reason: "危険なリンクのため",
                 adminIdentifier: "auth-adm",
                 adminRole: "admin",
                 createdAt: "2026-07-17T01:00:00.000Z",
+              },
+              {
+                id: "action-system-1",
+                targetType: "profile",
+                targetId: "profile-1",
+                action: "scheduleDeletion",
+                actorType: "system",
+                previousStatus: "suspended",
+                newStatus: "deletionPending",
+                reason: "利用停止後60日間、解除申請がなかったため",
+                adminIdentifier: null,
+                adminRole: null,
+                createdAt: "2026-07-18T01:00:00.000Z",
               },
             ],
           },
@@ -326,6 +340,8 @@ describe("AdminModerationDetail", () => {
       ),
     ).toBeDefined();
     expect(screen.getByRole("heading", { name: "管理操作履歴" })).toBeDefined();
+    expect(screen.getByText("削除予定化")).toBeDefined();
+    expect(screen.getByText("実行者: システム")).toBeDefined();
     expect(screen.getByRole("heading", { name: "違反履歴" })).toBeDefined();
     expect(screen.getByText("有効 1件")).toBeDefined();
     expect(screen.getByText("この違反確定により利用停止")).toBeDefined();
