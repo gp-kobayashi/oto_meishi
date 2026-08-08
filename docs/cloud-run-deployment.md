@@ -44,7 +44,7 @@ gcloud iam service-accounts create oto-meishi-runner --display-name="oto_meishi 
 
 ## 5. Secret Managerへ秘密値を登録する
 
-Google Cloud Consoleの「Secret Manager」で以下の6件を作成し、初期バージョンを`1`として値を登録します。
+Google Cloud Consoleの「Secret Manager」で以下の7件を作成し、初期バージョンを`1`として値を登録します。
 
 | Secret名 | 設定する値 |
 | --- | --- |
@@ -54,6 +54,7 @@ Google Cloud Consoleの「Secret Manager」で以下の6件を作成し、初期
 | `oto-meishi-r2-access-key-id` | R2 APIトークンのAccess Key ID |
 | `oto-meishi-r2-secret-access-key` | R2 APIトークンのSecret Access Key |
 | `oto-meishi-moderation-cleanup-secret` | 32文字以上のランダムな定期削除API用Bearerトークン |
+| `oto-meishi-account-ban-hash-secret` | 32文字以上のランダムな再登録禁止照合用HMAC秘密値 |
 
 各Secretに対して、Cloud Run実行アカウントへ「Secret Managerのシークレットアクセサー」権限を付与します。
 
@@ -66,7 +67,8 @@ $SECRETS = @(
   "oto-meishi-r2-account-id",
   "oto-meishi-r2-access-key-id",
   "oto-meishi-r2-secret-access-key",
-  "oto-meishi-moderation-cleanup-secret"
+  "oto-meishi-moderation-cleanup-secret",
+  "oto-meishi-account-ban-hash-secret"
 )
 
 foreach ($SECRET in $SECRETS) {

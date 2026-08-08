@@ -122,6 +122,7 @@ cp .env.example .env.local
 | `R2_ACCESS_KEY_ID` | サーバーのみ | 必須 | R2 APIトークンのAccess Key ID |
 | `R2_SECRET_ACCESS_KEY` | サーバーのみ | 必須 | R2 APIトークンのSecret Access Key |
 | `MODERATION_CLEANUP_SECRET` | サーバーのみ | 必須（本番） | モデレーション期限処理と審査用音声削除の内部APIで使用するBearer認証用ランダム値 |
+| `ACCOUNT_BAN_HASH_SECRET` | サーバーのみ | 必須（本番） | 再登録禁止対象のメール・外部認証IDをHMAC照合値へ変換する32文字以上の秘密値 |
 | `R2_BUCKET` | サーバーのみ | 必須 | 非公開R2バケット名 |
 | `R2_REGION` | サーバーのみ | 必須 | 通常は`auto` |
 | `R2_PUBLIC_URL` | サーバーのみ | 任意 | 過去の公開R2 URLをオブジェクトキーへ移行するときだけ使用 |
@@ -140,12 +141,15 @@ R2_ACCOUNT_ID=your-account-id
 R2_ACCESS_KEY_ID=your-access-key-id
 R2_SECRET_ACCESS_KEY=your-secret-access-key
 MODERATION_CLEANUP_SECRET=replace-with-at-least-32-random-characters
+ACCOUNT_BAN_HASH_SECRET=replace-with-another-stable-32-character-secret
 R2_BUCKET=your-private-bucket
 R2_REGION=auto
 R2_PUBLIC_URL=
 ```
 
-`.env.local`は`.gitignore`の対象です。`DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2の認証情報、`MODERATION_CLEANUP_SECRET`をGitへコミットしたり、`NEXT_PUBLIC_`を付けたりしないでください。`NEXT_PUBLIC_`付きの値はブラウザへ含まれるため、秘密情報には使用できません。
+`.env.local`は`.gitignore`の対象です。`DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2の認証情報、`MODERATION_CLEANUP_SECRET`、`ACCOUNT_BAN_HASH_SECRET`をGitへコミットしたり、`NEXT_PUBLIC_`を付けたりしないでください。`NEXT_PUBLIC_`付きの値はブラウザへ含まれるため、秘密情報には使用できません。
+
+`ACCOUNT_BAN_HASH_SECRET`は既存の再登録禁止記録との照合に継続して必要です。通常のシークレット更新では変更せず、漏えい時は既存照合値の移行方法を決めてから更新してください。
 
 `NEXT_PUBLIC_SITE_URL`はパスや末尾スラッシュを含まないオリジンを設定します。ローカル開発では`http://localhost:3000`、本番環境では次の値を使用します。
 
@@ -371,7 +375,7 @@ GitHub
 本番環境では、公開値と秘密値を分けて設定してください。
 
 - Dockerビルド時と実行時の公開値: `NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`NEXT_PUBLIC_SITE_URL`
-- Secret Manager: `DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2認証情報、`MODERATION_CLEANUP_SECRET`
+- Secret Manager: `DATABASE_URL`、`SUPABASE_SERVICE_ROLE_KEY`、R2認証情報、`MODERATION_CLEANUP_SECRET`、`ACCOUNT_BAN_HASH_SECRET`
 - Cloud Runの通常環境変数: `R2_BUCKET`、`R2_REGION`
 
 Google CloudのAPI有効化、Artifact Registry、実行サービスアカウント、Secret Manager、Cloud Buildの権限、デプロイコマンドについては[Cloud Runデプロイ手順](docs/cloud-run-deployment.md)を参照してください。

@@ -50,7 +50,7 @@ steps:
       - --cpu-throttling
       - --no-cpu-boost
       - --set-env-vars=NEXT_PUBLIC_SUPABASE_URL=${_NEXT_PUBLIC_SUPABASE_URL},NEXT_PUBLIC_SUPABASE_ANON_KEY=${_NEXT_PUBLIC_SUPABASE_ANON_KEY},NEXT_PUBLIC_SITE_URL=${_NEXT_PUBLIC_SITE_URL},R2_BUCKET=${_R2_BUCKET},R2_REGION=auto
-      - --set-secrets=DATABASE_URL=oto-meishi-database-url:1,SUPABASE_SERVICE_ROLE_KEY=oto-meishi-supabase-service-role-key:1,R2_ACCOUNT_ID=oto-meishi-r2-account-id:1,R2_ACCESS_KEY_ID=oto-meishi-r2-access-key-id:1,R2_SECRET_ACCESS_KEY=oto-meishi-r2-secret-access-key:1,MODERATION_CLEANUP_SECRET=oto-meishi-moderation-cleanup-secret:1
+      - --set-secrets=DATABASE_URL=oto-meishi-database-url:1,SUPABASE_SERVICE_ROLE_KEY=oto-meishi-supabase-service-role-key:1,R2_ACCOUNT_ID=oto-meishi-r2-account-id:1,R2_ACCESS_KEY_ID=oto-meishi-r2-access-key-id:1,R2_SECRET_ACCESS_KEY=oto-meishi-r2-secret-access-key:1,MODERATION_CLEANUP_SECRET=oto-meishi-moderation-cleanup-secret:1,ACCOUNT_BAN_HASH_SECRET=oto-meishi-account-ban-hash-secret:1
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE_NAME}:$BUILD_ID
