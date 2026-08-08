@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { sanitizeProfileData } from "@/lib/apiValidation";
@@ -23,6 +24,7 @@ import {
   consumePrivateProfileReadUserRateLimit,
   consumePublicProfileReadIpRateLimit,
 } from "@/lib/profileReadRateLimit";
+import { isRegistrationBanned } from "@/lib/registrationBan";
 
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -520,9 +522,10 @@ export async function POST(request: Request) {
     }
     const token = authHeader.split(" ")[1];
 
-    let supabaseUser: { id: string } | null = null;
+    let supabaseUser: User | null = null;
+    let supabaseServer: ReturnType<typeof createServerSupabaseClient>;
     try {
-      const supabaseServer = createServerSupabaseClient();
+      supabaseServer = createServerSupabaseClient();
       const { data: { user }, error } = await supabaseServer.auth.getUser(token);
       if (error || !user) {
         return NextResponse.json(
@@ -653,6 +656,19 @@ export async function POST(request: Request) {
         return NextResponse.json(
           { error: "このアカウントはすでに別のユーザーIDで登録されています。" },
           { status: 400 },
+        );
+      }
+
+      if (await isRegistrationBanned(supabaseUser)) {
+        const { error: deleteAuthError } =
+          await supabaseServer.auth.admin.deleteUser(supabaseUser.id);
+        if (deleteAuthError) {
+          console.error("Failed to delete a prohibited Auth registration");
+        }
+
+        return NextResponse.json(
+          { error: "このアカウントは利用できません。" },
+          { status: 403, headers: PRIVATE_NO_STORE_HEADERS },
         );
       }
 

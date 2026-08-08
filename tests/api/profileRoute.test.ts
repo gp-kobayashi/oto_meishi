@@ -4,6 +4,8 @@ import { createModeratedUrlHash } from "@/lib/moderationRemediation";
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     getUser: vi.fn(),
+    deleteUser: vi.fn(),
+    isRegistrationBanned: vi.fn(),
     profileFindUnique: vi.fn(),
     profileCreate: vi.fn(),
     profileUpdate: vi.fn(),
@@ -31,8 +33,15 @@ vi.mock("@/lib/supabaseClient", () => ({
   createServerSupabaseClient: () => ({
     auth: {
       getUser: mocks.getUser,
+      admin: {
+        deleteUser: mocks.deleteUser,
+      },
     },
   }),
+}));
+
+vi.mock("@/lib/registrationBan", () => ({
+  isRegistrationBanned: mocks.isRegistrationBanned,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -86,9 +95,17 @@ describe("/api/profile route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getUser.mockResolvedValue({
-      data: { user: { id: "auth-user-1" } },
+      data: {
+        user: {
+          id: "auth-user-1",
+          email: "user@example.com",
+          identities: [],
+        },
+      },
       error: null,
     });
+    mocks.deleteUser.mockResolvedValue({ data: {}, error: null });
+    mocks.isRegistrationBanned.mockResolvedValue(false);
     mocks.socialLinkDeleteMany.mockResolvedValue({ count: 0 });
     mocks.socialLinkCreateMany.mockResolvedValue({ count: 0 });
     mocks.socialLinkCreate.mockResolvedValue({});
@@ -1646,6 +1663,33 @@ describe("/api/profile route", () => {
     });
     expect(mocks.profileCreate).not.toHaveBeenCalled();
     expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
+  });
+
+  it("再登録禁止対象のプロフィール作成を拒否してAuthユーザーを削除する", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce(null);
+    mocks.profileFindUnique.mockResolvedValueOnce(null);
+    mocks.isRegistrationBanned.mockResolvedValueOnce(true);
+
+    const response = await POST(
+      postRequest({
+        userId: "banned-user",
+        displayName: "Banned User",
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(response.headers.get("Cache-Control")).toContain("no-store");
+    await expect(response.json()).resolves.toEqual({
+      error: "このアカウントは利用できません。",
+    });
+    expect(mocks.isRegistrationBanned).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "auth-user-1",
+        email: "user@example.com",
+      }),
+    );
+    expect(mocks.deleteUser).toHaveBeenCalledWith("auth-user-1");
+    expect(mocks.profileCreate).not.toHaveBeenCalled();
   });
 
   it("プロフィール保存の内部エラーをレスポンスへ公開しない", async () => {
