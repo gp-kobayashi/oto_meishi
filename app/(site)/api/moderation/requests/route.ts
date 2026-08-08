@@ -58,6 +58,7 @@ export async function GET(request: Request) {
           status: true,
           accountModerationStatus: true,
           suspensionAppealDueAt: true,
+          deletionScheduledAt: true,
           audioStatus: true,
           sns: {
             where: { status: "hidden" },
@@ -117,6 +118,7 @@ export async function GET(request: Request) {
     return Response.json(
       {
         eligibility: {
+          accountStatus: profile.accountModerationStatus,
           kind: isDeletionPending
             ? null
             : isSuspended
@@ -126,6 +128,8 @@ export async function GET(request: Request) {
               : null,
           suspensionAppealDueAt:
             profile.suspensionAppealDueAt?.toISOString() ?? null,
+          deletionScheduledAt:
+            profile.deletionScheduledAt?.toISOString() ?? null,
         },
         requests: requests.map(serializeRequest),
       },

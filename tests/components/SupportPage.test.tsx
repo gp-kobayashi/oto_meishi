@@ -24,7 +24,9 @@ describe("SupportPage", () => {
       Response.json({
         eligibility: {
           kind: "accountAppeal",
+          accountStatus: "suspended",
           suspensionAppealDueAt: "2026-09-29T00:00:00.000Z",
+          deletionScheduledAt: null,
         },
         requests: [],
       }),
@@ -41,6 +43,30 @@ describe("SupportPage", () => {
       screen.getByRole<HTMLButtonElement>("button", { name: "申請を送信" })
         .disabled,
     ).toBe(true);
+  });
+
+  it("削除予定状態と削除予定日を表示する", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      Response.json({
+        eligibility: {
+          kind: null,
+          accountStatus: "deletionPending",
+          suspensionAppealDueAt: "2026-08-08T00:00:00.000Z",
+          deletionScheduledAt: "2026-10-07T00:00:00.000Z",
+        },
+        requests: [],
+      }),
+    );
+
+    render(<SupportPage />);
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "アカウントは削除予定です",
+      }),
+    ).toBeDefined();
+    expect(screen.getByText(/削除予定日：/)).toBeDefined();
+    expect(screen.queryByLabelText("申請内容（必須）")).toBeNull();
   });
 
   it("確認中の同種申請がある場合はフォームを表示しない", async () => {

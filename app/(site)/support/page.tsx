@@ -22,7 +22,9 @@ type ModerationRequest = {
 type RequestResponse = {
   eligibility?: {
     kind: RequestKind | null;
+    accountStatus: "active" | "suspended" | "deletionPending";
     suspensionAppealDueAt: string | null;
+    deletionScheduledAt: string | null;
   };
   requests?: ModerationRequest[];
   error?: string;
@@ -180,11 +182,27 @@ export default function SupportPage() {
         <div className={styles.content}>
           <section className={styles.panel} aria-labelledby="request-heading">
             <h2 id="request-heading">
-              {eligibility?.kind
+              {eligibility?.accountStatus === "deletionPending"
+                ? "アカウントは削除予定です"
+                : eligibility?.kind
                 ? kindLabels[eligibility.kind]
                 : "現在申請できる対応はありません"}
             </h2>
-            {eligibility?.kind === "accountAppeal" ? (
+            {eligibility?.accountStatus === "deletionPending" ? (
+              <>
+                <p>
+                  利用停止後60日間、解除申請が確認できなかったため、アカウントは削除予定になっています。
+                </p>
+                {eligibility.deletionScheduledAt ? (
+                  <p className={styles.deadline}>
+                    削除予定日：
+                    <time dateTime={eligibility.deletionScheduledAt}>
+                      {formatDate(eligibility.deletionScheduledAt)}
+                    </time>
+                  </p>
+                ) : null}
+              </>
+            ) : eligibility?.kind === "accountAppeal" ? (
               <>
                 <p>
                   問題だと思われる箇所を確認し、対応した内容を具体的に記載してください。
@@ -198,6 +216,9 @@ export default function SupportPage() {
                     </time>
                   </p>
                 ) : null}
+                <p>
+                  申請期限を過ぎると削除予定となり、その60日後が削除予定日になります。
+                </p>
               </>
             ) : eligibility?.kind === "inquiry" ? (
               <p>

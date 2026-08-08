@@ -53,6 +53,7 @@ const activeModerationProfile = {
   status: "hidden",
   accountModerationStatus: "active",
   suspensionAppealDueAt: null,
+  deletionScheduledAt: null,
   audioStatus: "active",
   sns: [],
   moderationCases: [{ id: "case-1" }],
@@ -114,7 +115,9 @@ describe("/api/moderation/requests", () => {
     expect(response.status).toBe(200);
     expect(result.eligibility).toEqual({
       kind: "inquiry",
+      accountStatus: "active",
       suspensionAppealDueAt: null,
+      deletionScheduledAt: null,
     });
     expect(result.requests[0]).toEqual(
       expect.objectContaining({
@@ -122,6 +125,31 @@ describe("/api/moderation/requests", () => {
         resolvedAt: "2026-07-31T06:00:00.000Z",
       }),
     );
+  });
+
+  it("削除予定状態では削除予定日を返し申請対象を設けない", async () => {
+    mocks.transaction.mockResolvedValueOnce([
+      {
+        ...activeModerationProfile,
+        status: "suspended",
+        accountModerationStatus: "deletionPending",
+        suspensionAppealDueAt: new Date("2026-08-08T00:00:00.000Z"),
+        deletionScheduledAt: new Date("2026-10-07T00:00:00.000Z"),
+      },
+      [],
+    ]);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      eligibility: {
+        kind: null,
+        accountStatus: "deletionPending",
+        suspensionAppealDueAt: "2026-08-08T00:00:00.000Z",
+        deletionScheduledAt: "2026-10-07T00:00:00.000Z",
+      },
+    });
   });
 
   it("利用停止中は60日以内の解除申請を受け付ける", async () => {
