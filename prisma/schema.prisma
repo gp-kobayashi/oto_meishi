@@ -353,7 +353,7 @@ model AccountDeletionRecord {
   id                String                      @id @default(uuid()) @db.Uuid
   formerAuthId      String                      @unique @db.Uuid
   reason            String                      @db.VarChar(500)
-  deletedAt         DateTime                    @default(now())
+  deletedAt         DateTime?
   banStatus         RegistrationBanStatus       @default(active)
   createdAt         DateTime                    @default(now())
   updatedAt         DateTime                    @updatedAt

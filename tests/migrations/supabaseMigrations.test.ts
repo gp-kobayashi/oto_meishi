@@ -212,4 +212,19 @@ describe("Supabase migrations", () => {
       "revoke all on function public.prevent_moderation_action_mutation()",
     );
   });
+
+  it("外部サービスを含む完全削除が完了した時だけ削除日時を記録する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_make_account_deletion_completion_explicit.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain('alter column "deletedAt" drop default');
+    expect(sql).toContain('alter column "deletedAt" drop not null');
+  });
 });
