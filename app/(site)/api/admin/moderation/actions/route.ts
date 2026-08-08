@@ -173,6 +173,7 @@ export async function PATCH(request: Request) {
         | "deletionPending"
         | null = null;
       let profileStatus: string | null = null;
+      let deletionProcessingStartedAt: Date | null = null;
 
       if (targetType === "profile") {
         const target = await tx.profile.findUnique({
@@ -181,6 +182,7 @@ export async function PATCH(request: Request) {
             id: true,
             status: true,
             accountModerationStatus: true,
+            deletionProcessingStartedAt: true,
             displayName: true,
             bio: true,
             theme: true,
@@ -189,6 +191,7 @@ export async function PATCH(request: Request) {
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
         accountModerationStatus = target.accountModerationStatus;
+        deletionProcessingStartedAt = target.deletionProcessingStartedAt;
         profileStatus = target.status;
         previousStatus = target.status;
         reportedContent = {
@@ -212,12 +215,14 @@ export async function PATCH(request: Request) {
             audioStatus: true,
             status: true,
             accountModerationStatus: true,
+            deletionProcessingStartedAt: true,
           },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
         profileStatus = target.status;
         accountModerationStatus = target.accountModerationStatus;
+        deletionProcessingStartedAt = target.deletionProcessingStartedAt;
         previousStatus = target.audioStatus;
         reportedContent = {
           audioTitle: target.audioTitle ?? "",
@@ -239,10 +244,15 @@ export async function PATCH(request: Request) {
             label: true,
             url: true,
             status: true,
+            profile: {
+              select: { deletionProcessingStartedAt: true },
+            },
           },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.profileId;
+        deletionProcessingStartedAt =
+          target.profile?.deletionProcessingStartedAt ?? null;
         previousStatus = target.status;
         reportedContent = {
           service: target.service,
@@ -257,6 +267,13 @@ export async function PATCH(request: Request) {
       }
 
       if (action === "restore") {
+        if (deletionProcessingStartedAt) {
+          return {
+            error: "アカウントの削除処理が開始されているため、再公開できません。",
+            status: 409,
+          } as const;
+        }
+
         const openCase = await tx.moderationCase.findFirst({
           where: {
             profileId,
