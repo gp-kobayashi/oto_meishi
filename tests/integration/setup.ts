@@ -22,6 +22,9 @@ const databaseUrl = readRequiredVariable("INTEGRATION_DATABASE_URL");
 const serviceRoleKey = readRequiredVariable(
   "INTEGRATION_SUPABASE_SERVICE_ROLE_KEY",
 );
+const accountBanHashSecret = readRequiredVariable(
+  "INTEGRATION_ACCOUNT_BAN_HASH_SECRET",
+);
 
 assertAllowedIntegrationTestTargets({
   supabaseUrl,
@@ -32,3 +35,4 @@ process.env.DATABASE_URL = databaseUrl;
 process.env.NEXT_PUBLIC_SUPABASE_URL = supabaseUrl;
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = supabaseAnonKey;
 process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey;
+process.env.ACCOUNT_BAN_HASH_SECRET = accountBanHashSecret;
