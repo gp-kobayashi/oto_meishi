@@ -697,12 +697,9 @@ export async function POST(request: Request) {
       }
 
 
-      if (
-        (existingProfile.accountModerationStatus ?? "active") !== "active" ||
-        existingProfile.status === "suspended"
-      ) {
+      if (existingProfile.accountModerationStatus === "deletionPending") {
         return NextResponse.json(
-          { error: "アカウント利用停止中のため、プロフィールを変更できません。" },
+          { error: "削除手続き中のため、プロフィールを変更できません。" },
           { status: 403 },
         );
       }

@@ -638,13 +638,49 @@ describe("/api/profile route", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("利用停止中のアカウントはプロフィールを変更できない", async () => {
-    mocks.profileFindUnique.mockResolvedValueOnce({
+  it("利用停止中でも非公開のままプロフィールを修正できる", async () => {
+    const suspendedProfile = {
       id: "profile-1",
       userId: "testuser",
       authId: "auth-user-1",
       status: "suspended",
       accountModerationStatus: "suspended",
+      displayName: "変更前",
+      bio: "",
+      theme: "normal",
+      audioStatus: "active",
+      audioTitle: "",
+      audioUrl: "",
+      sns: [],
+    };
+    mocks.profileFindUnique.mockResolvedValue(suspendedProfile);
+    mocks.profileUpdate.mockResolvedValue(suspendedProfile);
+
+    const response = await POST(
+      postRequest({ userId: "testuser", displayName: "変更後" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "testuser" },
+        data: expect.objectContaining({ displayName: "変更後" }),
+      }),
+    );
+    expect(mocks.profileUpdate).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ accountModerationStatus: "active" }),
+      }),
+    );
+  });
+
+  it("削除手続き中のアカウントはプロフィールを変更できない", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      userId: "testuser",
+      authId: "auth-user-1",
+      status: "suspended",
+      accountModerationStatus: "deletionPending",
       audioStatus: "active",
       audioTitle: "",
       audioUrl: "",
@@ -657,7 +693,7 @@ describe("/api/profile route", () => {
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      error: "アカウント利用停止中のため、プロフィールを変更できません。",
+      error: "削除手続き中のため、プロフィールを変更できません。",
     });
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
     expect(mocks.socialLinkDeleteMany).not.toHaveBeenCalled();
