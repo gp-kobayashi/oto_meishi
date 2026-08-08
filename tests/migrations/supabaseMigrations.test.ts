@@ -189,4 +189,27 @@ describe("Supabase migrations", () => {
       'revoke all on table public."RegistrationBanIdentifier" from anon, authenticated',
     );
   });
+
+  it("完全削除専用トランザクションだけ追記型履歴の削除を許可する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_allow_account_data_deletion.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain("tg_op = 'DELETE'");
+    expect(sql).toContain(
+      "current_setting('app.account_deletion', true) = 'enabled'",
+    );
+    expect(sql).toContain("return old");
+    expect(sql).toContain("raise insufficient_privilege");
+    expect(sql).not.toContain("tg_op = 'UPDATE'");
+    expect(sql).toContain(
+      "revoke all on function public.prevent_moderation_action_mutation()",
+    );
+  });
 });
