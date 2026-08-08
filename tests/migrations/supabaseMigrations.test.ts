@@ -244,4 +244,21 @@ describe("Supabase migrations", () => {
       'create index "Profile_accountStatus_deletionProcessingStartedAt_idx"',
     );
   });
+
+  it("審査完了後から音声証拠の保持期限を数え直す", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_retain_evidence_until_case_review_complete.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain('update public."ModerationCase"');
+    expect(sql).toContain('update public."ModerationSnapshot"');
+    expect(sql).toContain('"status" = \'confirmed\'');
+    expect(sql).toContain("interval '60 days'");
+  });
 });

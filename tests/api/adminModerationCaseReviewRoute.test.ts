@@ -6,6 +6,7 @@ const { mocks } = vi.hoisted(() => ({
     transaction: vi.fn(),
     caseFindUnique: vi.fn(),
     caseUpdate: vi.fn(),
+    snapshotUpdateMany: vi.fn(),
     eventCreate: vi.fn(),
     profileUpdate: vi.fn(),
     linkFindUnique: vi.fn(),
@@ -99,6 +100,7 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
           findUnique: mocks.caseFindUnique,
           update: mocks.caseUpdate,
         },
+        moderationSnapshot: { updateMany: mocks.snapshotUpdateMany },
         moderationCaseEvent: { create: mocks.eventCreate },
         profile: { update: mocks.profileUpdate },
         socialLink: {
@@ -133,7 +135,18 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
     expect(mocks.caseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
-      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+      data: {
+        status: "confirmed",
+        resolvedAt: expect.any(Date),
+        retentionExpiresAt: expect.any(Date),
+      },
+    });
+    expect(mocks.snapshotUpdateMany).toHaveBeenCalledWith({
+      where: {
+        moderationCaseId: "case-1",
+        storageObjectKey: { not: null },
+      },
+      data: { expiresAt: expect.any(Date) },
     });
     expect(mocks.eventCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -181,7 +194,11 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
     expect(mocks.caseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
-      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+      data: expect.objectContaining({
+        status: "confirmed",
+        resolvedAt: expect.any(Date),
+        retentionExpiresAt: expect.any(Date),
+      }),
     });
     expect(mocks.actionCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ action: "restore", newStatus: "active" }),
@@ -225,7 +242,11 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     expect(response.status).toBe(200);
     expect(mocks.caseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
-      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+      data: expect.objectContaining({
+        status: "confirmed",
+        resolvedAt: expect.any(Date),
+        retentionExpiresAt: expect.any(Date),
+      }),
     });
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { id: "profile-1" },
@@ -268,7 +289,11 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
     expect(mocks.caseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
-      data: { status: "confirmed", resolvedAt: expect.any(Date) },
+      data: expect.objectContaining({
+        status: "confirmed",
+        resolvedAt: expect.any(Date),
+        retentionExpiresAt: expect.any(Date),
+      }),
     });
     expect(mocks.actionCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ action: "restore", newStatus: "active" }),

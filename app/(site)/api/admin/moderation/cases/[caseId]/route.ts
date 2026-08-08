@@ -16,6 +16,7 @@ import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
 
 const MAX_BODY_BYTES = 8 * 1024;
+const AUDIO_EVIDENCE_RETENTION_MS = 60 * 24 * 60 * 60 * 1000;
 const decisions = ["approve", "continueHidden", "requestChanges"] as const;
 type Decision = (typeof decisions)[number];
 
@@ -165,13 +166,27 @@ export async function PATCH(
           } as const;
         }
         action = targetWasDeleted ? "remove" : "restore";
+        const evidenceRetentionExpiresAt = new Date(
+          now.getTime() + AUDIO_EVIDENCE_RETENTION_MS,
+        );
         if (!targetWasDeleted) {
           newTargetStatus = "active";
           await updateTargetStatus(tx, moderationCase, "active");
         }
         await tx.moderationCase.update({
           where: { id: moderationCase.id },
-          data: { status: "confirmed", resolvedAt: now },
+          data: {
+            status: "confirmed",
+            resolvedAt: now,
+            retentionExpiresAt: evidenceRetentionExpiresAt,
+          },
+        });
+        await tx.moderationSnapshot.updateMany({
+          where: {
+            moderationCaseId: moderationCase.id,
+            storageObjectKey: { not: null },
+          },
+          data: { expiresAt: evidenceRetentionExpiresAt },
         });
         await tx.moderationCaseEvent.create({
           data: {
