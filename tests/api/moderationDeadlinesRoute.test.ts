@@ -25,6 +25,8 @@ describe("POST /api/internal/moderation/deadlines", () => {
       suspended: 1,
       deletionScheduled: 1,
       deletionCandidates: 1,
+      deleted: 1,
+      pendingAuthDeletionsCompleted: 0,
       skipped: 0,
       failed: 0,
     });
@@ -40,6 +42,8 @@ describe("POST /api/internal/moderation/deadlines", () => {
       suspended: 1,
       deletionScheduled: 1,
       deletionCandidates: 1,
+      deleted: 1,
+      pendingAuthDeletionsCompleted: 0,
       skipped: 0,
       failed: 0,
     });

@@ -14,6 +14,13 @@ export type ModeratedAccountDeletionResult =
   | { status: "deleted" }
   | { status: "skipped"; reason: "notEligible" | "missingAuthId" };
 
+export type PendingAuthDeletionResult = {
+  examined: number;
+  completed: number;
+  skipped: number;
+  failed: number;
+};
+
 function isNotFoundAuthError(error: { status?: number; code?: string }): boolean {
   return error.status === 404 || error.code === "user_not_found";
 }
@@ -169,4 +176,62 @@ export async function deleteModeratedAccount(
   });
 
   return { status: "deleted" };
+}
+
+export async function completePendingAccountAuthDeletions(
+  now: Date = new Date(),
+  batchSize: number = 100,
+): Promise<PendingAuthDeletionResult> {
+  const records = await prisma.accountDeletionRecord.findMany({
+    where: { deletedAt: null, banStatus: "active" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: Math.min(Math.max(Math.trunc(batchSize), 1), 500),
+    select: { formerAuthId: true },
+  });
+  const result: PendingAuthDeletionResult = {
+    examined: records.length,
+    completed: 0,
+    skipped: 0,
+    failed: 0,
+  };
+  const supabaseAdmin = createServerSupabaseClient();
+
+  for (const record of records) {
+    try {
+      const profileStillExists = await prisma.profile.count({
+        where: { authId: record.formerAuthId },
+      });
+      if (profileStillExists > 0) {
+        result.skipped += 1;
+        continue;
+      }
+
+      const { data, error: getUserError } =
+        await supabaseAdmin.auth.admin.getUserById(record.formerAuthId);
+      if (getUserError && !isNotFoundAuthError(getUserError)) {
+        throw new Error("Failed to load pending Auth user.");
+      }
+      if (data.user) {
+        const { error: deleteUserError } =
+          await supabaseAdmin.auth.admin.deleteUser(record.formerAuthId);
+        if (deleteUserError && !isNotFoundAuthError(deleteUserError)) {
+          throw new Error("Failed to delete pending Auth user.");
+        }
+      }
+
+      await prisma.accountDeletionRecord.update({
+        where: { formerAuthId: record.formerAuthId },
+        data: { deletedAt: now },
+      });
+      result.completed += 1;
+    } catch (error) {
+      result.failed += 1;
+      console.error("Failed to complete pending Auth account deletion:", {
+        formerAuthId: record.formerAuthId,
+        error,
+      });
+    }
+  }
+
+  return result;
 }

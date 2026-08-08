@@ -5,6 +5,7 @@ const { mocks } = vi.hoisted(() => ({
     profileUpdateMany: vi.fn(),
     profileFindUnique: vi.fn(),
     deletionRecordFindUnique: vi.fn(),
+    deletionRecordFindMany: vi.fn(),
     deletionRecordCreate: vi.fn(),
     deletionRecordUpdate: vi.fn(),
     profileCount: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock("@/lib/prisma", () => ({
     moderationSnapshot: { count: mocks.snapshotCount },
     accountDeletionRecord: {
       findUnique: mocks.deletionRecordFindUnique,
+      findMany: mocks.deletionRecordFindMany,
       create: mocks.deletionRecordCreate,
       update: mocks.deletionRecordUpdate,
     },
@@ -52,7 +54,10 @@ vi.mock("@/lib/registrationBanFingerprint", () => ({
   createRegistrationBanFingerprints: mocks.createFingerprints,
 }));
 
-import { deleteModeratedAccount } from "@/lib/moderatedAccountDeletion";
+import {
+  completePendingAccountAuthDeletions,
+  deleteModeratedAccount,
+} from "@/lib/moderatedAccountDeletion";
 
 const now = new Date("2026-12-06T00:00:00.000Z");
 const tx = {
@@ -82,6 +87,7 @@ describe("deleteModeratedAccount", () => {
       ],
     });
     mocks.deletionRecordFindUnique.mockResolvedValue(null);
+    mocks.deletionRecordFindMany.mockResolvedValue([]);
     mocks.getUserById.mockResolvedValue({
       data: {
         user: {
@@ -186,5 +192,39 @@ describe("deleteModeratedAccount", () => {
     expect(mocks.createFingerprints).not.toHaveBeenCalled();
     expect(mocks.deleteUser).not.toHaveBeenCalled();
     expect(mocks.txProfileDelete).toHaveBeenCalled();
+  });
+
+  it("利用データ削除後に残ったAuth削除を再試行して完了日時を記録する", async () => {
+    mocks.deletionRecordFindMany.mockResolvedValue([
+      { formerAuthId: "11111111-1111-1111-1111-111111111111" },
+    ]);
+    mocks.profileCount.mockResolvedValue(0);
+
+    await expect(completePendingAccountAuthDeletions(now)).resolves.toEqual({
+      examined: 1,
+      completed: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(mocks.deleteUser).toHaveBeenCalledWith(
+      "11111111-1111-1111-1111-111111111111",
+    );
+    expect(mocks.deletionRecordUpdate).toHaveBeenCalledWith({
+      where: { formerAuthId: "11111111-1111-1111-1111-111111111111" },
+      data: { deletedAt: now },
+    });
+  });
+
+  it("利用データが残る準備中記録ではAuthを削除しない", async () => {
+    mocks.deletionRecordFindMany.mockResolvedValue([
+      { formerAuthId: "11111111-1111-1111-1111-111111111111" },
+    ]);
+    mocks.profileCount.mockResolvedValue(1);
+
+    const result = await completePendingAccountAuthDeletions(now);
+
+    expect(result.skipped).toBe(1);
+    expect(mocks.getUserById).not.toHaveBeenCalled();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
   });
 });

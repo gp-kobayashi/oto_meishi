@@ -8,7 +8,14 @@ const { mocks } = vi.hoisted(() => ({
     actionCreate: vi.fn(),
     notificationCreate: vi.fn(),
     eventCreateMany: vi.fn(),
+    deleteModeratedAccount: vi.fn(),
+    completePendingAuthDeletions: vi.fn(),
   },
+}));
+
+vi.mock("@/lib/moderatedAccountDeletion", () => ({
+  deleteModeratedAccount: mocks.deleteModeratedAccount,
+  completePendingAccountAuthDeletions: mocks.completePendingAuthDeletions,
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -39,6 +46,13 @@ describe("processModerationDeadlines", () => {
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
     mocks.eventCreateMany.mockResolvedValue({ count: 1 });
+    mocks.deleteModeratedAccount.mockResolvedValue({ status: "deleted" });
+    mocks.completePendingAuthDeletions.mockResolvedValue({
+      examined: 0,
+      completed: 0,
+      skipped: 0,
+      failed: 0,
+    });
   });
 
   it("修正されないまま期限を過ぎたプロフィールを利用停止する", async () => {
@@ -65,6 +79,8 @@ describe("processModerationDeadlines", () => {
       suspended: 1,
       deletionScheduled: 0,
       deletionCandidates: 0,
+      deleted: 0,
+      pendingAuthDeletionsCompleted: 0,
       skipped: 0,
       failed: 0,
     });
@@ -179,6 +195,11 @@ describe("processModerationDeadlines", () => {
     const result = await processModerationDeadlines(now);
 
     expect(result.deletionCandidates).toBe(1);
+    expect(result.deleted).toBe(1);
+    expect(mocks.deleteModeratedAccount).toHaveBeenCalledWith(
+      "profile-5",
+      now,
+    );
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 });

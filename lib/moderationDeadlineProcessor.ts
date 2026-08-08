@@ -3,6 +3,10 @@ import {
   addModerationPeriod,
   decideModerationDeadlineAction,
 } from "@/lib/moderationDeadline";
+import {
+  completePendingAccountAuthDeletions,
+  deleteModeratedAccount,
+} from "@/lib/moderatedAccountDeletion";
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 500;
@@ -16,6 +20,8 @@ export type ModerationDeadlineProcessResult = {
   suspended: number;
   deletionScheduled: number;
   deletionCandidates: number;
+  deleted: number;
+  pendingAuthDeletionsCompleted: number;
   skipped: number;
   failed: number;
 };
@@ -80,6 +86,8 @@ export async function processModerationDeadlines(
     suspended: 0,
     deletionScheduled: 0,
     deletionCandidates: 0,
+    deleted: 0,
+    pendingAuthDeletionsCompleted: 0,
     skipped: 0,
     failed: 0,
   };
@@ -113,6 +121,20 @@ export async function processModerationDeadlines(
     }
     if (decision.action === "delete") {
       result.deletionCandidates += 1;
+      try {
+        const deletion = await deleteModeratedAccount(profile.id, now);
+        if (deletion.status === "deleted") {
+          result.deleted += 1;
+        } else {
+          result.skipped += 1;
+        }
+      } catch (error) {
+        result.failed += 1;
+        console.error("Failed to delete moderated account:", {
+          profileId: profile.id,
+          error,
+        });
+      }
       continue;
     }
 
@@ -249,6 +271,10 @@ export async function processModerationDeadlines(
       });
     }
   }
+
+  const pendingAuthDeletions = await completePendingAccountAuthDeletions(now);
+  result.pendingAuthDeletionsCompleted = pendingAuthDeletions.completed;
+  result.failed += pendingAuthDeletions.failed;
 
   return result;
 }
