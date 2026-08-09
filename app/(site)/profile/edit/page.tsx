@@ -26,6 +26,7 @@ import {
 import styles from "./page.module.css";
 import AudioPlayer from "@/components/card/audioPlayer/AudioPlayer";
 import Card from "@/components/card/Card";
+import IdentityVerificationRequestPanel from "@/components/moderation/IdentityVerificationRequestPanel";
 
 const themeOptions = [
   { value: "normal", label: "標準" },
@@ -613,6 +614,11 @@ export default function ProfileEditPage() {
   const audioModerationCase = profile?.moderationCases?.find(
     (moderationCase) => moderationCase.targetType === "audio",
   );
+  const identityVerificationCase = profile?.moderationCases?.find(
+    (moderationCase) =>
+      moderationCase.reasonCode === "impersonation" &&
+      moderationCase.status !== "confirmed",
+  );
   const previewProfile: ProfileData | null = profile
     ? {
         ...profile,
@@ -679,6 +685,12 @@ export default function ProfileEditPage() {
             <div className={styles.cardBody}>
               {profileModerationCase ? (
                 <ModerationNotice moderationCase={profileModerationCase} />
+              ) : null}
+              {identityVerificationCase ? (
+                <IdentityVerificationRequestPanel
+                  moderationCaseId={identityVerificationCase.id}
+                  socialLinks={socialLinks}
+                />
               ) : null}
 
               <div className={styles.fieldRow}>
