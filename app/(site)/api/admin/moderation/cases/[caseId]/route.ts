@@ -6,6 +6,7 @@ import {
 } from "@/lib/adminActionRateLimit";
 import { getClientIp } from "@/lib/clientIp";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
+import { getIncompleteImpersonationRemediationFields } from "@/lib/impersonationRemediation";
 import {
   compareModeratedContentHashes,
   compareModeratedUrls,
@@ -102,13 +103,13 @@ export async function PATCH(
           profileId: true,
           targetType: true,
           targetId: true,
+          reasonCode: true,
           status: true,
           reviewMode: true,
           snapshots: {
-            where: { kind: "corrected" },
+            where: { kind: { in: ["reported", "corrected"] } },
             orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            take: 1,
-            select: { id: true, content: true, contentHash: true },
+            select: { id: true, kind: true, content: true, contentHash: true },
           },
           profile: {
             select: {
@@ -121,6 +122,14 @@ export async function PATCH(
               audioUrl: true,
               audioContentHash: true,
               accountModerationStatus: true,
+              sns: {
+                select: {
+                  id: true,
+                  service: true,
+                  url: true,
+                  label: true,
+                },
+              },
             },
           },
         },
@@ -139,7 +148,14 @@ export async function PATCH(
       }
 
       const now = new Date();
-      const correctedContent = moderationCase.snapshots[0]?.content;
+      const latestCorrectedSnapshot =
+        moderationCase.snapshots.find(
+          (snapshot) => snapshot.kind === "corrected",
+        ) ?? moderationCase.snapshots[0];
+      const reportedSnapshot = moderationCase.snapshots.find(
+        (snapshot) => snapshot.kind === "reported",
+      );
+      const correctedContent = latestCorrectedSnapshot?.content;
       const targetWasDeleted =
         isRecord(correctedContent) && correctedContent.deleted === true;
       const previousTargetStatus = getCurrentTargetStatus(moderationCase);
@@ -147,7 +163,7 @@ export async function PATCH(
       let action: "hide" | "restore" | "suspend" | "remove";
 
       if (decision === "approve") {
-        const latestSnapshot = moderationCase.snapshots[0];
+        const latestSnapshot = latestCorrectedSnapshot;
         if (
           compareModerationSnapshotVersions(
             reviewedSnapshotId,
@@ -164,6 +180,29 @@ export async function PATCH(
               "審査対象が更新されています。最新の内容を読み込み直して確認してください。",
             httpStatus: 409,
           } as const;
+        }
+        if (
+          moderationCase.targetType === "profile" &&
+          moderationCase.reasonCode === "impersonation"
+        ) {
+          const incompleteFields = getIncompleteImpersonationRemediationFields(
+            reportedSnapshot?.content,
+            {
+              displayName: moderationCase.profile.displayName,
+              bio: moderationCase.profile.bio,
+              theme: moderationCase.profile.theme,
+              audioKey: moderationCase.profile.audioKey,
+              audioUrl: moderationCase.profile.audioUrl,
+              audioContentHash: moderationCase.profile.audioContentHash,
+              socialLinks: moderationCase.profile.sns ?? [],
+            },
+          );
+          if (incompleteFields.length > 0) {
+            return {
+              error: `なりすましへの対応に必要な項目が未修正です: ${incompleteFields.join("、")}`,
+              httpStatus: 409,
+            } as const;
+          }
         }
         action = targetWasDeleted ? "remove" : "restore";
         const evidenceRetentionExpiresAt = new Date(
@@ -297,6 +336,7 @@ async function doesCurrentTargetMatchSnapshot(
   moderationCase: {
     targetType: "profile" | "audio" | "socialLink";
     targetId: string;
+    reasonCode: string;
     profile: {
       displayName: string;
       bio: string;
@@ -304,6 +344,12 @@ async function doesCurrentTargetMatchSnapshot(
       audioKey: string;
       audioUrl: string;
       audioContentHash: string | null;
+      sns?: {
+        id: string;
+        service: string;
+        url: string;
+        label: string;
+      }[];
     };
   },
   snapshot:

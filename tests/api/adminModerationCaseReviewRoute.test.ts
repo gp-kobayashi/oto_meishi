@@ -258,6 +258,159 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
   });
 
+  it("なりすまし案件で未修正の登録内容があれば承認しない", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      targetType: "profile",
+      targetId: "profile-1",
+      reasonCode: "impersonation",
+      snapshots: [
+        {
+          id: "snapshot-corrected",
+          kind: "corrected",
+          content: {
+            displayName: "修正後の名前",
+            bio: "修正後の自己紹介",
+            theme: "dark",
+          },
+          contentHash: null,
+        },
+        {
+          id: "snapshot-reported",
+          kind: "reported",
+          content: {
+            displayName: "なりすまし前の名前",
+            bio: "以前の自己紹介",
+            theme: "normal",
+            audio: {
+              hasAudio: true,
+              contentHash: "a".repeat(64),
+              storageKey: "audio/current.m4a",
+            },
+            socialLinks: [
+              {
+                id: "link-1",
+                service: "youtube",
+                url: "https://www.youtube.com/@before",
+                label: "以前のYouTube",
+              },
+            ],
+          },
+          contentHash: null,
+        },
+      ],
+      profile: {
+        ...pendingCase.profile,
+        status: "suspended",
+        accountModerationStatus: "suspended",
+        displayName: "修正後の名前",
+        bio: "修正後の自己紹介",
+        theme: "dark",
+        sns: [
+          {
+            id: "link-1",
+            service: "youtube",
+            url: "https://www.youtube.com/@before",
+            label: "以前のYouTube",
+          },
+        ],
+      },
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正内容を確認しました。",
+        reviewedSnapshotId: "snapshot-corrected",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "なりすましへの対応に必要な項目が未修正です: 音声、リンク（以前のYouTube）",
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.caseUpdate).not.toHaveBeenCalled();
+  });
+
+  it("なりすまし案件で登録内容をすべて修正した場合は承認できる", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      targetType: "profile",
+      targetId: "profile-1",
+      reasonCode: "impersonation",
+      snapshots: [
+        {
+          id: "snapshot-corrected",
+          kind: "corrected",
+          content: {
+            displayName: "修正後の名前",
+            bio: "修正後の自己紹介",
+            theme: "dark",
+          },
+          contentHash: null,
+        },
+        {
+          id: "snapshot-reported",
+          kind: "reported",
+          content: {
+            displayName: "なりすまし前の名前",
+            bio: "以前の自己紹介",
+            theme: "normal",
+            audio: {
+              hasAudio: true,
+              contentHash: "a".repeat(64),
+              storageKey: "audio/current.m4a",
+            },
+            socialLinks: [
+              {
+                id: "link-1",
+                service: "youtube",
+                url: "https://www.youtube.com/@before",
+                label: "以前のYouTube",
+              },
+            ],
+          },
+          contentHash: null,
+        },
+      ],
+      profile: {
+        ...pendingCase.profile,
+        status: "suspended",
+        accountModerationStatus: "suspended",
+        displayName: "修正後の名前",
+        bio: "修正後の自己紹介",
+        theme: "dark",
+        audioKey: "audio/after.m4a",
+        audioContentHash: "b".repeat(64),
+        sns: [
+          {
+            id: "link-1",
+            service: "youtube",
+            url: "https://www.youtube.com/@after",
+            label: "修正後のYouTube",
+          },
+        ],
+      },
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正内容を確認しました。",
+        reviewedSnapshotId: "snapshot-corrected",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.caseUpdate).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      data: expect.objectContaining({ status: "confirmed" }),
+    });
+  });
+
   it("音声の修正をケース審査から承認して再公開する", async () => {
     mocks.caseFindUnique.mockResolvedValueOnce({
       ...pendingCase,
