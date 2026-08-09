@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
@@ -191,6 +192,7 @@ type PendingReportAction = {
 };
 
 export default function AdminModerationDetail({ profileId }: { profileId: string }) {
+  const router = useRouter();
   const [data, setData] = useState<ModerationDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -242,6 +244,10 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
         `/api/admin/moderation/${encodeURIComponent(profileId)}`,
         { headers: { Authorization: `Bearer ${session.access_token}` } },
       );
+      if (response.status === 403) {
+        router.replace("/profile");
+        return;
+      }
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(result.error || "管理対象の詳細を取得できませんでした。");
@@ -258,7 +264,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
     } finally {
       setLoading(false);
     }
-  }, [profileId]);
+  }, [profileId, router]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void loadDetail(), 0);

@@ -2,11 +2,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mocks } = vi.hoisted(() => ({
-  mocks: { getSession: vi.fn() },
+  mocks: {
+    getSession: vi.fn(),
+    router: { replace: vi.fn() },
+  },
 }));
 
 vi.mock("@/lib/supabaseClient", () => ({
   supabase: { auth: { getSession: mocks.getSession } },
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => mocks.router,
 }));
 
 import AdminModerationDetail from "@/app/(site)/admin/moderation/[profileId]/AdminModerationDetail";
@@ -17,6 +23,22 @@ describe("AdminModerationDetail", () => {
     mocks.getSession.mockResolvedValue({
       data: { session: { access_token: "admin-token" } },
     });
+  });
+
+  it("ログイン済みの非管理者はプロフィールへ移動する", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      Response.json(
+        { error: "管理者権限がありません。" },
+        { status: 403 },
+      ),
+    );
+
+    render(<AdminModerationDetail profileId="profile-1" />);
+
+    await waitFor(() => {
+      expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
+    });
+    expect(screen.queryByText("管理者権限がありません。")).toBeNull();
   });
 
   it("音声とリンクの詳細を表示する", async () => {
