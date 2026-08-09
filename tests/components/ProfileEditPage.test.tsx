@@ -8,6 +8,7 @@ import {
   within,
 } from "@testing-library/react";
 import ProfileEditPage from "@/app/(site)/profile/edit/page";
+import type { ProfileData } from "@/lib/mock/profileData";
 import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 
 const { mocks } = vi.hoisted(() => ({
@@ -28,7 +29,7 @@ vi.mock("@/components/auth/UserIdRedirect", () => ({
   default: () => null,
 }));
 
-const baseProfile = {
+const baseProfile: ProfileData = {
   id: "profile-1",
   userId: "testuser",
   displayName: "テストユーザー",
@@ -42,12 +43,11 @@ const baseProfile = {
       service: "x",
       url: "https://x.com/test",
       label: "X",
-      sortOrder: 0,
     },
   ],
 };
 
-function mockFetchWithProfile(profile = baseProfile) {
+function mockFetchWithProfile(profile: ProfileData = baseProfile) {
   const fetchMock = vi.fn().mockResolvedValueOnce(
     Response.json(profile, {
       status: 200,
@@ -57,7 +57,7 @@ function mockFetchWithProfile(profile = baseProfile) {
   return fetchMock;
 }
 
-async function renderLoadedPage(profile = baseProfile) {
+async function renderLoadedPage(profile: ProfileData = baseProfile) {
   const fetchMock = mockFetchWithProfile(profile);
   render(<ProfileEditPage />);
   await screen.findByDisplayValue(profile.displayName);
