@@ -9,7 +9,8 @@ const { mocks } = vi.hoisted(() => ({
     transaction: vi.fn(),
     executeRawUnsafe: vi.fn(),
     findUnique: vi.fn(),
-    findFirst: vi.fn(),
+    violationFindFirst: vi.fn(),
+    verificationFindFirst: vi.fn(),
     create: vi.fn(),
   },
 }));
@@ -60,15 +61,19 @@ describe("PATCH /api/admin/moderation/violations/[violationId]", () => {
       eventType: "confirmed",
       reasonCode: "impersonation",
     });
-    mocks.findFirst.mockResolvedValue(null);
+    mocks.violationFindFirst.mockResolvedValue(null);
+    mocks.verificationFindFirst.mockResolvedValue({ id: "verification-1" });
     mocks.create.mockResolvedValue({ id: "revocation-1" });
     mocks.transaction.mockImplementation((callback) =>
       callback({
         $executeRawUnsafe: mocks.executeRawUnsafe,
         moderationViolationEvent: {
           findUnique: mocks.findUnique,
-          findFirst: mocks.findFirst,
+          findFirst: mocks.violationFindFirst,
           create: mocks.create,
+        },
+        identityVerificationRequest: {
+          findFirst: mocks.verificationFindFirst,
         },
       }),
     );
@@ -97,7 +102,16 @@ describe("PATCH /api/admin/moderation/violations/[violationId]", () => {
   });
 
   it("取り消し済みの違反を再度取り消さない", async () => {
-    mocks.findFirst.mockResolvedValue({ id: "revocation-1" });
+    mocks.violationFindFirst.mockResolvedValue({ id: "revocation-1" });
+
+    const response = await PATCH(request(), context());
+
+    expect(response.status).toBe(409);
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it("本人確認申請が未審査なら違反回数を取り消さない", async () => {
+    mocks.verificationFindFirst.mockResolvedValueOnce(null);
 
     const response = await PATCH(request(), context());
 

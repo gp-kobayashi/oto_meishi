@@ -113,6 +113,21 @@ export async function PATCH(
         } as const;
       }
 
+      const verifiedRequest =
+        await transaction.identityVerificationRequest.findFirst({
+          where: {
+            moderationCaseId: violation.moderationCaseId,
+            status: "verified",
+          },
+          select: { id: true },
+        });
+      if (!verifiedRequest) {
+        return {
+          error: "本人確認申請の審査を完了してから取り消してください。",
+          status: 409,
+        } as const;
+      }
+
       const existingRevocation =
         await transaction.moderationViolationEvent.findFirst({
           where: {
