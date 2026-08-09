@@ -116,6 +116,23 @@ describe("AdminModerationDetail", () => {
                 updatedAt: "2026-07-17T05:00:00.000Z",
               },
             ],
+            identityVerificationRequests: [
+              {
+                id: "verification-1",
+                moderationCaseId: "case-identity",
+                socialLinkId: "link-1",
+                socialUrl: "https://x.com/sample",
+                plannedContent: "カフェの写真を投稿します。",
+                status: "pending",
+                postingDeadlineAt: "2026-07-17T05:10:00.000Z",
+                reviewNote: "",
+                reviewerIdentifier: null,
+                reviewerRole: null,
+                reviewedAt: null,
+                createdAt: "2026-07-17T05:00:00.000Z",
+                updatedAt: "2026-07-17T05:00:00.000Z",
+              },
+            ],
             moderationCases: [
               {
                 id: "case-1",
@@ -404,6 +421,38 @@ describe("AdminModerationDetail", () => {
     expect(screen.getByText("未確認")).toBeDefined();
     expect(screen.getByText(/最終変更:.*admin.*auth-adm/)).toBeDefined();
     expect(screen.getByText(/対応メモ: リンク先を確認しました/)).toBeDefined();
+    expect(screen.getByRole("heading", { name: "本人確認申請" })).toBeDefined();
+    expect(screen.getByText("カフェの写真を投稿します。")).toBeDefined();
+    expect(
+      screen.getByRole("link", { name: "申請時のSNSを確認する" }).getAttribute(
+        "href",
+      ),
+    ).toBe("https://x.com/sample");
+    const identityVerifiedButton = screen.getByRole("button", {
+      name: "本人と確認",
+    }) as HTMLButtonElement;
+    expect(identityVerifiedButton.disabled).toBe(true);
+    fireEvent.change(
+      screen.getByLabelText("審査メモ・ユーザーへの説明（必須）"),
+      { target: { value: "申請内容と投稿時刻を確認しました。" } },
+    );
+    fireEvent.click(identityVerifiedButton);
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/moderation/identity-verification/verification-1",
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer admin-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            decision: "verified",
+            note: "申請内容と投稿時刻を確認しました。",
+          }),
+        },
+      );
+    });
     expect(screen.getByRole("heading", { name: "対応履歴" })).toBeDefined();
     expect(screen.getByText("未確認 → 確認済み")).toBeDefined();
     expect(screen.getByText("最初の確認記録")).toBeDefined();

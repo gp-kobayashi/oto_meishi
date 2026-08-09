@@ -18,6 +18,13 @@
   text-decoration: none;
 }
 
+.evidenceLink {
+  display: inline-flex;
+  margin-top: 12px;
+  color: #5b21b6;
+  font-weight: 700;
+}
+
 .heading,
 .sectionHeading,
 .linkHeading {
