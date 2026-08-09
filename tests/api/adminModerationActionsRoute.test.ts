@@ -84,6 +84,21 @@ describe("PATCH /api/admin/moderation/actions", () => {
       displayName: "変更前の名前",
       bio: "変更前の自己紹介",
       theme: "normal",
+      audioUrl: "",
+      audioKey: "audio/testuser/before.m4a",
+      audioContentHash: "a".repeat(64),
+      audioTitle: "変更前の音声",
+      audioStatus: "active",
+      sns: [
+        {
+          id: "link-1",
+          service: "youtube",
+          url: "https://www.youtube.com/@before",
+          label: "変更前のYouTube",
+          sortOrder: 0,
+          status: "active",
+        },
+      ],
     });
     mocks.profileUpdate.mockResolvedValue({});
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
@@ -183,6 +198,22 @@ describe("PATCH /api/admin/moderation/actions", () => {
           bio: "変更前の自己紹介",
           theme: "normal",
           status: "active",
+          audio: {
+            hasAudio: true,
+            contentHash: "a".repeat(64),
+            title: "変更前の音声",
+            status: "active",
+          },
+          socialLinks: [
+            {
+              id: "link-1",
+              service: "youtube",
+              url: "https://www.youtube.com/@before",
+              label: "変更前のYouTube",
+              sortOrder: 0,
+              status: "active",
+            },
+          ],
         },
       }),
     });

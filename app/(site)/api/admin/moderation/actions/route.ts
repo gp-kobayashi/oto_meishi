@@ -186,6 +186,22 @@ export async function PATCH(request: Request) {
             displayName: true,
             bio: true,
             theme: true,
+            audioUrl: true,
+            audioKey: true,
+            audioContentHash: true,
+            audioTitle: true,
+            audioStatus: true,
+            sns: {
+              orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+              select: {
+                id: true,
+                service: true,
+                url: true,
+                label: true,
+                sortOrder: true,
+                status: true,
+              },
+            },
           },
         });
         if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
@@ -199,6 +215,20 @@ export async function PATCH(request: Request) {
           bio: target.bio ?? "",
           theme: target.theme ?? "",
           status: target.status,
+          audio: {
+            hasAudio: Boolean(target.audioKey || target.audioUrl),
+            contentHash: target.audioContentHash,
+            title: target.audioTitle ?? "",
+            status: target.audioStatus,
+          },
+          socialLinks: (target.sns ?? []).map((link) => ({
+            id: link.id,
+            service: link.service,
+            url: link.url,
+            label: link.label,
+            sortOrder: link.sortOrder,
+            status: link.status,
+          })),
         };
         if (previousStatus === nextStatus) {
           return { error: "公開状態はすでに変更されています。", status: 409 } as const;
