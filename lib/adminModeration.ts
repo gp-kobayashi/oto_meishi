@@ -111,6 +111,21 @@ export type ModerationDetailResponse = {
       createdAt: string;
       updatedAt: string;
     }[];
+    identityVerificationRequests: {
+      id: string;
+      moderationCaseId: string;
+      socialLinkId: string | null;
+      socialUrl: string;
+      plannedContent: string;
+      status: "pending" | "verified" | "rejected" | "expired";
+      postingDeadlineAt: string;
+      reviewNote: string;
+      reviewerIdentifier: string | null;
+      reviewerRole: "moderator" | "admin" | null;
+      reviewedAt: string | null;
+      createdAt: string;
+      updatedAt: string;
+    }[];
     moderationCases: {
       id: string;
       targetType: "profile" | "audio" | "socialLink";

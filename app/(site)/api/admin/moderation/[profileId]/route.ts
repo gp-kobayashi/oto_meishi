@@ -87,6 +87,26 @@ export async function GET(
             updatedAt: true,
           },
         },
+        identityVerificationRequests: {
+          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+          take: 50,
+          select: {
+            id: true,
+            moderationCaseId: true,
+            socialLinkId: true,
+            socialUrl: true,
+            plannedContent: true,
+            status: true,
+            postingDeadlineAt: true,
+            reviewNote: true,
+            reviewedAt: true,
+            reviewedByAdminUser: {
+              select: { authId: true, role: true },
+            },
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
         moderationCases: {
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
           take: 50,
@@ -267,6 +287,29 @@ export async function GET(
               updatedAt: moderationRequest.updatedAt.toISOString(),
             }),
           ),
+          identityVerificationRequests:
+            profile.identityVerificationRequests.map(
+              (verificationRequest) => ({
+                id: verificationRequest.id,
+                moderationCaseId: verificationRequest.moderationCaseId,
+                socialLinkId: verificationRequest.socialLinkId,
+                socialUrl: verificationRequest.socialUrl,
+                plannedContent: verificationRequest.plannedContent,
+                status: verificationRequest.status,
+                postingDeadlineAt:
+                  verificationRequest.postingDeadlineAt.toISOString(),
+                reviewNote: verificationRequest.reviewNote,
+                reviewerIdentifier:
+                  verificationRequest.reviewedByAdminUser?.authId.slice(0, 8) ??
+                  null,
+                reviewerRole:
+                  verificationRequest.reviewedByAdminUser?.role ?? null,
+                reviewedAt:
+                  verificationRequest.reviewedAt?.toISOString() ?? null,
+                createdAt: verificationRequest.createdAt.toISOString(),
+                updatedAt: verificationRequest.updatedAt.toISOString(),
+              }),
+            ),
           moderationCases: profile.moderationCases.map((moderationCase) => ({
             id: moderationCase.id,
             targetType: moderationCase.targetType,
