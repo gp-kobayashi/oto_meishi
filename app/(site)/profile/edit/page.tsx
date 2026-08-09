@@ -92,6 +92,9 @@ function ModerationNotice({ moderationCase }: { moderationCase: ModerationCase }
   const guidance =
     moderationCase.status === "confirmed"
       ? "管理者による確認は完了しています。"
+      : moderationCase.reasonCode === "impersonation" &&
+          moderationCase.targetType === "profile"
+        ? "なりすましへの対応では、表示名・自己紹介・テーマと、登録済みの音声・リンクをすべて変更または削除してください。すべての修正を管理者が確認するまで公開されません。"
       : "問題の箇所を変更しても、管理者の確認が完了するまで公開されません。";
 
   return (

@@ -361,6 +361,30 @@ describe("ProfileEditPage", () => {
     ).toHaveLength(2);
   });
 
+  it("なりすまし案件では全項目の修正条件を表示する", async () => {
+    await renderLoadedPage({
+      ...baseProfile,
+      moderationCases: [
+        {
+          id: "case-profile",
+          targetType: "profile",
+          targetId: "profile-1",
+          reasonCode: "impersonation",
+          reviewMode: "preReview",
+          status: "correctionRequired",
+          userMessage: "なりすましのため修正が必要です。",
+          reviewDueAt: "2026-09-29T00:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(
+      screen.getByText(
+        "なりすましへの対応では、表示名・自己紹介・テーマと、登録済みの音声・リンクをすべて変更または削除してください。すべての修正を管理者が確認するまで公開されません。",
+      ),
+    ).toBeDefined();
+  });
+
   it("音声とリンクが非公開でも対象外のプロフィール項目を保存できる", async () => {
     const moderatedProfile = {
       ...baseProfile,
