@@ -218,6 +218,7 @@ export async function PATCH(request: Request) {
           audio: {
             hasAudio: Boolean(target.audioKey || target.audioUrl),
             contentHash: target.audioContentHash,
+            storageKey: target.audioKey || null,
             title: target.audioTitle ?? "",
             status: target.audioStatus,
           },

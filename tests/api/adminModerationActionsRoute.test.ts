@@ -201,6 +201,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
           audio: {
             hasAudio: true,
             contentHash: "a".repeat(64),
+            storageKey: "audio/testuser/before.m4a",
             title: "変更前の音声",
             status: "active",
           },
