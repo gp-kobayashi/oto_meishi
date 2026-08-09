@@ -4,11 +4,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     getSession: vi.fn(),
+    router: { replace: vi.fn() },
   },
 }));
 
 vi.mock("@/lib/supabaseClient", () => ({
   supabase: { auth: { getSession: mocks.getSession } },
+}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => mocks.router,
 }));
 
 import AdminPage from "@/app/(site)/admin/page";
@@ -67,5 +71,24 @@ describe("AdminPage", () => {
         screen.getByText("管理者アカウントでログインしてください。"),
       ).toBeDefined();
     });
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+  });
+
+  it("ログイン済みの非管理者はプロフィールへ移動する", async () => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      Response.json(
+        { error: "管理者権限がありません。" },
+        { status: 403 },
+      ),
+    );
+
+    render(<AdminPage />);
+
+    await waitFor(() => {
+      expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
+    });
+    expect(
+      screen.queryByText("管理者権限がありません。"),
+    ).toBeNull();
   });
 });

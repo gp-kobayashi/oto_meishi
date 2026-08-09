@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import {
   type ModerationFilter,
@@ -31,6 +32,7 @@ const audioStatusLabels = {
 };
 
 export default function AdminPage() {
+  const router = useRouter();
   const [data, setData] = useState<ModerationListResponse | null>(null);
   const [filter, setFilter] = useState<ModerationFilter>("all");
   const [page, setPage] = useState(1);
@@ -64,6 +66,10 @@ export default function AdminPage() {
       const response = await fetch(`/api/admin/moderation?${params}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+      if (response.status === 403) {
+        router.replace("/profile");
+        return;
+      }
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(result.error || "管理対象の一覧を取得できませんでした。");
@@ -80,7 +86,7 @@ export default function AdminPage() {
     } finally {
       setLoading(false);
     }
-  }, [filter, page, query]);
+  }, [filter, page, query, router]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => void loadItems(), 0);
