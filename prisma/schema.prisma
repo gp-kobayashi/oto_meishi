@@ -166,17 +166,25 @@ enum ModerationViolationEventType {
   revoked
 }
 
+enum IdentityVerificationRequestStatus {
+  pending
+  verified
+  rejected
+  expired
+}
+
 model AdminUser {
-  id                 String                     @id @default(uuid()) @db.Uuid
-  authId             String                     @unique
-  role               AdminRole                  @default(moderator)
-  isActive           Boolean                    @default(true)
-  moderationActions  ModerationAction[]
-  reviewedReports    ContentReport[]            @relation("ReportReviewer")
-  reportStatusEvents ContentReportStatusEvent[]
-  violationEvents    ModerationViolationEvent[]
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
+  id                                   String                        @id @default(uuid()) @db.Uuid
+  authId                               String                        @unique
+  role                                 AdminRole                     @default(moderator)
+  isActive                             Boolean                       @default(true)
+  moderationActions                    ModerationAction[]
+  reviewedReports                      ContentReport[]               @relation("ReportReviewer")
+  reportStatusEvents                   ContentReportStatusEvent[]
+  violationEvents                      ModerationViolationEvent[]
+  reviewedIdentityVerificationRequests IdentityVerificationRequest[]
+  createdAt                            DateTime                      @default(now())
+  updatedAt                            DateTime                      @updatedAt
 }
 
 model ModerationAction {
@@ -200,23 +208,24 @@ model ModerationAction {
 }
 
 model ModerationCase {
-  id                 String                     @id @default(uuid()) @db.Uuid
-  profile            Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  profileId          String
-  targetType         ModerationTargetType
-  targetId           String
-  reasonCode         ModerationReasonCode
-  reviewMode         ModerationReviewMode
-  status             ModerationCaseStatus       @default(correctionRequired)
-  userMessage        String                     @db.VarChar(500)
-  reviewDueAt        DateTime                   @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
-  retentionExpiresAt DateTime                   @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
-  resolvedAt         DateTime?
-  createdAt          DateTime                   @default(now())
-  updatedAt          DateTime                   @updatedAt
-  snapshots          ModerationSnapshot[]
-  events             ModerationCaseEvent[]
-  violationEvents    ModerationViolationEvent[]
+  id                           String                        @id @default(uuid()) @db.Uuid
+  profile                      Profile                       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId                    String
+  targetType                   ModerationTargetType
+  targetId                     String
+  reasonCode                   ModerationReasonCode
+  reviewMode                   ModerationReviewMode
+  status                       ModerationCaseStatus          @default(correctionRequired)
+  userMessage                  String                        @db.VarChar(500)
+  reviewDueAt                  DateTime                      @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
+  retentionExpiresAt           DateTime                      @default(dbgenerated("(CURRENT_TIMESTAMP + '60 days'::interval)"))
+  resolvedAt                   DateTime?
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
+  snapshots                    ModerationSnapshot[]
+  events                       ModerationCaseEvent[]
+  violationEvents              ModerationViolationEvent[]
+  identityVerificationRequests IdentityVerificationRequest[]
 
   @@index([profileId, status, createdAt])
   @@index([status, reviewDueAt])
@@ -319,30 +328,31 @@ model ContentReportStatusEvent {
 }
 
 model Profile {
-  id                          String                     @id @default(uuid())
-  userId                      String                     @unique
-  authId                      String?                    @unique
-  status                      ProfileStatus              @default(active)
-  accountModerationStatus     AccountModerationStatus    @default(active)
-  suspensionAppealDueAt       DateTime?
-  deletionScheduledAt         DateTime?
-  deletionProcessingStartedAt DateTime?
-  theme                       Theme                      @default(normal)
-  displayName                 String
-  bio                         String
-  audioUrl                    String
-  audioKey                    String                     @default("")
-  audioContentHash            String?                    @db.VarChar(64)
-  audioTitle                  String
-  audioStatus                 AudioModerationStatus      @default(active)
-  sns                         SocialLink[]
-  reports                     ContentReport[]
-  notifications               UserNotification[]
-  moderationCases             ModerationCase[]
-  violationEvents             ModerationViolationEvent[]
-  moderationRequests          ModerationRequest[]
-  createdAt                   DateTime                   @default(now())
-  updatedAt                   DateTime                   @updatedAt
+  id                           String                        @id @default(uuid())
+  userId                       String                        @unique
+  authId                       String?                       @unique
+  status                       ProfileStatus                 @default(active)
+  accountModerationStatus      AccountModerationStatus       @default(active)
+  suspensionAppealDueAt        DateTime?
+  deletionScheduledAt          DateTime?
+  deletionProcessingStartedAt  DateTime?
+  theme                        Theme                         @default(normal)
+  displayName                  String
+  bio                          String
+  audioUrl                     String
+  audioKey                     String                        @default("")
+  audioContentHash             String?                       @db.VarChar(64)
+  audioTitle                   String
+  audioStatus                  AudioModerationStatus         @default(active)
+  sns                          SocialLink[]
+  reports                      ContentReport[]
+  notifications                UserNotification[]
+  moderationCases              ModerationCase[]
+  violationEvents              ModerationViolationEvent[]
+  moderationRequests           ModerationRequest[]
+  identityVerificationRequests IdentityVerificationRequest[]
+  createdAt                    DateTime                      @default(now())
+  updatedAt                    DateTime                      @updatedAt
 
   @@index([status])
   @@index([audioStatus])
@@ -392,6 +402,32 @@ model ModerationRequest {
   @@index([status, createdAt])
 }
 
+model IdentityVerificationRequest {
+  id                    String                            @id @default(uuid()) @db.Uuid
+  profile               Profile                           @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  profileId             String
+  moderationCase        ModerationCase                    @relation(fields: [moderationCaseId], references: [id], onDelete: Cascade)
+  moderationCaseId      String                            @db.Uuid
+  socialLink            SocialLink?                       @relation(fields: [socialLinkId], references: [id], onDelete: SetNull)
+  socialLinkId          String?
+  socialUrl             String                            @db.VarChar(2048)
+  plannedContent        String                            @db.VarChar(500)
+  status                IdentityVerificationRequestStatus @default(pending)
+  postingDeadlineAt     DateTime                          @db.Timestamptz(3)
+  reviewedByAdminUser   AdminUser?                        @relation(fields: [reviewedByAdminUserId], references: [id], onDelete: SetNull)
+  reviewedByAdminUserId String?                           @db.Uuid
+  reviewNote            String                            @default("") @db.VarChar(500)
+  reviewedAt            DateTime?                         @db.Timestamptz(3)
+  createdAt             DateTime                          @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime                          @updatedAt @db.Timestamptz(3)
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([moderationCaseId, createdAt(sort: Desc)])
+  @@index([socialLinkId])
+  @@index([status, postingDeadlineAt])
+  @@index([reviewedByAdminUserId, reviewedAt])
+}
+
 model UserNotification {
   id                 String           @id @default(uuid()) @db.Uuid
   profile            Profile          @relation(fields: [profileId], references: [id], onDelete: Cascade)
@@ -407,14 +443,15 @@ model UserNotification {
 }
 
 model SocialLink {
-  id        String                     @id @default(uuid())
-  profile   Profile                    @relation(fields: [profileId], references: [id])
-  profileId String
-  service   SocialService
-  url       String
-  label     String
-  sortOrder Int                        @default(0)
-  status    SocialLinkModerationStatus @default(active)
+  id                           String                        @id @default(uuid())
+  profile                      Profile                       @relation(fields: [profileId], references: [id])
+  profileId                    String
+  service                      SocialService
+  url                          String
+  label                        String
+  sortOrder                    Int                           @default(0)
+  status                       SocialLinkModerationStatus    @default(active)
+  identityVerificationRequests IdentityVerificationRequest[]
 
   @@index([profileId])
   @@index([status])
