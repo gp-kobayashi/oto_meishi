@@ -19,4 +19,25 @@ describe("TermsPage", () => {
     expect(screen.getByRole("link", { name: "使い方を見る" }).getAttribute("href")).toBe("/help");
     expect(screen.getByRole("link", { name: "アカウント登録へ" }).getAttribute("href")).toBe("/signup");
   });
+
+  it("他人主体のプロフィールと政治・宗教に関する禁止範囲を表示する", () => {
+    render(<TermsPage />);
+
+    expect(
+      screen.getByText(
+        "アカウントを利用する本人以外の人物を主体としたプロフィールを作成すること",
+      ),
+    ).toBeDefined();
+    expect(
+      screen.getByText("政党・政治団体・宗教団体への勧誘または宣伝を行うこと"),
+    ).toBeDefined();
+    expect(
+      screen.getByText(
+        "他の宗教、政党またはその支持者を攻撃したり、誹謗中傷したりすること",
+      ),
+    ).toBeDefined();
+    expect(
+      screen.getByText(/個人として政治・宗教上の所属や信条を紹介することは禁止しません/),
+    ).toBeDefined();
+  });
 });
