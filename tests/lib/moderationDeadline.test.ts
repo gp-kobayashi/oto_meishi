@@ -23,6 +23,19 @@ describe("モデレーション期限判定", () => {
     ).toEqual({ action: "suspend" });
   });
 
+  it("別ケースが管理者確認中なら期限超過ケースがあっても利用停止しない", () => {
+    expect(
+      decideModerationDeadlineAction(
+        {
+          ...state,
+          overdueUnsubmittedCaseCount: 1,
+          hasPendingAdminReview: true,
+        },
+        now,
+      ),
+    ).toEqual({ action: "none" });
+  });
+
   it("利用停止から60日間申請がなければさらに60日後を削除予定日にする", () => {
     expect(
       decideModerationDeadlineAction(

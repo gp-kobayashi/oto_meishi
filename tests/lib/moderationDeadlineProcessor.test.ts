@@ -55,6 +55,29 @@ describe("processModerationDeadlines", () => {
     });
   });
 
+  it("管理者確認・解除申請待ちをバッチ取得前に除外する", async () => {
+    mocks.findMany.mockResolvedValue([]);
+
+    await processModerationDeadlines(now, 100);
+
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          moderationCases: {
+            none: {
+              status: { in: ["postReviewPending", "preReviewPending"] },
+            },
+          },
+          moderationRequests: {
+            none: { kind: "accountAppeal", status: "pending" },
+          },
+        }),
+        orderBy: { id: "asc" },
+        take: 100,
+      }),
+    );
+  });
+
   it("修正されないまま期限を過ぎたプロフィールを利用停止する", async () => {
     mocks.findMany.mockResolvedValue([
       {

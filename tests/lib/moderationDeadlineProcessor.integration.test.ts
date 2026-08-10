@@ -6,6 +6,7 @@ describe("モデレーション期限処理の統合テスト", () => {
   const testRunId = crypto.randomUUID();
   let profileId = "";
   let moderationCaseId = "";
+  const blockedProfileId = `00000000-${testRunId}`;
 
   beforeAll(async () => {
     const profile = await prisma.profile.create({
@@ -37,6 +38,33 @@ describe("モデレーション期限処理の統合テスト", () => {
       select: { id: true },
     });
     moderationCaseId = moderationCase.id;
+
+    await prisma.profile.create({
+      data: {
+        id: blockedProfileId,
+        userId: `integration-deadline-blocked-${testRunId}`,
+        displayName: "管理者確認待ち",
+        bio: "統合テスト用データ",
+        theme: "normal",
+        audioUrl: "",
+        audioTitle: "",
+        status: "suspended",
+        accountModerationStatus: "suspended",
+        suspensionAppealDueAt: new Date("2026-08-01T00:00:00.000Z"),
+        moderationCases: {
+          create: {
+            targetType: "profile",
+            targetId: blockedProfileId,
+            reasonCode: "harassment",
+            reviewMode: "preReview",
+            status: "preReviewPending",
+            userMessage: "管理者確認中です。",
+            reviewDueAt: new Date("2026-08-01T00:00:00.000Z"),
+            retentionExpiresAt: new Date("2026-10-01T00:00:00.000Z"),
+          },
+        },
+      },
+    });
   });
 
   afterAll(async () => {
@@ -48,7 +76,9 @@ describe("モデレーション期限処理の統合テスト", () => {
     );
     try {
       await prisma.moderationAction.deleteMany({ where: { profileId } });
-      await prisma.profile.deleteMany({ where: { id: profileId } });
+      await prisma.profile.deleteMany({
+        where: { id: { in: [profileId, blockedProfileId] } },
+      });
     } finally {
       await prisma.$executeRawUnsafe(
         'alter table public."ModerationCaseEvent" enable trigger prevent_moderation_case_event_update_or_delete',
@@ -62,9 +92,15 @@ describe("モデレーション期限処理の統合テスト", () => {
 
   it("未対応期限超過から利用停止、削除予定化、削除候補化まで進める", async () => {
     const suspensionAt = new Date("2026-08-08T00:00:00.000Z");
-    const suspensionResult = await processModerationDeadlines(suspensionAt);
+    const suspensionResult = await processModerationDeadlines(suspensionAt, 1);
 
     expect(suspensionResult.suspended).toBe(1);
+    await expect(
+      prisma.profile.findUnique({
+        where: { id: blockedProfileId },
+        select: { accountModerationStatus: true },
+      }),
+    ).resolves.toEqual({ accountModerationStatus: "suspended" });
     await expect(
       prisma.profile.findUnique({
         where: { id: profileId },

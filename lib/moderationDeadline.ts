@@ -29,14 +29,14 @@ export function decideModerationDeadlineAction(
   state: ModerationDeadlineState,
   now: Date = new Date(),
 ): ModerationDeadlineDecision {
+  if (state.hasPendingAdminReview || state.hasPendingAppeal) {
+    return { action: "none" };
+  }
+
   if (state.accountStatus === "active") {
     return state.overdueUnsubmittedCaseCount > 0
       ? { action: "suspend" }
       : { action: "none" };
-  }
-
-  if (state.hasPendingAdminReview || state.hasPendingAppeal) {
-    return { action: "none" };
   }
 
   if (state.accountStatus === "suspended") {

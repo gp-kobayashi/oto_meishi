@@ -36,6 +36,12 @@ export async function processModerationDeadlines(
   );
   const profiles = await prisma.profile.findMany({
     where: {
+      moderationCases: {
+        none: { status: { in: [...PENDING_ADMIN_REVIEW_STATUSES] } },
+      },
+      moderationRequests: {
+        none: { kind: "accountAppeal", status: "pending" },
+      },
       OR: [
         {
           accountModerationStatus: "active",
