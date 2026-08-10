@@ -108,31 +108,16 @@ describe("違反回数による利用停止の統合テスト", () => {
   });
 
   afterAll(async () => {
-    await prisma.$executeRawUnsafe(
-      'alter table public."ModerationSnapshot" disable trigger prevent_moderation_snapshot_update_or_delete',
-    );
-    await prisma.$executeRawUnsafe(
-      'alter table public."ModerationCaseEvent" disable trigger prevent_moderation_case_event_update_or_delete',
-    );
-    await prisma.$executeRawUnsafe(
-      'alter table public."ModerationAction" disable trigger prevent_moderation_action_update_or_delete',
-    );
     try {
-      await prisma.moderationAction.deleteMany({
-        where: { profileId: { in: profileIds } },
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`select set_config('app.account_deletion', 'enabled', true)`;
+        await tx.moderationAction.deleteMany({
+          where: { profileId: { in: profileIds } },
+        });
+        await tx.profile.deleteMany({ where: { id: { in: profileIds } } });
+        await tx.adminUser.deleteMany({ where: { id: adminUserId } });
       });
-      await prisma.profile.deleteMany({ where: { id: { in: profileIds } } });
-      await prisma.adminUser.deleteMany({ where: { id: adminUserId } });
     } finally {
-      await prisma.$executeRawUnsafe(
-        'alter table public."ModerationSnapshot" enable trigger prevent_moderation_snapshot_update_or_delete',
-      );
-      await prisma.$executeRawUnsafe(
-        'alter table public."ModerationCaseEvent" enable trigger prevent_moderation_case_event_update_or_delete',
-      );
-      await prisma.$executeRawUnsafe(
-        'alter table public."ModerationAction" enable trigger prevent_moderation_action_update_or_delete',
-      );
       await prisma.$disconnect();
     }
   }, 15_000);
