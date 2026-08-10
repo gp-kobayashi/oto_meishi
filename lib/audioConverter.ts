@@ -2,6 +2,7 @@ import { execFile } from "child_process";
 import { promisify } from "util";
 import path from "path";
 import fs from "fs/promises";
+import { AUDIO_TEMP_ROOT } from "@/lib/audioTempDirectory";
 import { getFfmpegBinaryPath } from "@/lib/ffmpegBinary";
 import {
   LOUDNESS_TARGET_INTEGRATED_LUFS,
@@ -12,10 +13,6 @@ import {
 } from "@/lib/audioLoudness";
 
 const execFileAsync = promisify(execFile);
-
-// os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
-// プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
-const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
 
 // 変換フォーマット設定
 const OUTPUT_EXT = ".m4a";
@@ -123,8 +120,8 @@ export async function convertToAac(options: ConversionOptions): Promise<string> 
 
   if (!finalOutputPath) {
     // 呼び出し側から出力先が指定されない場合のみ一時ディレクトリを作成する
-    await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
-    ownedTempDir = await fs.mkdtemp(path.join(PROJECT_TMP_DIR, "audio-"));
+    await fs.mkdir(AUDIO_TEMP_ROOT, { recursive: true });
+    ownedTempDir = await fs.mkdtemp(path.join(AUDIO_TEMP_ROOT, "audio-"));
     finalOutputPath = path.join(ownedTempDir, `${Date.now()}${OUTPUT_EXT}`);
   }
 

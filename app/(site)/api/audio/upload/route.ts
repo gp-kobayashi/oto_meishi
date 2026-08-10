@@ -11,6 +11,7 @@ import {
 } from "@/lib/r2Storage";
 import path from "path";
 import fs from "fs/promises";
+import { AUDIO_TEMP_ROOT } from "@/lib/audioTempDirectory";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { prisma } from "@/lib/prisma";
 import { inspectAudioFile } from "@/lib/audioInspector";
@@ -36,9 +37,6 @@ import {
   getAudioObjectReferenceState,
 } from "@/lib/moderationAudioEvidence";
 
-// os.tmpdir()は日本語ユーザー名を含む場合がありFFmpegが失敗するため、
-// プロジェクトルート内のASCIIパスのみの一時ディレクトリを使用する
-const PROJECT_TMP_DIR = path.join(process.cwd(), ".tmp");
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 const MAX_REQUEST_BODY_SIZE_BYTES =
   MAX_AUDIO_FILE_SIZE_BYTES + MAX_MULTIPART_OVERHEAD_BYTES;
@@ -243,9 +241,8 @@ export async function POST(request: NextRequest) {
 
     let tempDir: string | null = null;
     try {
-      // 一時ディレクトリを作成（ASCIIパスのみのプロジェクト内ディレクトリを使用）
-      await fs.mkdir(PROJECT_TMP_DIR, { recursive: true });
-      tempDir = await fs.mkdtemp(path.join(PROJECT_TMP_DIR, "upload-"));
+      await fs.mkdir(AUDIO_TEMP_ROOT, { recursive: true });
+      tempDir = await fs.mkdtemp(path.join(AUDIO_TEMP_ROOT, "upload-"));
 
       // クライアント提供のファイル名をパスに使用せず、固定名で保存する
       const inputPath = path.join(tempDir, "input.bin");

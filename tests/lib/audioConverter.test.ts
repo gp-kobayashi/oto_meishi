@@ -4,6 +4,7 @@ import {
   buildFfmpegArguments,
   buildLoudnessNormalizationFilter,
 } from '@/lib/audioConverter';
+import { resolveAudioTempRoot } from '@/lib/audioTempDirectory';
 
 const loudnessMeasurement = {
   inputIntegratedLufs: -22.1,
@@ -15,10 +16,20 @@ const loudnessMeasurement = {
 
 describe('音声変換機能', () => {
   describe('ファイルパス生成ロジック', () => {
-    it('プロジェクトルートからの相対パスが正しく生成される', () => {
-      const projectRoot = process.cwd();
-      const expectedTmpDir = path.join(projectRoot, '.tmp');
-      expect(expectedTmpDir).toContain('.tmp');
+    it('本番環境では書き込み可能なOSの一時領域を使用する', () => {
+      expect(resolveAudioTempRoot({
+        nodeEnv: 'production',
+        projectRoot: '/app',
+        osTempDir: '/tmp',
+      })).toBe(path.join('/tmp', 'oto-meishi'));
+    });
+
+    it('ローカル開発では日本語ユーザー名を避けてプロジェクト内を使用する', () => {
+      expect(resolveAudioTempRoot({
+        nodeEnv: 'development',
+        projectRoot: 'C:\\workspace\\oto_meishi',
+        osTempDir: 'C:\\Users\\祐斗\\AppData\\Local\\Temp',
+      })).toBe(path.join('C:\\workspace\\oto_meishi', '.tmp'));
     });
 
     it('出力ファイル拡張子が.m4aである', () => {
