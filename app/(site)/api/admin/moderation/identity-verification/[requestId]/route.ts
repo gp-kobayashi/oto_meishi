@@ -171,6 +171,7 @@ export async function PATCH(
             id: true,
             status: true,
             profileId: true,
+            postingDeadlineAt: true,
             moderationCase: {
               select: {
                 id: true,
@@ -202,6 +203,18 @@ export async function PATCH(
           httpStatus: 409,
         } as const;
       }
+      const reviewedAt = new Date();
+      if (verificationRequest.postingDeadlineAt <= reviewedAt) {
+        await transaction.identityVerificationRequest.update({
+          where: { id: verificationRequest.id },
+          data: { status: "expired" },
+        });
+        return {
+          error:
+            "投稿期限を過ぎているため、この本人確認申請は審査できません。",
+          httpStatus: 409,
+        } as const;
+      }
       const moderationCase = verificationRequest.moderationCase;
       if (
         moderationCase.reasonCode !== "impersonation" ||
@@ -215,7 +228,6 @@ export async function PATCH(
         } as const;
       }
 
-      const reviewedAt = new Date();
       await transaction.identityVerificationRequest.update({
         where: { id: verificationRequest.id },
         data: {

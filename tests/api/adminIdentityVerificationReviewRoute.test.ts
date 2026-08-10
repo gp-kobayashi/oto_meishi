@@ -87,6 +87,7 @@ describe("管理者の本人確認審査API", () => {
       id: requestId,
       status: "pending",
       profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
       moderationCase,
     });
     mocks.requestUpdate.mockResolvedValue({ id: requestId });
@@ -206,6 +207,7 @@ describe("管理者の本人確認審査API", () => {
       id: requestId,
       status: "verified",
       profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
       moderationCase,
     });
 
@@ -215,5 +217,34 @@ describe("管理者の本人確認審査API", () => {
 
     expect(response.status).toBe(409);
     expect(mocks.requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it("投稿期限を過ぎた申請を期限切れにして審査を拒否する", async () => {
+    mocks.requestFindUnique.mockResolvedValueOnce({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2000-01-01T00:00:00.000Z"),
+      moderationCase,
+    });
+
+    const response = await PATCH(
+      reviewRequest("verified", "期限後の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "投稿期限を過ぎているため、この本人確認申請は審査できません。",
+    });
+    expect(mocks.requestUpdate).toHaveBeenCalledWith({
+      where: { id: requestId },
+      data: { status: "expired" },
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.caseUpdate).not.toHaveBeenCalled();
+    expect(mocks.violationCreate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 });
