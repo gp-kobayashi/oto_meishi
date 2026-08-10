@@ -130,6 +130,28 @@ describe("Supabase migrations", () => {
     );
   });
 
+  it("違反履歴の更新と削除を完全削除時以外はDBトリガーで禁止する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_make_moderation_violation_events_immutable.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain(
+      "create trigger prevent_moderation_violation_event_update_or_delete",
+    );
+    expect(sql).toContain(
+      'before update or delete on public."ModerationViolationEvent"',
+    );
+    expect(sql).toContain(
+      "execute function public.prevent_moderation_action_mutation()",
+    );
+  });
+
   it("issue #102で定めた違反分類を追加する", () => {
     const migrationFile = migrationFiles.find((fileName) =>
       fileName.endsWith("_add_moderation_reason_codes.sql"),
