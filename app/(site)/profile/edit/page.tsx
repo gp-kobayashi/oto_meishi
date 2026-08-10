@@ -22,6 +22,7 @@ import {
   AUDIO_FILE_ACCEPT,
   AUDIO_UPLOAD_REQUIREMENTS,
   MAX_AUDIO_FILE_SIZE_BYTES,
+  MAX_AUDIO_FILE_SIZE_MEGABYTES,
 } from "@/lib/audioUploadConstraints";
 import styles from "./page.module.css";
 import AudioPlayer from "@/components/card/audioPlayer/AudioPlayer";
@@ -124,7 +125,7 @@ function getAudioUploadErrorMessage(
     return "プロフィールが見つかりません。";
   }
   if (status === 413) {
-    return "音声ファイルは64MB以下にしてください。";
+    return `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`;
   }
   if (status === 422 && typeof response.error === "string") {
     return response.error;
@@ -378,7 +379,9 @@ export default function ProfileEditPage() {
     }
 
     if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
-      setAudioFileError("音声ファイルは64MB以下にしてください。");
+      setAudioFileError(
+        `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`,
+      );
       return false;
     }
 
@@ -541,8 +544,9 @@ export default function ProfileEditPage() {
       let finalAudioKey = profile.audioKey || "";
       if (audioFile) {
         if (audioFile.size > MAX_AUDIO_FILE_SIZE_BYTES) {
-          setAudioFileError("音声ファイルは64MB以下にしてください。");
-          throw new Error("音声ファイルは64MB以下にしてください。");
+          const message = `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`;
+          setAudioFileError(message);
+          throw new Error(message);
         }
 
         const formData = new FormData();

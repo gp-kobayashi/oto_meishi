@@ -175,7 +175,7 @@ describe("ProfileEditPage", () => {
   it("音声ファイルの制限と対応形式を表示する", async () => {
     await renderLoadedPage();
 
-    expect(screen.getByText(/3分以内・64MB以下/)).toBeDefined();
+    expect(screen.getByText(/3分以内・30MB以下/)).toBeDefined();
     const input = document.querySelector<HTMLInputElement>("input[type='file']");
     expect(input?.accept).toContain(".m4a");
     expect(input?.accept).toContain(".caf");
@@ -237,20 +237,20 @@ describe("ProfileEditPage", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("64MiBを超える音声は送信前に拒否する", async () => {
+  it("30MiBを超える音声は送信前に拒否する", async () => {
     await renderLoadedPage();
     const oversizedFile = new File(["audio bytes"], "large.wav", {
       type: "audio/wav",
     });
     Object.defineProperty(oversizedFile, "size", {
-      value: 64 * 1024 * 1024 + 1,
+      value: 30 * 1024 * 1024 + 1,
     });
 
     const input = document.querySelector<HTMLInputElement>("input[type='file']");
     fireEvent.change(input!, { target: { files: [oversizedFile] } });
 
     expect((await screen.findByRole("alert")).textContent).toBe(
-      "音声ファイルは64MB以下にしてください。",
+      "音声ファイルは30MB以下にしてください。",
     );
     expect(URL.createObjectURL).not.toHaveBeenCalled();
   });
@@ -270,7 +270,7 @@ describe("ProfileEditPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
 
     expect(
-      await screen.findByText("音声ファイルは64MB以下にしてください。"),
+      await screen.findByText("音声ファイルは30MB以下にしてください。"),
     ).toBeDefined();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });

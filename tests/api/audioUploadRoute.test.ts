@@ -228,19 +228,19 @@ describe("/api/audio/upload route", () => {
     expect(mocks.getUser).not.toHaveBeenCalled();
   });
 
-  it("リクエスト全体が65MiBを超える場合はformData解析前に413を返す", async () => {
+  it("リクエスト全体が31MiBを超える場合はformData解析前に413を返す", async () => {
     const formData = vi.fn();
     const response = await POST({
       headers: new Headers({
         Authorization: "Bearer valid-token",
-        "Content-Length": String(65 * 1024 * 1024 + 1),
+        "Content-Length": String(31 * 1024 * 1024 + 1),
       }),
       formData,
     } as unknown as Parameters<typeof POST>[0]);
 
     expect(response.status).toBe(413);
     await expect(response.json()).resolves.toEqual({
-      error: "音声ファイルは64MB以下にしてください。",
+      error: "音声ファイルは30MB以下にしてください。",
     });
     expect(formData).not.toHaveBeenCalled();
     expect(mocks.getUser).not.toHaveBeenCalled();
@@ -337,7 +337,11 @@ describe("/api/audio/upload route", () => {
       expect(mocks.convertToAac).toHaveBeenCalledTimes(1);
     });
 
-    const secondResponse = await POST(uploadRequest(formDataWithFile()));
+    const secondFormData = vi.fn(async () => formDataWithFile());
+    const secondResponse = await POST({
+      headers: new Headers({ Authorization: "Bearer valid-token" }),
+      formData: secondFormData,
+    } as unknown as Parameters<typeof POST>[0]);
 
     expect(secondResponse.status).toBe(429);
     expect(secondResponse.headers.get("Retry-After")).toBe("30");
@@ -345,6 +349,7 @@ describe("/api/audio/upload route", () => {
       error: "ほかの音声を変換中です。しばらく待ってから再度お試しください。",
     });
     expect(mocks.convertToAac).toHaveBeenCalledTimes(1);
+    expect(secondFormData).not.toHaveBeenCalled();
 
     finishConversion?.(OUTPUT_PATH);
     await expect(firstUpload).resolves.toMatchObject({ status: 200 });
@@ -400,24 +405,24 @@ describe("/api/audio/upload route", () => {
     expect(mocks.writeFile).not.toHaveBeenCalled();
   });
 
-  it("64MiBを超えるファイルの場合は413を返す", async () => {
+  it("30MiBを超えるファイルの場合は413を返す", async () => {
     const formData = new FormData();
-    formData.append("file", fileWithReportedSize(64 * 1024 * 1024 + 1));
+    formData.append("file", fileWithReportedSize(30 * 1024 * 1024 + 1));
     formData.append("userId", "testuser");
 
     const response = await POST(uploadRequest(formData));
 
     expect(response.status).toBe(413);
     await expect(response.json()).resolves.toEqual({
-      error: "音声ファイルは64MB以下にしてください。",
+      error: "音声ファイルは30MB以下にしてください。",
     });
     expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
     expect(mocks.writeFile).not.toHaveBeenCalled();
   });
 
-  it("64MiBちょうどのファイルはサイズ検証を通過する", async () => {
+  it("30MiBちょうどのファイルはサイズ検証を通過する", async () => {
     const formData = new FormData();
-    formData.append("file", fileWithReportedSize(64 * 1024 * 1024));
+    formData.append("file", fileWithReportedSize(30 * 1024 * 1024));
     formData.append("userId", "testuser");
 
     const response = await POST(uploadRequest(formData));

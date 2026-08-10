@@ -19,7 +19,10 @@ import {
   validateAudioMetadata,
   validateConvertedAudioMetadata,
 } from "@/lib/audioUploadPolicy";
-import { MAX_AUDIO_FILE_SIZE_BYTES } from "@/lib/audioUploadConstraints";
+import {
+  MAX_AUDIO_FILE_SIZE_BYTES,
+  MAX_AUDIO_FILE_SIZE_MEGABYTES,
+} from "@/lib/audioUploadConstraints";
 import { tryAcquireAudioConversionSlot } from "@/lib/audioConversionGuard";
 import {
   consumeAudioUploadIpRateLimit,
@@ -63,7 +66,9 @@ export async function POST(request: NextRequest) {
 
     if (exceedsRequestSizeLimit(request.headers.get("Content-Length"))) {
       return NextResponse.json(
-        { error: "音声ファイルは64MB以下にしてください。" },
+        {
+          error: `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`,
+        },
         { status: 413 },
       );
     }
@@ -131,7 +136,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const formData = await request.formData();
+    const releaseConversionSlot = tryAcquireAudioConversionSlot();
+    if (!releaseConversionSlot) {
+      return NextResponse.json(
+        {
+          error:
+            "ほかの音声を変換中です。しばらく待ってから再度お試しください。",
+        },
+        { status: 429, headers: { "Retry-After": "30" } },
+      );
+    }
+
+    let tempDir: string | null = null;
+    try {
+      const formData = await request.formData();
     const file = formData.get("file");
     const userId = formData.get("userId");
 
@@ -148,7 +166,9 @@ export async function POST(request: NextRequest) {
 
     if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
       return NextResponse.json(
-        { error: "音声ファイルは64MB以下にしてください。" },
+        {
+          error: `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`,
+        },
         { status: 413 },
       );
     }
@@ -228,19 +248,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const releaseConversionSlot = tryAcquireAudioConversionSlot();
-    if (!releaseConversionSlot) {
-      return NextResponse.json(
-        {
-          error:
-            "ほかの音声を変換中です。しばらく待ってから再度お試しください。",
-        },
-        { status: 429, headers: { "Retry-After": "30" } },
-      );
-    }
-
-    let tempDir: string | null = null;
-    try {
       await fs.mkdir(AUDIO_TEMP_ROOT, { recursive: true });
       tempDir = await fs.mkdtemp(path.join(AUDIO_TEMP_ROOT, "upload-"));
 
