@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { AuthError } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import PasswordResetRequestForm from "@/components/auth/PasswordResetRequestForm";
 
@@ -52,8 +53,8 @@ describe("PasswordResetRequestForm", () => {
       supabase!.auth.resetPasswordForEmail,
     );
     resetPasswordForEmail.mockResolvedValueOnce({
-      data: {},
-      error: new Error("メールを送信できませんでした。"),
+      data: null,
+      error: new AuthError("メールを送信できませんでした。"),
     });
 
     render(<PasswordResetRequestForm />);
