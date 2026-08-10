@@ -366,6 +366,7 @@ model AccountDeletionRecord {
   formerAuthId      String                      @unique @db.Uuid
   reason            String                      @db.VarChar(500)
   deletedAt         DateTime?
+  pendingStorageObjectKeys String[]
   banStatus         RegistrationBanStatus       @default(active)
   createdAt         DateTime                    @default(now())
   updatedAt         DateTime                    @updatedAt

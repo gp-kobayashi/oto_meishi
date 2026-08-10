@@ -146,6 +146,22 @@ describe("Supabase migrations", () => {
     expect(sql).toContain("'politicalReligiousPromotion'");
   });
 
+  it("アカウント削除後に再試行するR2キーを一時保存する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_add_pending_account_deletion_storage_keys.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+
+    expect(sql).toContain(
+      'add column "pendingStorageObjectKeys" text[] not null default \'{}\'',
+    );
+  });
+
   it("期限処理を管理者操作と区別して監査履歴へ保存する", () => {
     const migrationFile = migrationFiles.find((fileName) =>
       fileName.endsWith("_support_system_moderation_actions.sql"),
