@@ -541,13 +541,18 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
   const isDirectRestoreBlocked = (
     targetType: PendingAction["targetType"],
     targetId: string,
-  ) =>
-    data?.profile.moderationCases.some(
+  ) => {
+    if (targetType === "profile" && data?.profile.status === "suspended") {
+      return true;
+    }
+
+    return data?.profile.moderationCases.some(
       (moderationCase) =>
         moderationCase.targetType === targetType &&
         moderationCase.targetId === targetId &&
         pendingModerationCaseStatuses.has(moderationCase.status),
     ) ?? false;
+  };
 
   return (
     <section className={styles.page}>
@@ -665,7 +670,9 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                 {data.profile.status !== "active" &&
                 isDirectRestoreBlocked("profile", data.profile.id) ? (
                   <p className={styles.restoreBlocked}>
-                    未完了の審査ケースがあります。ケースの「修正を承認」から再公開してください。
+                    {data.profile.status === "suspended"
+                      ? "利用停止の解除は、すべての修正審査後に解除申請から行ってください。"
+                      : "未完了の審査ケースがあります。ケースの「修正を承認」から再公開してください。"}
                   </p>
                 ) : null}
               </div>

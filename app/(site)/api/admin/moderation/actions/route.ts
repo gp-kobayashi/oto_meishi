@@ -305,6 +305,17 @@ export async function PATCH(request: Request) {
           } as const;
         }
 
+        if (
+          targetType === "profile" &&
+          accountModerationStatus !== "active"
+        ) {
+          return {
+            error:
+              "利用停止中のプロフィールは、解除申請の審査操作からのみ復旧できます。",
+            status: 409,
+          } as const;
+        }
+
         const openCase = await tx.moderationCase.findFirst({
           where: {
             profileId,
@@ -384,12 +395,7 @@ export async function PATCH(request: Request) {
                   accountModerationStatus: "suspended" as const,
                   suspensionAppealDueAt,
                 }
-              : action === "restore" && accountModerationStatus !== "active"
-                ? {
-                    accountModerationStatus: "active" as const,
-                    suspensionAppealDueAt: null,
-                  }
-                : {}),
+              : {}),
           },
         });
       } else if (targetType === "audio") {

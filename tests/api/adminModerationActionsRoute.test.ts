@@ -488,6 +488,37 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(mocks.moderationViolationEventCreate).not.toHaveBeenCalled();
   });
 
+  it("利用停止中のプロフィールは未完了ケースの対象にかかわらず直接復旧を拒否する", async () => {
+    mocks.profileFindUnique.mockResolvedValue({
+      id: "profile-1",
+      status: "suspended",
+      accountModerationStatus: "suspended",
+      deletionProcessingStartedAt: null,
+      displayName: "修正後の名前",
+      bio: "修正後の自己紹介",
+      theme: "normal",
+    });
+
+    const response = await PATCH(
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "restore",
+        reason: "音声の修正を確認したため再公開",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "利用停止中のプロフィールは、解除申請の審査操作からのみ復旧できます。",
+    });
+    expect(mocks.moderationCaseFindFirst).not.toHaveBeenCalled();
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
   it("完全削除処理が開始されたプロフィールは直接復旧できない", async () => {
     mocks.profileFindUnique.mockResolvedValue({
       id: "profile-1",
