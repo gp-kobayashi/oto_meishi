@@ -135,7 +135,7 @@ describe("GET /api/audio/playback", () => {
     });
     const playbackRequest = new Request(
       "http://localhost/api/audio/playback?userId=testuser",
-      { headers: { "CF-Connecting-IP": "203.0.113.10" } },
+      { headers: { "X-Forwarded-For": "203.0.113.10, 10.0.0.1" } },
     );
 
     const response = await GET(playbackRequest);
@@ -155,7 +155,7 @@ describe("GET /api/audio/playback", () => {
     expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
   });
 
-  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+  it("接続元IPを取得できない場合も共通キーでIP制限する", async () => {
     mocks.findUnique.mockResolvedValue({
       status: "active",
       accountModerationStatus: "active",
@@ -167,6 +167,8 @@ describe("GET /api/audio/playback", () => {
     const response = await GET(request("testuser"));
 
     expect(response.status).toBe(200);
-    expect(mocks.consumePublicPlaybackIpRateLimit).not.toHaveBeenCalled();
+    expect(mocks.consumePublicPlaybackIpRateLimit).toHaveBeenCalledWith(
+      "unresolved-client",
+    );
   });
 });

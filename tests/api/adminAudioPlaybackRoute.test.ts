@@ -160,7 +160,7 @@ describe("GET /api/admin/audio/playback", () => {
       {
         headers: {
           Authorization: "Bearer admin-token",
-          "CF-Connecting-IP": "203.0.113.10",
+          "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
         },
       },
     );
@@ -182,11 +182,13 @@ describe("GET /api/admin/audio/playback", () => {
     expect(mocks.createSignedAudioUrl).not.toHaveBeenCalled();
   });
 
-  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+  it("接続元IPを取得できない場合も共通キーでIP制限する", async () => {
     const response = await GET(request());
 
     expect(response.status).toBe(200);
-    expect(mocks.consumeAdminPlaybackIpRateLimit).not.toHaveBeenCalled();
+    expect(mocks.consumeAdminPlaybackIpRateLimit).toHaveBeenCalledWith(
+      "unresolved-client",
+    );
   });
 
   it("音声がなければ署名URLを発行しない", async () => {

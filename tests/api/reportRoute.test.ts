@@ -106,7 +106,7 @@ describe("POST /api/reports", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "CF-Connecting-IP": "203.0.113.10",
+        "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
       },
       body: JSON.stringify({ profileId: "profile-1", reason: "other" }),
     });
@@ -139,7 +139,7 @@ describe("POST /api/reports", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "CF-Connecting-IP": "203.0.113.10",
+        "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
       },
       body: JSON.stringify({ profileId: "profile-1", reason: "harassment" }),
     });
@@ -161,14 +161,19 @@ describe("POST /api/reports", () => {
     expect(mocks.contentReportCreate).not.toHaveBeenCalled();
   });
 
-  it("接続元IPを取得できない場合は回数制限をスキップする", async () => {
+  it("接続元IPを取得できない場合も共通キーで回数制限する", async () => {
     const response = await POST(
       reportRequest({ profileId: "profile-1", reason: "other" }),
     );
 
     expect(response.status).toBe(201);
-    expect(mocks.consumeReportIpRateLimit).not.toHaveBeenCalled();
-    expect(mocks.consumeReportTargetRateLimit).not.toHaveBeenCalled();
+    expect(mocks.consumeReportIpRateLimit).toHaveBeenCalledWith(
+      "unresolved-client",
+    );
+    expect(mocks.consumeReportTargetRateLimit).toHaveBeenCalledWith(
+      "unresolved-client",
+      "profile-1",
+    );
   });
 
   it("8KBを超える通報データを413で拒否する", async () => {

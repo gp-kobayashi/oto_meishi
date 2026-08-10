@@ -286,7 +286,7 @@ describe("/api/profile route", () => {
       {
         headers: {
           ...authHeader,
-          "CF-Connecting-IP": "203.0.113.10",
+          "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
         },
       },
     );
@@ -307,7 +307,7 @@ describe("/api/profile route", () => {
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
   });
 
-  it("自分のプロフィール取得でIPを取得できない場合はIP制限をスキップする", async () => {
+  it("自分のプロフィール取得でIPを取得できない場合も共通キーでIP制限する", async () => {
     mocks.profileFindUnique.mockResolvedValueOnce({
       id: "profile-1",
       userId: "testuser",
@@ -322,7 +322,9 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.consumePrivateProfileReadIpRateLimit).not.toHaveBeenCalled();
+    expect(mocks.consumePrivateProfileReadIpRateLimit).toHaveBeenCalledWith(
+      "unresolved-client",
+    );
   });
 
   it("プロフィール取得の内部エラーをレスポンスへ公開しない", async () => {
@@ -454,7 +456,7 @@ describe("/api/profile route", () => {
     });
     const profileRequest = new Request(
       "http://localhost/api/profile?userId=testuser",
-      { headers: { "CF-Connecting-IP": "203.0.113.10" } },
+      { headers: { "X-Forwarded-For": "203.0.113.10, 10.0.0.1" } },
     );
 
     const response = await GET(profileRequest);
@@ -543,7 +545,7 @@ describe("/api/profile route", () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "CF-Connecting-IP": "203.0.113.10",
+        "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
         ...authHeader,
       },
       body: JSON.stringify({
@@ -569,7 +571,7 @@ describe("/api/profile route", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+  it("接続元IPを取得できない場合も共通キーでIP制限する", async () => {
     mocks.profileFindUnique.mockResolvedValueOnce({
       id: "profile-1",
       userId: "testuser",
@@ -591,7 +593,9 @@ describe("/api/profile route", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.consumeProfileSaveIpRateLimit).not.toHaveBeenCalled();
+    expect(mocks.consumeProfileSaveIpRateLimit).toHaveBeenCalledWith(
+      "unresolved-client",
+    );
   });
 
   it("JSON以外のContent-Typeは本文解析前に415を返す", async () => {

@@ -732,7 +732,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
         headers: {
           "Content-Type": "application/json",
           Authorization: "Bearer token",
-          "CF-Connecting-IP": "203.0.113.10",
+          "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
         },
         body: JSON.stringify({
           targetType: "profile",
@@ -759,7 +759,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
-  it("接続元IPを取得できない場合はIP制限をスキップする", async () => {
+  it("接続元IPを取得できない場合も共通キーでIP制限する", async () => {
     const response = await PATCH(
       request({
         targetType: "profile",
@@ -770,7 +770,9 @@ describe("PATCH /api/admin/moderation/actions", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.consumeAdminActionIpRateLimit).not.toHaveBeenCalled();
+    expect(mocks.consumeAdminActionIpRateLimit).toHaveBeenCalledWith(
+      "unresolved-client",
+    );
   });
 
   it("JSON以外のContent-Typeは認可後かつ本文解析前に415を返す", async () => {
