@@ -44,5 +44,25 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Start local Supabase
+        run: npm run supabase:test:start
+
+      - name: Configure integration test environment
+        run: |
+          npx supabase status -o env \
+            --override-name api.url=INTEGRATION_SUPABASE_URL \
+            --override-name db.url=INTEGRATION_DATABASE_URL \
+            --override-name auth.anon_key=INTEGRATION_SUPABASE_ANON_KEY \
+            --override-name auth.service_role_key=INTEGRATION_SUPABASE_SERVICE_ROLE_KEY \
+            > .env.integration.local
+          echo "INTEGRATION_ACCOUNT_BAN_HASH_SECRET=ci-integration-test-secret-32-characters" >> .env.integration.local
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Stop local Supabase
+        if: always()
+        run: npm run supabase:test:stop
+
       - name: Build application
         run: npm run build
