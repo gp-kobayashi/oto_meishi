@@ -110,10 +110,11 @@ describe("deleteModeratedAccount", () => {
     mocks.deleteFromR2.mockResolvedValue(undefined);
     mocks.deleteUser.mockResolvedValue({ error: null });
     mocks.txProfileFindFirst.mockResolvedValue({ id: "profile-1" });
+    mocks.txProfileDelete.mockResolvedValue({ id: "profile-1" });
     mocks.transaction.mockImplementation((callback) => callback(tx));
   });
 
-  it("禁止記録、R2、利用データ、Authの順で完全削除する", async () => {
+  it("禁止記録、利用データ、R2、Authの順で完全削除する", async () => {
     await expect(deleteModeratedAccount("profile-1", now)).resolves.toEqual({
       status: "deleted",
     });
@@ -122,6 +123,10 @@ describe("deleteModeratedAccount", () => {
       data: {
         formerAuthId: "11111111-1111-1111-1111-111111111111",
         reason: expect.stringContaining("harassment"),
+        pendingStorageObjectKeys: [
+          "audio/user/current.m4a",
+          "audio/user/old.m4a",
+        ],
         bannedIdentifiers: {
           create: [
             expect.objectContaining({ fingerprint: "a".repeat(64) }),
@@ -140,9 +145,26 @@ describe("deleteModeratedAccount", () => {
     expect(mocks.txProfileDelete).toHaveBeenCalledWith({
       where: { id: "profile-1" },
     });
+    expect(mocks.txProfileFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: "profile-1",
+        accountModerationStatus: "deletionPending",
+        deletionScheduledAt: { lte: now },
+        deletionProcessingStartedAt: now,
+        moderationCases: {
+          none: {
+            status: { in: ["postReviewPending", "preReviewPending"] },
+          },
+        },
+        moderationRequests: {
+          none: { kind: "accountAppeal", status: "pending" },
+        },
+      },
+      select: { id: true },
+    });
     expect(mocks.deletionRecordUpdate).toHaveBeenCalledWith({
       where: { formerAuthId: "11111111-1111-1111-1111-111111111111" },
-      data: { deletedAt: now },
+      data: { deletedAt: now, pendingStorageObjectKeys: [] },
     });
   });
 
@@ -168,6 +190,52 @@ describe("deleteModeratedAccount", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("利用データの削除に失敗した場合はR2オブジェクトを削除しない", async () => {
+    mocks.txProfileDelete.mockRejectedValue(new Error("database unavailable"));
+
+    await expect(deleteModeratedAccount("profile-1", now)).rejects.toThrow(
+      "database unavailable",
+    );
+
+    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("利用データ削除後のR2削除失敗を次回処理で再試行する", async () => {
+    mocks.deleteFromR2.mockRejectedValueOnce(new Error("R2 unavailable"));
+
+    await expect(deleteModeratedAccount("profile-1", now)).rejects.toThrow(
+      "R2 unavailable",
+    );
+    expect(mocks.txProfileDelete).toHaveBeenCalled();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+
+    mocks.deletionRecordFindMany.mockResolvedValue([
+      {
+        formerAuthId: "11111111-1111-1111-1111-111111111111",
+        pendingStorageObjectKeys: [
+          "audio/user/current.m4a",
+          "audio/user/old.m4a",
+        ],
+      },
+    ]);
+
+    await expect(completePendingAccountAuthDeletions(now)).resolves.toEqual({
+      examined: 1,
+      completed: 1,
+      skipped: 0,
+      failed: 0,
+    });
+    expect(mocks.deleteFromR2).toHaveBeenCalledTimes(3);
+    expect(mocks.deleteUser).toHaveBeenCalledWith(
+      "11111111-1111-1111-1111-111111111111",
+    );
+    expect(mocks.deletionRecordUpdate).toHaveBeenLastCalledWith({
+      where: { formerAuthId: "11111111-1111-1111-1111-111111111111" },
+      data: { deletedAt: now, pendingStorageObjectKeys: [] },
+    });
+  });
+
   it("他プロフィールから参照中のR2オブジェクトは削除しない", async () => {
     mocks.profileCount.mockImplementation(({ where }) =>
       Promise.resolve(where.audioKey.endsWith("current.m4a") ? 1 : 0),
@@ -180,7 +248,10 @@ describe("deleteModeratedAccount", () => {
   });
 
   it("保存済みの禁止記録があればAuthユーザー削除後の再試行を継続できる", async () => {
-    mocks.deletionRecordFindUnique.mockResolvedValue({ id: "record-1" });
+    mocks.deletionRecordFindUnique.mockResolvedValue({
+      id: "record-1",
+      pendingStorageObjectKeys: [],
+    });
     mocks.getUserById.mockResolvedValue({
       data: { user: null },
       error: { status: 404, code: "user_not_found" },
@@ -196,7 +267,10 @@ describe("deleteModeratedAccount", () => {
 
   it("利用データ削除後に残ったAuth削除を再試行して完了日時を記録する", async () => {
     mocks.deletionRecordFindMany.mockResolvedValue([
-      { formerAuthId: "11111111-1111-1111-1111-111111111111" },
+      {
+        formerAuthId: "11111111-1111-1111-1111-111111111111",
+        pendingStorageObjectKeys: [],
+      },
     ]);
     mocks.profileCount.mockResolvedValue(0);
 
@@ -211,13 +285,16 @@ describe("deleteModeratedAccount", () => {
     );
     expect(mocks.deletionRecordUpdate).toHaveBeenCalledWith({
       where: { formerAuthId: "11111111-1111-1111-1111-111111111111" },
-      data: { deletedAt: now },
+      data: { deletedAt: now, pendingStorageObjectKeys: [] },
     });
   });
 
   it("利用データが残る準備中記録ではAuthを削除しない", async () => {
     mocks.deletionRecordFindMany.mockResolvedValue([
-      { formerAuthId: "11111111-1111-1111-1111-111111111111" },
+      {
+        formerAuthId: "11111111-1111-1111-1111-111111111111",
+        pendingStorageObjectKeys: [],
+      },
     ]);
     mocks.profileCount.mockResolvedValue(1);
 

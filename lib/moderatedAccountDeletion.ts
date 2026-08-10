@@ -32,6 +32,22 @@ function buildDeletionReason(reasonCodes: string[]): string {
     : "利用停止後の申請期限を過ぎたため";
 }
 
+async function deleteUnreferencedStorageObjects(
+  objectKeys: readonly string[],
+): Promise<void> {
+  for (const objectKey of objectKeys) {
+    const [profileReferences, snapshotReferences] = await Promise.all([
+      prisma.profile.count({ where: { audioKey: objectKey } }),
+      prisma.moderationSnapshot.count({
+        where: { storageObjectKey: objectKey },
+      }),
+    ]);
+    if (profileReferences === 0 && snapshotReferences === 0) {
+      await deleteFromR2(objectKey);
+    }
+  }
+}
+
 export async function deleteModeratedAccount(
   profileId: string,
   now: Date = new Date(),
@@ -79,12 +95,23 @@ export async function deleteModeratedAccount(
   if (!profile) return { status: "skipped", reason: "notEligible" };
   if (!profile.authId) return { status: "skipped", reason: "missingAuthId" };
 
+  const objectKeys = new Set<string>();
+  if (profile.audioKey) objectKeys.add(profile.audioKey);
+  for (const moderationCase of profile.moderationCases) {
+    for (const snapshot of moderationCase.snapshots) {
+      if (snapshot.storageObjectKey) objectKeys.add(snapshot.storageObjectKey);
+    }
+  }
+
   const authId = profile.authId;
   const supabaseAdmin = createServerSupabaseClient();
   const existingDeletionRecord = await prisma.accountDeletionRecord.findUnique({
     where: { formerAuthId: authId },
-    select: { id: true },
+    select: { id: true, pendingStorageObjectKeys: true },
   });
+  for (const objectKey of existingDeletionRecord?.pendingStorageObjectKeys ?? []) {
+    objectKeys.add(objectKey);
+  }
   const { data: authUserData, error: getUserError } =
     await supabaseAdmin.auth.admin.getUserById(authId);
 
@@ -112,34 +139,15 @@ export async function deleteModeratedAccount(
             String(moderationCase.reasonCode),
           ),
         ),
+        pendingStorageObjectKeys: [...objectKeys],
         bannedIdentifiers: { create: fingerprints },
       },
     });
-  }
-
-  const objectKeys = new Set<string>();
-  if (profile.audioKey) objectKeys.add(profile.audioKey);
-  for (const moderationCase of profile.moderationCases) {
-    for (const snapshot of moderationCase.snapshots) {
-      if (snapshot.storageObjectKey) objectKeys.add(snapshot.storageObjectKey);
-    }
-  }
-
-  for (const objectKey of objectKeys) {
-    const [otherProfileReferences, otherSnapshotReferences] = await Promise.all([
-      prisma.profile.count({
-        where: { id: { not: profileId }, audioKey: objectKey },
-      }),
-      prisma.moderationSnapshot.count({
-        where: {
-          storageObjectKey: objectKey,
-          moderationCase: { profileId: { not: profileId } },
-        },
-      }),
-    ]);
-    if (otherProfileReferences === 0 && otherSnapshotReferences === 0) {
-      await deleteFromR2(objectKey);
-    }
+  } else {
+    await prisma.accountDeletionRecord.update({
+      where: { formerAuthId: authId },
+      data: { pendingStorageObjectKeys: [...objectKeys] },
+    });
   }
 
   const deleted = await prisma.$transaction(
@@ -147,7 +155,15 @@ export async function deleteModeratedAccount(
       const eligibleProfile = await tx.profile.findFirst({
         where: {
           id: profileId,
+          accountModerationStatus: "deletionPending",
+          deletionScheduledAt: { lte: now },
           deletionProcessingStartedAt: now,
+          moderationCases: {
+            none: { status: { in: [...PENDING_ADMIN_REVIEW_STATUSES] } },
+          },
+          moderationRequests: {
+            none: { kind: "accountAppeal", status: "pending" },
+          },
         },
         select: { id: true },
       });
@@ -163,6 +179,8 @@ export async function deleteModeratedAccount(
 
   if (!deleted) return { status: "skipped", reason: "notEligible" };
 
+  await deleteUnreferencedStorageObjects([...objectKeys]);
+
   if (authUserData.user) {
     const { error: deleteUserError } =
       await supabaseAdmin.auth.admin.deleteUser(authId);
@@ -172,7 +190,7 @@ export async function deleteModeratedAccount(
   }
   await prisma.accountDeletionRecord.update({
     where: { formerAuthId: authId },
-    data: { deletedAt: now },
+    data: { deletedAt: now, pendingStorageObjectKeys: [] },
   });
 
   return { status: "deleted" };
@@ -186,7 +204,7 @@ export async function completePendingAccountAuthDeletions(
     where: { deletedAt: null, banStatus: "active" },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
     take: Math.min(Math.max(Math.trunc(batchSize), 1), 500),
-    select: { formerAuthId: true },
+    select: { formerAuthId: true, pendingStorageObjectKeys: true },
   });
   const result: PendingAuthDeletionResult = {
     examined: records.length,
@@ -206,6 +224,8 @@ export async function completePendingAccountAuthDeletions(
         continue;
       }
 
+      await deleteUnreferencedStorageObjects(record.pendingStorageObjectKeys);
+
       const { data, error: getUserError } =
         await supabaseAdmin.auth.admin.getUserById(record.formerAuthId);
       if (getUserError && !isNotFoundAuthError(getUserError)) {
@@ -221,7 +241,7 @@ export async function completePendingAccountAuthDeletions(
 
       await prisma.accountDeletionRecord.update({
         where: { formerAuthId: record.formerAuthId },
-        data: { deletedAt: now },
+        data: { deletedAt: now, pendingStorageObjectKeys: [] },
       });
       result.completed += 1;
     } catch (error) {

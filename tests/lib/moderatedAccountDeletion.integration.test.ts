@@ -67,6 +67,7 @@ describe("モデレーション対象アカウント完全削除の統合テス�
     expect(deletionRecord).toMatchObject({
       formerAuthId: authId,
       deletedAt: deletionAt,
+      pendingStorageObjectKeys: [],
       banStatus: "active",
     });
     expect(deletionRecord?.bannedIdentifiers).toEqual([
