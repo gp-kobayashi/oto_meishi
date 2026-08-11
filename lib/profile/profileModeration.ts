@@ -1,4 +1,7 @@
-import type { Prisma } from "@/lib/generated/prisma/client";
+import type {
+  ModerationCaseStatus,
+  Prisma,
+} from "@/lib/generated/prisma/client";
 import {
   compareModeratedUrls,
   createModeratedUrlHash,
@@ -8,6 +11,75 @@ import {
 } from "@/lib/moderationRemediation";
 
 type ProfileTransaction = Prisma.TransactionClient;
+
+const MODERATION_CASE_PENDING_STATUSES = [
+  "correctionRequired",
+  "postReviewPending",
+  "preReviewPending",
+] satisfies ModerationCaseStatus[];
+const PRE_REVIEW_MODE = "preReview" as const;
+const PRE_REVIEW_PENDING_STATUS = "preReviewPending" as const;
+
+async function transitionExistingCaseToPreReview(
+  transaction: ProfileTransaction,
+  caseId: string,
+  deadline: Date,
+) {
+  return transaction.moderationCase.update({
+    where: { id: caseId },
+    data: {
+      reviewMode: PRE_REVIEW_MODE,
+      status: PRE_REVIEW_PENDING_STATUS,
+      reviewDueAt: deadline,
+      retentionExpiresAt: deadline,
+      resolvedAt: null,
+    },
+    select: { id: true },
+  });
+}
+
+async function appendCorrectionAudit({
+  transaction,
+  caseId,
+  correctedContent,
+  contentHash,
+  expiresAt,
+  eventType,
+  actorId,
+  previousStatus,
+  details,
+}: {
+  transaction: ProfileTransaction;
+  caseId: string;
+  correctedContent: Prisma.InputJsonValue;
+  contentHash?: string | null;
+  expiresAt: Date;
+  eventType: "contentChanged" | "contentDeleted";
+  actorId: string;
+  previousStatus: ModerationCaseStatus;
+  details: Prisma.InputJsonValue;
+}) {
+  await transaction.moderationSnapshot.create({
+    data: {
+      moderationCaseId: caseId,
+      kind: "corrected",
+      content: correctedContent,
+      ...(contentHash !== undefined ? { contentHash } : {}),
+      expiresAt,
+    },
+  });
+  await transaction.moderationCaseEvent.create({
+    data: {
+      moderationCaseId: caseId,
+      eventType,
+      actorType: "user",
+      actorId,
+      previousStatus,
+      newStatus: PRE_REVIEW_PENDING_STATUS,
+      details,
+    },
+  });
+}
 
 type LinkModerationCase = {
   snapshots: {
@@ -80,35 +152,27 @@ async function recordModeratedLinkCorrection({
       targetType: "socialLink",
       targetId: link.id,
       status: {
-        in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+        in: MODERATION_CASE_PENDING_STATUSES,
       },
     },
     select: { id: true, status: true, reviewMode: true },
   });
   if (!existingCase && link.status !== "hidden") return null;
 
-  const reviewMode = "preReview" as const;
-  const pendingStatus = "preReviewPending" as const;
   const moderationCase = existingCase
-    ? await transaction.moderationCase.update({
-        where: { id: existingCase.id },
-        data: {
-          reviewMode,
-          status: pendingStatus,
-          reviewDueAt: deadline,
-          retentionExpiresAt: deadline,
-          resolvedAt: null,
-        },
-        select: { id: true },
-      })
+    ? await transitionExistingCaseToPreReview(
+        transaction,
+        existingCase.id,
+        deadline,
+      )
     : await transaction.moderationCase.create({
         data: {
           profileId,
           targetType: "socialLink",
           targetId: link.id,
           reasonCode: "unsafeLink",
-          reviewMode,
-          status: pendingStatus,
+          reviewMode: PRE_REVIEW_MODE,
+          status: PRE_REVIEW_PENDING_STATUS,
           userMessage: "非公開リンクが修正されました。",
           reviewDueAt: deadline,
           retentionExpiresAt: deadline,
@@ -132,36 +196,27 @@ async function recordModeratedLinkCorrection({
     });
   }
 
-  await transaction.moderationSnapshot.create({
-    data: {
-      moderationCaseId: moderationCase.id,
-      kind: "corrected",
-      content: deleted
-        ? { deleted: true }
-        : {
-            service: requestedLink?.service,
-            url: requestedLink?.url,
-            label: requestedLink?.label,
-          },
-      contentHash: correctedContentHash,
-      expiresAt: deadline,
-    },
-  });
-  await transaction.moderationCaseEvent.create({
-    data: {
-      moderationCaseId: moderationCase.id,
-      eventType: deleted ? "contentDeleted" : "contentChanged",
-      actorType: "user",
-      actorId,
-      previousStatus: existingCase?.status ?? "correctionRequired",
-      newStatus: pendingStatus,
-      details: { targetType: "socialLink", targetId: link.id },
-    },
+  await appendCorrectionAudit({
+    transaction,
+    caseId: moderationCase.id,
+    correctedContent: deleted
+      ? { deleted: true }
+      : {
+          service: requestedLink?.service,
+          url: requestedLink?.url,
+          label: requestedLink?.label,
+        },
+    contentHash: correctedContentHash,
+    expiresAt: deadline,
+    eventType: deleted ? "contentDeleted" : "contentChanged",
+    actorId,
+    previousStatus: existingCase?.status ?? "correctionRequired",
+    details: { targetType: "socialLink", targetId: link.id },
   });
 
   return {
-    pendingStatus,
-    reviewMode,
+    pendingStatus: PRE_REVIEW_PENDING_STATUS,
+    reviewMode: PRE_REVIEW_MODE,
   };
 }
 
@@ -190,7 +245,7 @@ async function recordModeratedProfileCorrection({
       targetType: "profile",
       targetId: profileId,
       status: {
-        in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+        in: MODERATION_CASE_PENDING_STATUSES,
       },
     },
     select: { id: true, status: true, reviewMode: true },
@@ -198,42 +253,21 @@ async function recordModeratedProfileCorrection({
   if (!existingCase) return null;
 
   const deadline = getModerationDeadline();
-  const reviewMode = "preReview" as const;
-  const pendingStatus = "preReviewPending" as const;
-  await transaction.moderationCase.update({
-    where: { id: existingCase.id },
-    data: {
-      reviewMode,
-      status: pendingStatus,
-      reviewDueAt: deadline,
-      retentionExpiresAt: deadline,
-      resolvedAt: null,
-    },
-    select: { id: true },
-  });
-  await transaction.moderationSnapshot.create({
-    data: {
-      moderationCaseId: existingCase.id,
-      kind: "corrected",
-      content: correctedContent,
-      expiresAt: deadline,
-    },
-  });
-  await transaction.moderationCaseEvent.create({
-    data: {
-      moderationCaseId: existingCase.id,
-      eventType: "contentChanged",
-      actorType: "user",
-      actorId,
-      previousStatus: existingCase.status,
-      newStatus: pendingStatus,
-      details: { targetType: "profile", targetId: profileId, changedFields },
-    },
+  await transitionExistingCaseToPreReview(transaction, existingCase.id, deadline);
+  await appendCorrectionAudit({
+    transaction,
+    caseId: existingCase.id,
+    correctedContent,
+    expiresAt: deadline,
+    eventType: "contentChanged",
+    actorId,
+    previousStatus: existingCase.status,
+    details: { targetType: "profile", targetId: profileId, changedFields },
   });
 
   return {
-    reviewMode,
-    pendingStatus,
+    reviewMode: PRE_REVIEW_MODE,
+    pendingStatus: PRE_REVIEW_PENDING_STATUS,
     profileStatus: "hidden",
   } as const;
 }
