@@ -10,16 +10,13 @@ import {
   consumeProfileSaveIpRateLimit,
   consumeProfileSaveUserRateLimit,
 } from "@/lib/profileSaveRateLimit";
-import type { ModeratedProfileContent } from "@/lib/moderationRemediation";
-import { recordModeratedProfileCorrection } from "@/lib/profile/profileModeration";
 import {
   areSocialLinksUnchanged,
-  syncSocialLinks,
   validateSocialLinks,
 } from "@/lib/profile/profileLinks";
 import { getClientIp } from "@/lib/clientIp";
-import { ownerModerationCasesQuery } from "@/lib/profile/queries";
 import { isRegistrationBanned } from "@/lib/registrationBan";
+import { executeProfileSave } from "@/lib/profile/profileSaveCommand";
 
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -250,90 +247,16 @@ export async function saveProfile(request: Request) {
       }
     }
 
-    const savedProfile = await prisma.$transaction(async (transaction) => {
-      let profileId: string;
-
-      if (!existingProfile) {
-        const createdProfile = await transaction.profile.create({
-          data: {
-            userId,
-            authId: supabaseUser.id,
-            displayName: displayName || userId,
-            bio,
-            audioUrl: "",
-            audioKey: "",
-            audioTitle: audioTitleToSave,
-            theme,
-            sns: {
-              create: [],
-            },
-          },
-          include: { sns: true },
-        });
-        profileId = createdProfile.id;
-      } else {
-        const reportedProfileContent: ModeratedProfileContent = {
-          displayName: existingProfile.displayName,
-          bio: existingProfile.bio,
-          theme: existingProfile.theme,
-        };
-        const correctedProfileContent: ModeratedProfileContent = {
-          displayName: displayName || userId,
-          bio,
-          theme,
-        };
-        const profileCorrection = await recordModeratedProfileCorrection({
-          transaction,
-          profileId: existingProfile.id,
-          reportedContent: reportedProfileContent,
-          correctedContent: correctedProfileContent,
-          actorId: supabaseUser.id,
-        });
-        await transaction.profile.update({
-          where: { userId },
-          data: {
-            displayName: displayName || userId,
-            bio,
-            audioTitle: audioTitleToSave,
-            theme,
-            ...(profileCorrection
-              ? { status: profileCorrection.profileStatus }
-              : {}),
-          },
-          include: { sns: true },
-        });
-        profileId = existingProfile.id;
-      }
-
-      if (preserveExistingLinks) {
-        return transaction.profile.findUnique({
-          where: { userId },
-          include: {
-            sns: true,
-            moderationCases: ownerModerationCasesQuery,
-          },
-        });
-      }
-
-      const existingLinks = (existingProfile?.sns ?? []).map((link) => ({
-        ...link,
-        status: link.status ?? ("active" as const),
-      }));
-      await syncSocialLinks({
-        transaction,
-        profileId,
-        existingLinks,
-        requestedLinks: socialLinksToSave,
-        actorId: supabaseUser.id,
-      });
-
-      return transaction.profile.findUnique({
-        where: { userId },
-        include: {
-          sns: true,
-          moderationCases: ownerModerationCasesQuery,
-        },
-      });
+    const savedProfile = await executeProfileSave({
+      existingProfile,
+      userId,
+      authId: supabaseUser.id,
+      displayName,
+      bio,
+      audioTitle: audioTitleToSave,
+      theme,
+      socialLinks: socialLinksToSave,
+      preserveExistingLinks,
     });
 
     return NextResponse.json(savedProfile, {
