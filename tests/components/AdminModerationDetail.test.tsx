@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {
@@ -17,6 +17,321 @@ vi.mock("next/navigation", () => ({
 
 import AdminModerationDetail from "@/app/(site)/admin/moderation/[profileId]/AdminModerationDetail";
 
+const detailResponse = () =>
+  new Response(
+    JSON.stringify({
+      profile: {
+        id: "profile-1",
+        userId: "sample-user",
+        displayName: "サンプル",
+        bio: "自己紹介です",
+        theme: "normal",
+        status: "active",
+        hasAudio: true,
+        audioTitle: "",
+        audioStatus: "removed",
+        deletedAudio: {
+          moderationCaseId: "case-1",
+          status: "postReviewPending",
+          reviewMode: "postReview",
+          reviewDueAt: "2026-09-15T00:00:00.000Z",
+          previousTitle: "自己紹介音声",
+          previousStatus: "hidden",
+          deletedAt: "2026-07-17T04:00:00.000Z",
+          deletedByType: "user",
+          deletedByIdentifier: "auth-use",
+        },
+        createdAt: "2026-07-16T00:00:00.000Z",
+        updatedAt: "2026-07-17T00:00:00.000Z",
+        links: [
+          {
+            id: "link-1",
+            service: "youtube",
+            label: "YouTube",
+            url: "https://youtube.com/example",
+            sortOrder: 0,
+            status: "hidden",
+          },
+        ],
+        reports: [
+          {
+            id: "report-1",
+            reason: "unsafe_link",
+            details: "外部サイトへ誘導されます",
+            status: "pending",
+            reviewNote: "リンク先を確認しました",
+            reviewerIdentifier: "auth-adm",
+            reviewerRole: "admin",
+            reviewedAt: "2026-07-17T03:00:00.000Z",
+            createdAt: "2026-07-17T02:00:00.000Z",
+            updatedAt: "2026-07-17T02:00:00.000Z",
+            statusEvents: [
+              {
+                id: "report-event-1",
+                previousStatus: "pending",
+                newStatus: "reviewed",
+                note: "最初の確認記録",
+                isBackfilled: false,
+                adminIdentifier: "auth-adm",
+                adminRole: "admin",
+                createdAt: "2026-07-17T03:00:00.000Z",
+              },
+            ],
+          },
+        ],
+        moderationRequests: [
+          {
+            id: "request-1",
+            kind: "accountAppeal",
+            status: "pending",
+            message: "問題箇所を修正しました。",
+            responseMessage: "",
+            resolvedAt: null,
+            createdAt: "2026-07-17T05:00:00.000Z",
+            updatedAt: "2026-07-17T05:00:00.000Z",
+          },
+        ],
+        identityVerificationRequests: [
+          {
+            id: "verification-1",
+            moderationCaseId: "case-identity",
+            socialLinkId: "link-1",
+            socialUrl: "https://x.com/sample",
+            plannedContent: "カフェの写真を投稿します。",
+            status: "pending",
+            postingDeadlineAt: "2026-07-17T05:10:00.000Z",
+            reviewNote: "",
+            reviewerIdentifier: null,
+            reviewerRole: null,
+            reviewedAt: null,
+            createdAt: "2026-07-17T05:00:00.000Z",
+            updatedAt: "2026-07-17T05:00:00.000Z",
+          },
+        ],
+        moderationCases: [
+          {
+            id: "case-1",
+            targetType: "socialLink",
+            targetId: "link-1",
+            reasonCode: "unsafeLink",
+            status: "preReviewPending",
+            reviewMode: "preReview",
+            userMessage: "安全でないリンクのため",
+            reviewDueAt: "2026-09-15T00:00:00.000Z",
+            retentionExpiresAt: "2026-09-15T00:00:00.000Z",
+            resolvedAt: null,
+            createdAt: "2026-07-17T01:00:00.000Z",
+            updatedAt: "2026-07-17T04:00:00.000Z",
+            snapshots: [
+              {
+                id: "snapshot-1",
+                kind: "reported",
+                content: {
+                  service: "youtube",
+                  url: "https://unsafe.example",
+                  label: "変更前",
+                },
+                contentHash: null,
+                hasStoredAudio: false,
+                expiresAt: "2026-09-15T00:00:00.000Z",
+                createdAt: "2026-07-17T01:00:00.000Z",
+              },
+              {
+                id: "snapshot-2",
+                kind: "corrected",
+                content: {
+                  service: "youtube",
+                  url: "https://youtube.com/example",
+                  label: "YouTube",
+                },
+                contentHash: null,
+                hasStoredAudio: false,
+                expiresAt: "2026-09-15T00:00:00.000Z",
+                createdAt: "2026-07-17T04:00:00.000Z",
+              },
+            ],
+            events: [
+              {
+                id: "event-1",
+                eventType: "contentChanged",
+                actorType: "user",
+                actorIdentifier: "auth-use",
+                previousStatus: "correctionRequired",
+                newStatus: "preReviewPending",
+                details: { targetType: "socialLink" },
+                createdAt: "2026-07-17T04:00:00.000Z",
+              },
+            ],
+          },
+          {
+            id: "case-audio",
+            targetType: "audio",
+            targetId: "profile-1",
+            reasonCode: "inappropriateAudio",
+            status: "confirmed",
+            reviewMode: "postReview",
+            userMessage: "音声の修正が必要です",
+            reviewDueAt: "2026-09-15T00:00:00.000Z",
+            retentionExpiresAt: "2026-09-15T00:00:00.000Z",
+            resolvedAt: null,
+            createdAt: "2026-07-17T01:00:00.000Z",
+            updatedAt: "2026-07-17T04:00:00.000Z",
+            snapshots: [
+              {
+                id: "snapshot-audio-reported",
+                kind: "reported",
+                content: { audioTitle: "変更前の音声" },
+                contentHash: "old-audio-hash",
+                hasStoredAudio: true,
+                expiresAt: "2026-09-15T00:00:00.000Z",
+                createdAt: "2026-07-17T01:00:00.000Z",
+              },
+              {
+                id: "snapshot-audio-corrected",
+                kind: "corrected",
+                content: { audioTitle: "修正後の音声" },
+                contentHash: "new-audio-hash",
+                hasStoredAudio: false,
+                expiresAt: "2026-09-15T00:00:00.000Z",
+                createdAt: "2026-07-17T04:00:00.000Z",
+              },
+            ],
+            events: [],
+          },
+          {
+            id: "case-profile",
+            targetType: "profile",
+            targetId: "profile-1",
+            reasonCode: "harassment",
+            status: "confirmed",
+            reviewMode: "preReview",
+            userMessage: "プロフィール内容の修正が必要です",
+            reviewDueAt: "2026-09-15T00:00:00.000Z",
+            retentionExpiresAt: "2026-09-15T00:00:00.000Z",
+            resolvedAt: "2026-07-17T05:00:00.000Z",
+            createdAt: "2026-07-17T01:00:00.000Z",
+            updatedAt: "2026-07-17T05:00:00.000Z",
+            snapshots: [
+              {
+                id: "snapshot-profile-reported",
+                kind: "reported",
+                content: {
+                  displayName: "変更前の名前",
+                  bio: "自己紹介です",
+                  theme: "normal",
+                },
+                contentHash: null,
+                hasStoredAudio: false,
+                expiresAt: "2026-09-15T00:00:00.000Z",
+                createdAt: "2026-07-17T01:00:00.000Z",
+              },
+              {
+                id: "snapshot-profile-corrected",
+                kind: "corrected",
+                content: {
+                  displayName: "修正後の名前",
+                  bio: "修正後の自己紹介",
+                  theme: "normal",
+                },
+                contentHash: null,
+                hasStoredAudio: false,
+                expiresAt: "2026-09-15T00:00:00.000Z",
+                createdAt: "2026-07-17T04:30:00.000Z",
+              },
+            ],
+            events: [
+              {
+                id: "event-profile",
+                eventType: "contentChanged",
+                actorType: "user",
+                actorIdentifier: "auth-use",
+                previousStatus: "correctionRequired",
+                newStatus: "preReviewPending",
+                details: {
+                  targetType: "profile",
+                  changedFields: ["displayName", "bio"],
+                },
+                createdAt: "2026-07-17T04:30:00.000Z",
+              },
+            ],
+          },
+        ],
+        violationSummary: {
+          activeCount: 1,
+          countsByReason: { impersonation: 1 },
+        },
+        violationEvents: [
+          {
+            id: "violation-1",
+            moderationCaseId: "case-1",
+            eventType: "confirmed",
+            reasonCode: "impersonation",
+            originalViolationEventId: null,
+            suspensionTriggered: true,
+            note: "なりすましを確認",
+            isActive: true,
+            adminIdentifier: "auth-adm",
+            adminRole: "admin",
+            createdAt: "2026-07-17T01:00:00.000Z",
+          },
+          {
+            id: "revocation-1",
+            moderationCaseId: "case-profile",
+            eventType: "revoked",
+            reasonCode: "harassment",
+            originalViolationEventId: "old-violation",
+            suspensionTriggered: false,
+            note: "本人確認により取り消し",
+            isActive: false,
+            adminIdentifier: "auth-adm",
+            adminRole: "admin",
+            createdAt: "2026-07-18T01:00:00.000Z",
+          },
+        ],
+        history: [
+          {
+            id: "action-1",
+            targetType: "socialLink",
+            targetId: "link-1",
+            action: "hide",
+            actorType: "admin",
+            previousStatus: "active",
+            newStatus: "hidden",
+            reason: "危険なリンクのため",
+            adminIdentifier: "auth-adm",
+            adminRole: "admin",
+            createdAt: "2026-07-17T01:00:00.000Z",
+          },
+          {
+            id: "action-system-1",
+            targetType: "profile",
+            targetId: "profile-1",
+            action: "scheduleDeletion",
+            actorType: "system",
+            previousStatus: "suspended",
+            newStatus: "deletionPending",
+            reason: "利用停止後60日間、解除申請がなかったため",
+            adminIdentifier: null,
+            adminRole: null,
+            createdAt: "2026-07-18T01:00:00.000Z",
+          },
+        ],
+      },
+    }),
+    { status: 200 },
+  );
+
+const renderDetail = () => {
+  const fetchMock = vi.spyOn(global, "fetch").mockImplementation(
+    async (_input, init) =>
+      init?.method === "PATCH"
+        ? new Response(JSON.stringify({ success: true }), { status: 200 })
+        : detailResponse(),
+  );
+  render(<AdminModerationDetail profileId="profile-1" />);
+  return fetchMock;
+};
+
 describe("AdminModerationDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -24,17 +339,15 @@ describe("AdminModerationDetail", () => {
       data: { session: { access_token: "admin-token" } },
     });
   });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it("ログイン済みの非管理者はプロフィールへ移動する", async () => {
     vi.spyOn(global, "fetch").mockResolvedValue(
-      Response.json(
-        { error: "管理者権限がありません。" },
-        { status: 403 },
-      ),
+      Response.json({ error: "管理者権限がありません。" }, { status: 403 }),
     );
-
     render(<AdminModerationDetail profileId="profile-1" />);
-
     await waitFor(() => {
       expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
     });
@@ -42,318 +355,7 @@ describe("AdminModerationDetail", () => {
   });
 
   it("音声とリンクの詳細を表示する", async () => {
-    const detailResponse = () =>
-      new Response(
-        JSON.stringify({
-          profile: {
-            id: "profile-1",
-            userId: "sample-user",
-            displayName: "サンプル",
-            bio: "自己紹介です",
-            theme: "normal",
-            status: "active",
-            hasAudio: true,
-            audioTitle: "",
-            audioStatus: "removed",
-            deletedAudio: {
-              moderationCaseId: "case-1",
-              status: "postReviewPending",
-              reviewMode: "postReview",
-              reviewDueAt: "2026-09-15T00:00:00.000Z",
-              previousTitle: "自己紹介音声",
-              previousStatus: "hidden",
-              deletedAt: "2026-07-17T04:00:00.000Z",
-              deletedByType: "user",
-              deletedByIdentifier: "auth-use",
-            },
-            createdAt: "2026-07-16T00:00:00.000Z",
-            updatedAt: "2026-07-17T00:00:00.000Z",
-            links: [
-              {
-                id: "link-1",
-                service: "youtube",
-                label: "YouTube",
-                url: "https://youtube.com/example",
-                sortOrder: 0,
-                status: "hidden",
-              },
-            ],
-            reports: [
-              {
-                id: "report-1",
-                reason: "unsafe_link",
-                details: "外部サイトへ誘導されます",
-                status: "pending",
-                reviewNote: "リンク先を確認しました",
-                reviewerIdentifier: "auth-adm",
-                reviewerRole: "admin",
-                reviewedAt: "2026-07-17T03:00:00.000Z",
-                createdAt: "2026-07-17T02:00:00.000Z",
-                updatedAt: "2026-07-17T02:00:00.000Z",
-                statusEvents: [
-                  {
-                    id: "report-event-1",
-                    previousStatus: "pending",
-                    newStatus: "reviewed",
-                    note: "最初の確認記録",
-                    isBackfilled: false,
-                    adminIdentifier: "auth-adm",
-                    adminRole: "admin",
-                    createdAt: "2026-07-17T03:00:00.000Z",
-                  },
-                ],
-              },
-            ],
-            moderationRequests: [
-              {
-                id: "request-1",
-                kind: "accountAppeal",
-                status: "pending",
-                message: "問題箇所を修正しました。",
-                responseMessage: "",
-                resolvedAt: null,
-                createdAt: "2026-07-17T05:00:00.000Z",
-                updatedAt: "2026-07-17T05:00:00.000Z",
-              },
-            ],
-            identityVerificationRequests: [
-              {
-                id: "verification-1",
-                moderationCaseId: "case-identity",
-                socialLinkId: "link-1",
-                socialUrl: "https://x.com/sample",
-                plannedContent: "カフェの写真を投稿します。",
-                status: "pending",
-                postingDeadlineAt: "2026-07-17T05:10:00.000Z",
-                reviewNote: "",
-                reviewerIdentifier: null,
-                reviewerRole: null,
-                reviewedAt: null,
-                createdAt: "2026-07-17T05:00:00.000Z",
-                updatedAt: "2026-07-17T05:00:00.000Z",
-              },
-            ],
-            moderationCases: [
-              {
-                id: "case-1",
-                targetType: "socialLink",
-                targetId: "link-1",
-                reasonCode: "unsafeLink",
-                status: "preReviewPending",
-                reviewMode: "preReview",
-                userMessage: "安全でないリンクのため",
-                reviewDueAt: "2026-09-15T00:00:00.000Z",
-                retentionExpiresAt: "2026-09-15T00:00:00.000Z",
-                resolvedAt: null,
-                createdAt: "2026-07-17T01:00:00.000Z",
-                updatedAt: "2026-07-17T04:00:00.000Z",
-                snapshots: [
-                  {
-                    id: "snapshot-1",
-                    kind: "reported",
-                    content: {
-                      service: "youtube",
-                      url: "https://unsafe.example",
-                      label: "変更前",
-                    },
-                    contentHash: null,
-                    hasStoredAudio: false,
-                    expiresAt: "2026-09-15T00:00:00.000Z",
-                    createdAt: "2026-07-17T01:00:00.000Z",
-                  },
-                  {
-                    id: "snapshot-2",
-                    kind: "corrected",
-                    content: {
-                      service: "youtube",
-                      url: "https://youtube.com/example",
-                      label: "YouTube",
-                    },
-                    contentHash: null,
-                    hasStoredAudio: false,
-                    expiresAt: "2026-09-15T00:00:00.000Z",
-                    createdAt: "2026-07-17T04:00:00.000Z",
-                  },
-                ],
-                events: [
-                  {
-                    id: "event-1",
-                    eventType: "contentChanged",
-                    actorType: "user",
-                    actorIdentifier: "auth-use",
-                    previousStatus: "correctionRequired",
-                    newStatus: "preReviewPending",
-                    details: { targetType: "socialLink" },
-                    createdAt: "2026-07-17T04:00:00.000Z",
-                  },
-                ],
-              },
-              {
-                id: "case-audio",
-                targetType: "audio",
-                targetId: "profile-1",
-                reasonCode: "inappropriateAudio",
-                status: "confirmed",
-                reviewMode: "postReview",
-                userMessage: "音声の修正が必要です",
-                reviewDueAt: "2026-09-15T00:00:00.000Z",
-                retentionExpiresAt: "2026-09-15T00:00:00.000Z",
-                resolvedAt: null,
-                createdAt: "2026-07-17T01:00:00.000Z",
-                updatedAt: "2026-07-17T04:00:00.000Z",
-                snapshots: [
-                  {
-                    id: "snapshot-audio-reported",
-                    kind: "reported",
-                    content: { audioTitle: "変更前の音声" },
-                    contentHash: "old-audio-hash",
-                    hasStoredAudio: true,
-                    expiresAt: "2026-09-15T00:00:00.000Z",
-                    createdAt: "2026-07-17T01:00:00.000Z",
-                  },
-                  {
-                    id: "snapshot-audio-corrected",
-                    kind: "corrected",
-                    content: { audioTitle: "修正後の音声" },
-                    contentHash: "new-audio-hash",
-                    hasStoredAudio: false,
-                    expiresAt: "2026-09-15T00:00:00.000Z",
-                    createdAt: "2026-07-17T04:00:00.000Z",
-                  },
-                ],
-                events: [],
-              },
-              {
-                id: "case-profile",
-                targetType: "profile",
-                targetId: "profile-1",
-                reasonCode: "harassment",
-                status: "confirmed",
-                reviewMode: "preReview",
-                userMessage: "プロフィール内容の修正が必要です",
-                reviewDueAt: "2026-09-15T00:00:00.000Z",
-                retentionExpiresAt: "2026-09-15T00:00:00.000Z",
-                resolvedAt: "2026-07-17T05:00:00.000Z",
-                createdAt: "2026-07-17T01:00:00.000Z",
-                updatedAt: "2026-07-17T05:00:00.000Z",
-                snapshots: [
-                  {
-                    id: "snapshot-profile-reported",
-                    kind: "reported",
-                    content: {
-                      displayName: "変更前の名前",
-                      bio: "自己紹介です",
-                      theme: "normal",
-                    },
-                    contentHash: null,
-                    hasStoredAudio: false,
-                    expiresAt: "2026-09-15T00:00:00.000Z",
-                    createdAt: "2026-07-17T01:00:00.000Z",
-                  },
-                  {
-                    id: "snapshot-profile-corrected",
-                    kind: "corrected",
-                    content: {
-                      displayName: "修正後の名前",
-                      bio: "修正後の自己紹介",
-                      theme: "normal",
-                    },
-                    contentHash: null,
-                    hasStoredAudio: false,
-                    expiresAt: "2026-09-15T00:00:00.000Z",
-                    createdAt: "2026-07-17T04:30:00.000Z",
-                  },
-                ],
-                events: [
-                  {
-                    id: "event-profile",
-                    eventType: "contentChanged",
-                    actorType: "user",
-                    actorIdentifier: "auth-use",
-                    previousStatus: "correctionRequired",
-                    newStatus: "preReviewPending",
-                    details: {
-                      targetType: "profile",
-                      changedFields: ["displayName", "bio"],
-                    },
-                    createdAt: "2026-07-17T04:30:00.000Z",
-                  },
-                ],
-              },
-            ],
-            violationSummary: {
-              activeCount: 1,
-              countsByReason: { impersonation: 1 },
-            },
-            violationEvents: [
-              {
-                id: "violation-1",
-                moderationCaseId: "case-1",
-                eventType: "confirmed",
-                reasonCode: "impersonation",
-                originalViolationEventId: null,
-                suspensionTriggered: true,
-                note: "なりすましを確認",
-                isActive: true,
-                adminIdentifier: "auth-adm",
-                adminRole: "admin",
-                createdAt: "2026-07-17T01:00:00.000Z",
-              },
-              {
-                id: "revocation-1",
-                moderationCaseId: "case-profile",
-                eventType: "revoked",
-                reasonCode: "harassment",
-                originalViolationEventId: "old-violation",
-                suspensionTriggered: false,
-                note: "本人確認により取り消し",
-                isActive: false,
-                adminIdentifier: "auth-adm",
-                adminRole: "admin",
-                createdAt: "2026-07-18T01:00:00.000Z",
-              },
-            ],
-            history: [
-              {
-                id: "action-1",
-                targetType: "socialLink",
-                targetId: "link-1",
-                action: "hide",
-                actorType: "admin",
-                previousStatus: "active",
-                newStatus: "hidden",
-                reason: "危険なリンクのため",
-                adminIdentifier: "auth-adm",
-                adminRole: "admin",
-                createdAt: "2026-07-17T01:00:00.000Z",
-              },
-              {
-                id: "action-system-1",
-                targetType: "profile",
-                targetId: "profile-1",
-                action: "scheduleDeletion",
-                actorType: "system",
-                previousStatus: "suspended",
-                newStatus: "deletionPending",
-                reason: "利用停止後60日間、解除申請がなかったため",
-                adminIdentifier: null,
-                adminRole: null,
-                createdAt: "2026-07-18T01:00:00.000Z",
-              },
-            ],
-          },
-        }),
-        { status: 200 },
-      );
-    const fetchMock = vi.spyOn(global, "fetch").mockImplementation(
-      async (_input, init) =>
-        init?.method === "PATCH"
-          ? new Response(JSON.stringify({ success: true }), { status: 200 })
-          : detailResponse(),
-    );
-
-    render(<AdminModerationDetail profileId="profile-1" />);
-
+    renderDetail();
     expect(await screen.findByRole("heading", { name: "サンプル" })).toBeDefined();
     expect(screen.getByText("自己紹介音声")).toBeDefined();
     expect(screen.getByText("削除済み音声の対応状況")).toBeDefined();
@@ -400,31 +402,6 @@ describe("AdminModerationDetail", () => {
         "href",
       ),
     ).toBe("https://x.com/sample");
-    const identityVerifiedButton = screen.getByRole("button", {
-      name: "本人と確認",
-    }) as HTMLButtonElement;
-    expect(identityVerifiedButton.disabled).toBe(true);
-    fireEvent.change(
-      screen.getByLabelText("審査メモ・ユーザーへの説明（必須）"),
-      { target: { value: "申請内容と投稿時刻を確認しました。" } },
-    );
-    fireEvent.click(identityVerifiedButton);
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        "/api/admin/moderation/identity-verification/verification-1",
-        {
-          method: "PATCH",
-          headers: {
-            Authorization: "Bearer admin-token",
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            decision: "verified",
-            note: "申請内容と投稿時刻を確認しました。",
-          }),
-        },
-      );
-    });
     expect(screen.getByRole("heading", { name: "対応履歴" })).toBeDefined();
     expect(screen.getByText("未確認 → 確認済み")).toBeDefined();
     expect(screen.getByText("最初の確認記録")).toBeDefined();
@@ -457,16 +434,52 @@ describe("AdminModerationDetail", () => {
     expect(
       screen.getByRole("button", { name: "修正後の音声を確認" }),
     ).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: "問い合わせ・解除申請" }),
+    ).toBeDefined();
+    expect(screen.getByText("問題箇所を修正しました。")).toBeDefined();
+  });
 
-    const approveCaseButton = screen.getByRole("button", {
-      name: "修正を承認",
-    }) as HTMLButtonElement;
-    expect(approveCaseButton.disabled).toBe(true);
+  it("本人確認申請をPATCHできる", async () => {
+    const fetchMock = renderDetail();
+    const button = await screen.findByRole("button", { name: "本人と確認" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(
+      screen.getByLabelText("審査メモ・ユーザーへの説明（必須）"),
+      {
+        target: { value: "申請内容と投稿時刻を確認しました。" },
+      },
+    );
+    fireEvent.click(button);
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/admin/moderation/identity-verification/verification-1",
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: "Bearer admin-token",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            decision: "verified",
+            note: "申請内容と投稿時刻を確認しました。",
+          }),
+        },
+      );
+    });
+  });
+
+  it("モデレーションケースをPATCHで承認できる", async () => {
+    const fetchMock = renderDetail();
+    const button = await screen.findByRole("button", { name: "修正を承認" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(
       screen.getByLabelText("ユーザーに通知する審査理由（必須）"),
-      { target: { value: "安全なリンクへの変更を確認しました。" } },
+      {
+        target: { value: "安全なリンクへの変更を確認しました。" },
+      },
     );
-    fireEvent.click(approveCaseButton);
+    fireEvent.click(button);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/admin/moderation/cases/case-1",
@@ -484,20 +497,16 @@ describe("AdminModerationDetail", () => {
         },
       );
     });
+  });
 
-    expect(
-      screen.getByRole("heading", { name: "問い合わせ・解除申請" }),
-    ).toBeDefined();
-    expect(screen.getByText("問題箇所を修正しました。")).toBeDefined();
-
-    const appealButton = screen.getByRole("button", {
-      name: "解除を承認",
-    }) as HTMLButtonElement;
-    expect(appealButton.disabled).toBe(true);
+  it("解除申請をPATCHで承認できる", async () => {
+    const fetchMock = renderDetail();
+    const button = await screen.findByRole("button", { name: "解除を承認" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("ユーザー向け回答（必須）"), {
       target: { value: "修正を確認したため利用停止を解除します。" },
     });
-    fireEvent.click(appealButton);
+    fireEvent.click(button);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/admin/moderation/requests/request-1",
@@ -514,16 +523,17 @@ describe("AdminModerationDetail", () => {
         },
       );
     });
+  });
 
-    fireEvent.click(screen.getByRole("button", { name: "確認済みにする" }));
-    const reportSubmitButton = screen.getByRole("button", {
-      name: "メモを記録して変更",
-    }) as HTMLButtonElement;
-    expect(reportSubmitButton.disabled).toBe(true);
+  it("通報ステータスをPATCHで変更できる", async () => {
+    const fetchMock = renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "確認済みにする" }));
+    const button = screen.getByRole("button", { name: "メモを記録して変更" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("対応メモ（必須）"), {
       target: { value: "内容を確認しました" },
     });
-    fireEvent.click(reportSubmitButton);
+    fireEvent.click(button);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith("/api/admin/reports/report-1", {
         method: "PATCH",
@@ -537,14 +547,17 @@ describe("AdminModerationDetail", () => {
         }),
       });
     });
+  });
 
+  it("プロフィール非公開PATCHを実行できる", async () => {
+    const fetchMock = renderDetail();
     fireEvent.click(
-      screen.getByRole("button", { name: "プロフィールを非公開" }),
+      await screen.findByRole("button", { name: "プロフィールを非公開" }),
     );
-    const submitButton = screen.getByRole("button", {
+    const button = screen.getByRole("button", {
       name: "理由を記録して実行",
-    }) as HTMLButtonElement;
-    expect(submitButton.disabled).toBe(true);
+    });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(
       screen.getByLabelText<HTMLSelectElement>("違反分類（必須）").value,
     ).toBe("inappropriateContent");
@@ -553,19 +566,15 @@ describe("AdminModerationDetail", () => {
         "すべての対象は、修正後も管理者の確認が完了するまで非公開です。",
       ),
     ).toBeDefined();
-
     fireEvent.change(screen.getByLabelText("違反分類（必須）"), {
       target: { value: "harassment" },
     });
     fireEvent.change(
       screen.getByLabelText("ユーザーに表示する対応理由（必須）"),
-      {
-      target: { value: "不適切な内容を確認" },
-      },
+      { target: { value: "不適切な内容を確認" } },
     );
-    expect(submitButton.disabled).toBe(false);
-    fireEvent.click(submitButton);
-
+    expect((button as HTMLButtonElement).disabled).toBe(false);
+    fireEvent.click(button);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith("/api/admin/moderation/actions", {
         method: "PATCH",
