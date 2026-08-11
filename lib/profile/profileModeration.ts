@@ -3,12 +3,15 @@ import type {
   Prisma,
 } from "@/lib/generated/prisma/client";
 import {
-  compareModeratedUrls,
   createModeratedUrlHash,
   getChangedModeratedProfileFields,
   getModerationDeadline,
   type ModeratedProfileContent,
 } from "@/lib/moderationRemediation";
+import type {
+  ComparableSocialLink,
+  ExistingSocialLink,
+} from "@/lib/profile/profileLinks";
 
 type ProfileTransaction = Prisma.TransactionClient;
 
@@ -81,40 +84,6 @@ async function appendCorrectionAudit({
   });
 }
 
-type LinkModerationCase = {
-  snapshots: {
-    content: unknown;
-    contentHash: string | null;
-  }[];
-};
-
-async function hasMatchingModeratedLinkUrl(
-  moderationCases: LinkModerationCase[],
-  requestedUrl: string,
-): Promise<boolean> {
-  const requestedHash = await createModeratedUrlHash(requestedUrl);
-  if (!requestedHash) return false;
-
-  return moderationCases.some((moderationCase) =>
-    moderationCase.snapshots.some((snapshot) => {
-      if (snapshot.contentHash === requestedHash) return true;
-      if (
-        typeof snapshot.content !== "object" ||
-        snapshot.content === null ||
-        Array.isArray(snapshot.content)
-      ) {
-        return false;
-      }
-
-      const reportedUrl = (snapshot.content as Record<string, unknown>).url;
-      return (
-        typeof reportedUrl === "string" &&
-        compareModeratedUrls(reportedUrl, requestedUrl) === "same"
-      );
-    }),
-  );
-}
-
 async function recordModeratedLinkCorrection({
   transaction,
   profileId,
@@ -125,21 +94,8 @@ async function recordModeratedLinkCorrection({
 }: {
   transaction: ProfileTransaction;
   profileId: string;
-  link: {
-    id: string;
-    service: string;
-    url: string;
-    label: string;
-    sortOrder: number;
-    status: "active" | "hidden";
-  };
-  requestedLink?: {
-    id?: string;
-    service: string;
-    url: string;
-    label: string;
-    sortOrder: number;
-  };
+  link: ExistingSocialLink;
+  requestedLink?: ComparableSocialLink;
   actorId: string;
   deleted: boolean;
 }) {
@@ -151,14 +107,13 @@ async function recordModeratedLinkCorrection({
     where: {
       targetType: "socialLink",
       targetId: link.id,
-      status: {
-        in: MODERATION_CASE_PENDING_STATUSES,
-      },
+      status: { in: MODERATION_CASE_PENDING_STATUSES },
     },
     select: { id: true, status: true, reviewMode: true },
   });
-  if (!existingCase && link.status !== "hidden") return null;
-
+  if (!existingCase && link.status !== "hidden") {
+    return null;
+  }
   const moderationCase = existingCase
     ? await transitionExistingCaseToPreReview(
         transaction,
@@ -179,7 +134,6 @@ async function recordModeratedLinkCorrection({
         },
         select: { id: true },
       });
-
   const reportedSnapshot = await transaction.moderationSnapshot.findFirst({
     where: { moderationCaseId: moderationCase.id, kind: "reported" },
     select: { id: true },
@@ -195,7 +149,6 @@ async function recordModeratedLinkCorrection({
       },
     });
   }
-
   await appendCorrectionAudit({
     transaction,
     caseId: moderationCase.id,
@@ -213,7 +166,6 @@ async function recordModeratedLinkCorrection({
     previousStatus: existingCase?.status ?? "correctionRequired",
     details: { targetType: "socialLink", targetId: link.id },
   });
-
   return {
     pendingStatus: PRE_REVIEW_PENDING_STATUS,
     reviewMode: PRE_REVIEW_MODE,
@@ -253,7 +205,11 @@ async function recordModeratedProfileCorrection({
   if (!existingCase) return null;
 
   const deadline = getModerationDeadline();
-  await transitionExistingCaseToPreReview(transaction, existingCase.id, deadline);
+  await transitionExistingCaseToPreReview(
+    transaction,
+    existingCase.id,
+    deadline,
+  );
   await appendCorrectionAudit({
     transaction,
     caseId: existingCase.id,
@@ -272,8 +228,4 @@ async function recordModeratedProfileCorrection({
   } as const;
 }
 
-export {
-  hasMatchingModeratedLinkUrl,
-  recordModeratedLinkCorrection,
-  recordModeratedProfileCorrection,
-};
+export { recordModeratedLinkCorrection, recordModeratedProfileCorrection };

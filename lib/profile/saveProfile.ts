@@ -10,15 +10,13 @@ import {
   consumeProfileSaveIpRateLimit,
   consumeProfileSaveUserRateLimit,
 } from "@/lib/profileSaveRateLimit";
+import type { ModeratedProfileContent } from "@/lib/moderationRemediation";
+import { recordModeratedProfileCorrection } from "@/lib/profile/profileModeration";
 import {
-  compareModeratedUrls,
-  type ModeratedProfileContent,
-} from "@/lib/moderationRemediation";
-import {
-  hasMatchingModeratedLinkUrl,
-  recordModeratedLinkCorrection,
-  recordModeratedProfileCorrection,
-} from "@/lib/profile/profileModeration";
+  areSocialLinksUnchanged,
+  syncSocialLinks,
+  validateSocialLinks,
+} from "@/lib/profile/profileLinks";
 import { getClientIp } from "@/lib/clientIp";
 import { ownerModerationCasesQuery } from "@/lib/profile/queries";
 import { isRegistrationBanned } from "@/lib/registrationBan";
@@ -27,75 +25,10 @@ const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
 type ProfileRequestBody = Parameters<typeof sanitizeProfileData>[0];
 
-type ComparableSocialLink = {
-  id?: string;
-  service: string;
-  url: string;
-  label: string;
-  sortOrder: number;
-};
-
-type ExistingSocialLink = ComparableSocialLink & {
-  id: string;
-  status: "active" | "hidden";
-};
-
 function toProfileRequestBody(value: unknown): ProfileRequestBody {
   return typeof value === "object" && value !== null
     ? (value as ProfileRequestBody)
     : {};
-}
-
-function areSocialLinksUnchanged(
-  existingLinks: ComparableSocialLink[],
-  requestedLinks: ComparableSocialLink[],
-): boolean {
-  if (existingLinks.length !== requestedLinks.length) return false;
-
-  const sortedExisting = [...existingLinks].sort(
-    (left, right) =>
-      left.sortOrder - right.sortOrder ||
-      (left.id ?? "").localeCompare(right.id ?? ""),
-  );
-  const sortedRequested = [...requestedLinks].sort(
-    (left, right) => left.sortOrder - right.sortOrder,
-  );
-
-  return sortedExisting.every((existing, index) => {
-    const requested = sortedRequested[index];
-    return (
-      requested !== undefined &&
-      existing.service === requested.service &&
-      existing.url === requested.url &&
-      existing.label === requested.label &&
-      existing.sortOrder === requested.sortOrder
-    );
-  });
-}
-
-function findRequestedExistingLink(
-  existingLinks: ExistingSocialLink[],
-  requestedLink: ComparableSocialLink,
-): ExistingSocialLink | undefined {
-  if (requestedLink.id) {
-    return existingLinks.find((link) => link.id === requestedLink.id);
-  }
-
-  return existingLinks.find(
-    (link) =>
-      link.status === "active" && link.sortOrder === requestedLink.sortOrder,
-  );
-}
-
-function isSocialLinkContentUnchanged(
-  existing: ComparableSocialLink,
-  requested: ComparableSocialLink,
-): boolean {
-  return (
-    existing.service === requested.service &&
-    existing.url === requested.url &&
-    existing.label === requested.label
-  );
 }
 
 export async function saveProfile(request: Request) {
@@ -114,7 +47,10 @@ export async function saveProfile(request: Request) {
     let supabaseServer: ReturnType<typeof createServerSupabaseClient>;
     try {
       supabaseServer = createServerSupabaseClient();
-      const { data: { user }, error } = await supabaseServer.auth.getUser(token);
+      const {
+        data: { user },
+        error,
+      } = await supabaseServer.auth.getUser(token);
       if (error || !user) {
         return NextResponse.json(
           { error: "Unauthorized: Invalid token" },
@@ -179,7 +115,10 @@ export async function saveProfile(request: Request) {
       );
     }
 
-    const jsonBody = await readJsonBody(request, MAX_PROFILE_REQUEST_BODY_BYTES);
+    const jsonBody = await readJsonBody(
+      request,
+      MAX_PROFILE_REQUEST_BODY_BYTES,
+    );
     if (!jsonBody.ok) {
       return NextResponse.json(
         {
@@ -259,7 +198,6 @@ export async function saveProfile(request: Request) {
           { status: 403, headers: PRIVATE_NO_STORE_HEADERS },
         );
       }
-
     } else {
       if (!hasAudioTitleInput) {
         audioTitleToSave = existingProfile.audioTitle;
@@ -284,7 +222,6 @@ export async function saveProfile(request: Request) {
         );
       }
 
-
       if (existingProfile.accountModerationStatus === "deletionPending") {
         return NextResponse.json(
           { error: "削除手続き中のため、プロフィールを変更できません。" },
@@ -300,49 +237,16 @@ export async function saveProfile(request: Request) {
         ...link,
         status: link.status ?? ("active" as const),
       }));
-      for (const requestedLink of socialLinksToSave) {
-        if (
-          requestedLink.id &&
-          !existingLinks.some((link) => link.id === requestedLink.id)
-        ) {
-          return NextResponse.json(
-            { error: "プロフィールに属さないリンクは変更できません。" },
-            { status: 403 },
-          );
-        }
-
-        const existingLink = findRequestedExistingLink(
-          existingLinks,
-          requestedLink,
+      const linkValidation = await validateSocialLinks(
+        existingLinks,
+        socialLinksToSave,
+        existingProfile.moderationCases ?? [],
+      );
+      if (!linkValidation.ok) {
+        return NextResponse.json(
+          { error: linkValidation.error },
+          { status: linkValidation.status },
         );
-        if (
-          !existingLink &&
-          (await hasMatchingModeratedLinkUrl(
-            existingProfile.moderationCases ?? [],
-            requestedLink.url,
-          ))
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "過去に非公開となったリンクと同じURLです。別のURLを登録してください。",
-            },
-            { status: 409 },
-          );
-        }
-        if (
-          existingLink?.status === "hidden" &&
-          !isSocialLinkContentUnchanged(existingLink, requestedLink) &&
-          compareModeratedUrls(existingLink.url, requestedLink.url) !== "changed"
-        ) {
-          return NextResponse.json(
-            {
-              error:
-                "非公開前と同じリンクです。別のURLへ変更してください。",
-            },
-            { status: 409 },
-          );
-        }
       }
     }
 
@@ -415,73 +319,13 @@ export async function saveProfile(request: Request) {
         ...link,
         status: link.status ?? ("active" as const),
       }));
-      const retainedLinkIds = new Set<string>();
-
-      for (const requestedLink of socialLinksToSave) {
-        const existingLink = findRequestedExistingLink(
-          existingLinks,
-          requestedLink,
-        );
-        if (!existingLink) {
-          await transaction.socialLink.create({
-            data: {
-              profileId,
-              service: requestedLink.service,
-              url: requestedLink.url,
-              label: requestedLink.label,
-              sortOrder: requestedLink.sortOrder,
-            },
-          });
-          continue;
-        }
-
-        retainedLinkIds.add(existingLink.id);
-        if (
-          isSocialLinkContentUnchanged(existingLink, requestedLink) &&
-          existingLink.sortOrder === requestedLink.sortOrder
-        ) {
-          continue;
-        }
-
-        let nextStatus = existingLink.status;
-        if (!isSocialLinkContentUnchanged(existingLink, requestedLink)) {
-          const correction = await recordModeratedLinkCorrection({
-            transaction,
-            profileId,
-            link: existingLink,
-            requestedLink,
-            actorId: supabaseUser.id,
-            deleted: false,
-          });
-          if (correction) {
-            nextStatus = "hidden";
-          }
-        }
-
-        await transaction.socialLink.update({
-          where: { id: existingLink.id },
-          data: {
-            service: requestedLink.service,
-            url: requestedLink.url,
-            label: requestedLink.label,
-            sortOrder: requestedLink.sortOrder,
-            status: nextStatus,
-          },
-        });
-      }
-
-      for (const existingLink of existingLinks) {
-        if (retainedLinkIds.has(existingLink.id)) continue;
-
-        await recordModeratedLinkCorrection({
-          transaction,
-          profileId,
-          link: existingLink,
-          actorId: supabaseUser.id,
-          deleted: true,
-        });
-        await transaction.socialLink.delete({ where: { id: existingLink.id } });
-      }
+      await syncSocialLinks({
+        transaction,
+        profileId,
+        existingLinks,
+        requestedLinks: socialLinksToSave,
+        actorId: supabaseUser.id,
+      });
 
       return transaction.profile.findUnique({
         where: { userId },
