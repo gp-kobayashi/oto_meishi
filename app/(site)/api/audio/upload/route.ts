@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rateLimit = consumeAudioUploadUserRateLimit(authenticatedUserId);
+    const rateLimit = await consumeAudioUploadUserRateLimit(authenticatedUserId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {
@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeAudioUploadIpRateLimit(clientIp);
+      const ipRateLimit = await consumeAudioUploadIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return NextResponse.json(
           {

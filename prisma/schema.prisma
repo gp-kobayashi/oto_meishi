@@ -469,3 +469,16 @@ model SocialLink {
   @@index([profileId])
   @@index([status])
 }
+
+model RateLimitCounter {
+  scope     String   @db.VarChar(64)
+  keyHash   String   @map("key_hash") @db.Char(64)
+  count     Int
+  resetAt   DateTime @map("reset_at") @db.Timestamptz(3)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@id([scope, keyHash])
+  @@index([resetAt], map: "RateLimitCounter_reset_at_idx")
+  @@map("RateLimitCounter")
+}

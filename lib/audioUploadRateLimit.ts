@@ -1,22 +1,19 @@
-import { FixedWindowRateLimiter } from "@/lib/rateLimit";
+import { consumePersistentRateLimit } from "@/lib/persistentRateLimit";
 
-const AUDIO_UPLOAD_LIMIT = 10;
-const AUDIO_UPLOAD_WINDOW_MS = 15 * 60 * 1000;
+const WINDOW_MS = 15 * 60 * 1000;
+const AUDIO_UPLOAD_USER_LIMIT = 10;
 const AUDIO_UPLOAD_IP_LIMIT = 30;
-
-const userRateLimiter = new FixedWindowRateLimiter(
-  AUDIO_UPLOAD_LIMIT,
-  AUDIO_UPLOAD_WINDOW_MS,
-);
-const ipRateLimiter = new FixedWindowRateLimiter(
-  AUDIO_UPLOAD_IP_LIMIT,
-  AUDIO_UPLOAD_WINDOW_MS,
-);
-
-export function consumeAudioUploadUserRateLimit(authenticatedUserId: string) {
-  return userRateLimiter.consume(authenticatedUserId);
-}
-
-export function consumeAudioUploadIpRateLimit(clientIp: string) {
-  return ipRateLimiter.consume(clientIp);
-}
+export const consumeAudioUploadUserRateLimit = (key: string) =>
+  consumePersistentRateLimit({
+    scope: "audio-upload:user",
+    key,
+    limit: AUDIO_UPLOAD_USER_LIMIT,
+    windowMs: WINDOW_MS,
+  });
+export const consumeAudioUploadIpRateLimit = (key: string) =>
+  consumePersistentRateLimit({
+    scope: "audio-upload:ip",
+    key,
+    limit: AUDIO_UPLOAD_IP_LIMIT,
+    windowMs: WINDOW_MS,
+  });

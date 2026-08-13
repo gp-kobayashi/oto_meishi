@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   try {
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const rateLimit = consumeReportIpRateLimit(clientIp);
+      const rateLimit = await consumeReportIpRateLimit(clientIp);
       if (!rateLimit.allowed) {
         return NextResponse.json(
           {
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     }
 
     if (clientIp) {
-      const targetRateLimit = consumeReportTargetRateLimit(
+      const targetRateLimit = await consumeReportTargetRateLimit(
         clientIp,
         profileId,
       );

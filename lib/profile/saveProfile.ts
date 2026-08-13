@@ -57,7 +57,7 @@ export async function saveProfile(request: Request) {
       );
     }
 
-    const rateLimit = consumeProfileSaveUserRateLimit(supabaseUser.id);
+    const rateLimit = await consumeProfileSaveUserRateLimit(supabaseUser.id);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {
@@ -78,7 +78,7 @@ export async function saveProfile(request: Request) {
 
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeProfileSaveIpRateLimit(clientIp);
+      const ipRateLimit = await consumeProfileSaveIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return NextResponse.json(
           {
