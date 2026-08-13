@@ -35,6 +35,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseEventCreate: vi.fn(),
     deleteFromR2: vi.fn(),
     extractKeyFromUrl: vi.fn(),
+    readMultipartFormData: vi.fn(),
   },
 }));
 
@@ -90,20 +91,25 @@ vi.mock("@/lib/audioUploadRateLimit", () => ({
   consumeAudioUploadIpRateLimit: mocks.consumeAudioUploadIpRateLimit,
 }));
 
+vi.mock("@/lib/requestBody", () => ({
+  readMultipartFormData: mocks.readMultipartFormData,
+}));
+
 import { POST } from "@/app/(site)/api/audio/upload/route";
 
 function uploadRequest(formData: FormData, token = "valid-token") {
   return {
-    headers: new Headers({
-      Authorization: `Bearer ${token}`,
-    }),
+    headers: new Headers({ Authorization: `Bearer ${token}` }),
     formData: async () => formData,
   } as Parameters<typeof POST>[0];
 }
 
 function formDataWithFile() {
   const formData = new FormData();
-  formData.append("file", new File(["audio bytes"], "声.mp3", { type: "audio/mpeg" }));
+  formData.append(
+    "file",
+    new File(["audio bytes"], "声.mp3", { type: "audio/mpeg" }),
+  );
   formData.append("userId", "testuser");
   return formData;
 }
@@ -171,7 +177,7 @@ describe("/api/audio/upload route", () => {
     mocks.inspectAudioFile.mockImplementation(async (filePath: string) =>
       filePath.endsWith("output.m4a")
         ? validOutputMetadata()
-        : validInputMetadata()
+        : validInputMetadata(),
     );
     mocks.mkdir.mockResolvedValue(undefined);
     mocks.mkdtemp.mockResolvedValue(TEMP_DIR);
@@ -214,15 +220,23 @@ describe("/api/audio/upload route", () => {
       resetAt: Date.now() + 15 * 60 * 1000,
       retryAfterSeconds: 15 * 60,
     });
+    mocks.readMultipartFormData.mockImplementation(async (request: Request) => {
+      const contentLength = request.headers?.get("Content-Length");
+      if (
+        contentLength &&
+        Number(contentLength) > 30 * 1024 * 1024 + 1024 * 1024
+      ) {
+        return { ok: false, error: "too_large" };
+      }
+      return { ok: true, formData: await request.formData() };
+    });
   });
 
   it("トークン無しの場合は401を返す", async () => {
-    const response = await POST(
-      {
-        headers: new Headers(),
-        formData: async () => new FormData(),
-      } as Parameters<typeof POST>[0],
-    );
+    const response = await POST({
+      headers: new Headers(),
+      formData: async () => new FormData(),
+    } as Parameters<typeof POST>[0]);
 
     expect(response.status).toBe(401);
     expect(mocks.getUser).not.toHaveBeenCalled();
@@ -243,7 +257,45 @@ describe("/api/audio/upload route", () => {
       error: "音声ファイルは30MB以下にしてください。",
     });
     expect(formData).not.toHaveBeenCalled();
-    expect(mocks.getUser).not.toHaveBeenCalled();
+    expect(mocks.getUser).toHaveBeenCalled();
+  });
+
+  it("本文リーダーがtoo_largeを返した場合は処理資源を確保せず413を返す", async () => {
+    mocks.readMultipartFormData.mockResolvedValueOnce({
+      ok: false,
+      error: "too_large",
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toEqual({
+      error: "音声ファイルは30MB以下にしてください。",
+    });
+    expect(mocks.mkdir).not.toHaveBeenCalled();
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+    expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
+  });
+
+  it("本文リーダーがinvalid_bodyを返した場合は処理資源を確保せず400を返す", async () => {
+    mocks.readMultipartFormData.mockResolvedValueOnce({
+      ok: false,
+      error: "invalid_body",
+    });
+
+    const response = await POST(uploadRequest(formDataWithFile()));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "音声データが不正です。",
+    });
+    expect(mocks.mkdir).not.toHaveBeenCalled();
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+    expect(mocks.convertToAac).not.toHaveBeenCalled();
+    expect(mocks.uploadToR2).not.toHaveBeenCalled();
+    expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
   });
 
   it("Content-Lengthがない場合は既存のファイル検証へ進む", async () => {
@@ -362,7 +414,9 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formData));
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "File is required" });
+    await expect(response.json()).resolves.toEqual({
+      error: "File is required",
+    });
     expect(mocks.writeFile).not.toHaveBeenCalled();
   });
 
@@ -373,7 +427,9 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formData));
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "userId is required" });
+    await expect(response.json()).resolves.toEqual({
+      error: "userId is required",
+    });
     expect(mocks.writeFile).not.toHaveBeenCalled();
   });
 
@@ -385,7 +441,9 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formData));
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({ error: "File is required" });
+    await expect(response.json()).resolves.toEqual({
+      error: "File is required",
+    });
     expect(mocks.findUniqueProfile).not.toHaveBeenCalled();
     expect(mocks.writeFile).not.toHaveBeenCalled();
   });
@@ -437,7 +495,9 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({ error: "profile not found" });
+    await expect(response.json()).resolves.toEqual({
+      error: "profile not found",
+    });
     expect(mocks.findUniqueProfile).toHaveBeenCalledWith({
       where: { userId: "testuser" },
       select: {
@@ -466,10 +526,10 @@ describe("/api/audio/upload route", () => {
             ],
           },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-              select: {
-                id: true,
-                status: true,
-                snapshots: {
+          select: {
+            id: true,
+            status: true,
+            snapshots: {
               where: { kind: "reported" },
               orderBy: [{ createdAt: "desc" }, { id: "desc" }],
               take: 1,
@@ -485,7 +545,9 @@ describe("/api/audio/upload route", () => {
   });
 
   it("別ユーザーのプロフィールへのアップロードは403を返す", async () => {
-    mocks.findUniqueProfile.mockResolvedValueOnce({ authId: "other-auth-user" });
+    mocks.findUniqueProfile.mockResolvedValueOnce({
+      authId: "other-auth-user",
+    });
 
     const response = await POST(uploadRequest(formDataWithFile()));
 
@@ -614,13 +676,8 @@ describe("/api/audio/upload route", () => {
       success: true,
       audioKey: "audio/testuser/voice-123.m4a",
     });
-    expect(mocks.writeFile).toHaveBeenCalledWith(
-      INPUT_PATH,
-      expect.anything(),
-    );
-    expect(
-      Buffer.isBuffer(mocks.writeFile.mock.calls[0]?.[1]),
-    ).toBe(true);
+    expect(mocks.writeFile).toHaveBeenCalledWith(INPUT_PATH, expect.anything());
+    expect(Buffer.isBuffer(mocks.writeFile.mock.calls[0]?.[1])).toBe(true);
     expect(mocks.inspectAudioFile).toHaveBeenCalledWith(INPUT_PATH);
     expect(mocks.stat).toHaveBeenCalledWith(OUTPUT_PATH);
     expect(mocks.inspectAudioFile).toHaveBeenCalledWith(OUTPUT_PATH);
@@ -968,7 +1025,9 @@ describe("/api/audio/upload route", () => {
   });
 
   it("DBへの紐付け失敗時は新しいR2音声を削除する", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mocks.updateProfile.mockRejectedValueOnce(new Error("update failed"));
 
     try {
@@ -997,9 +1056,7 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(200);
-    expect(mocks.deleteFromR2).toHaveBeenCalledWith(
-      "audio/testuser/old.m4a",
-    );
+    expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/testuser/old.m4a");
     expect(mocks.updateProfile.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.deleteFromR2.mock.invocationCallOrder[0],
     );
@@ -1038,7 +1095,9 @@ describe("/api/audio/upload route", () => {
   });
 
   it("証拠参照の確認に失敗した場合は安全側で旧音声を残す", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mocks.findUniqueProfile.mockResolvedValueOnce({
       id: "profile-1",
       authId: "auth-user-1",
@@ -1065,7 +1124,9 @@ describe("/api/audio/upload route", () => {
   });
 
   it("置き換え前のR2音声を削除できなくてもアップロードは成功する", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mocks.findUniqueProfile.mockResolvedValueOnce({
       id: "profile-1",
       authId: "auth-user-1",
@@ -1154,7 +1215,9 @@ describe("/api/audio/upload route", () => {
   });
 
   it("一時ディレクトリの削除失敗で成功レスポンスを失わない", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mocks.rm.mockRejectedValueOnce(new Error("cleanup failed"));
 
     const response = await POST(uploadRequest(formDataWithFile()));

@@ -30,6 +30,7 @@ import {
 } from "@/lib/audioUploadRateLimit";
 import { getClientIp } from "@/lib/clientIp";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
+import { readMultipartFormData } from "@/lib/requestBody";
 import {
   compareModeratedContentHashes,
   createModerationContentHash,
@@ -44,15 +45,6 @@ const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 const MAX_REQUEST_BODY_SIZE_BYTES =
   MAX_AUDIO_FILE_SIZE_BYTES + MAX_MULTIPART_OVERHEAD_BYTES;
 
-function exceedsRequestSizeLimit(contentLength: string | null): boolean {
-  if (!contentLength) {
-    return false;
-  }
-
-  const size = Number(contentLength);
-  return Number.isSafeInteger(size) && size > MAX_REQUEST_BODY_SIZE_BYTES;
-}
-
 export async function POST(request: NextRequest) {
   try {
     // Authorizationヘッダーの検証
@@ -64,21 +56,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (exceedsRequestSizeLimit(request.headers.get("Content-Length"))) {
-      return NextResponse.json(
-        {
-          error: `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`,
-        },
-        { status: 413 },
-      );
-    }
-
     const token = authHeader.split(" ")[1];
 
     let authenticatedUserId: string;
     try {
       const supabaseServer = createServerSupabaseClient();
-      const { data: { user }, error } = await supabaseServer.auth.getUser(token);
+      const {
+        data: { user },
+        error,
+      } = await supabaseServer.auth.getUser(token);
       if (error || !user) {
         return NextResponse.json(
           { error: "Unauthorized: Invalid token" },
@@ -149,104 +135,134 @@ export async function POST(request: NextRequest) {
 
     let tempDir: string | null = null;
     try {
-      const formData = await request.formData();
-    const file = formData.get("file");
-    const userId = formData.get("userId");
-
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: "File is required" }, { status: 400 });
-    }
-
-    if (file.size === 0) {
-      return NextResponse.json(
-        { error: "空の音声ファイルはアップロードできません。" },
-        { status: 400 },
+      const formDataResult = await readMultipartFormData(
+        request,
+        MAX_REQUEST_BODY_SIZE_BYTES,
       );
-    }
+      if (!formDataResult.ok) {
+        if (formDataResult.error === "too_large") {
+          return NextResponse.json(
+            {
+              error: `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`,
+            },
+            { status: 413 },
+          );
+        }
+        return NextResponse.json(
+          { error: "音声データが不正です。" },
+          { status: 400 },
+        );
+      }
 
-    if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
-      return NextResponse.json(
-        {
-          error: `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`,
-        },
-        { status: 413 },
-      );
-    }
+      const formData = formDataResult.formData;
+      const file = formData.get("file");
+      const userId = formData.get("userId");
 
-    if (typeof userId !== "string" || !userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
-    }
+      if (!(file instanceof File)) {
+        return NextResponse.json(
+          { error: "File is required" },
+          { status: 400 },
+        );
+      }
 
-    const profile = await prisma.profile.findUnique({
-      where: { userId },
-      select: {
-        id: true,
-        authId: true,
-        status: true,
-        accountModerationStatus: true,
-        audioStatus: true,
-        audioKey: true,
-        audioContentHash: true,
-        audioUrl: true,
-        moderationCases: {
-          where: {
-            targetType: "audio",
-            OR: [
-              {
-                status: {
-                  in: [
-                    "correctionRequired",
-                    "postReviewPending",
-                    "preReviewPending",
-                  ],
-                },
-              },
-              { retentionExpiresAt: { gt: new Date() } },
-            ],
+      if (file.size === 0) {
+        return NextResponse.json(
+          { error: "空の音声ファイルはアップロードできません。" },
+          { status: 400 },
+        );
+      }
+
+      if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+        return NextResponse.json(
+          {
+            error: `音声ファイルは${MAX_AUDIO_FILE_SIZE_MEGABYTES}MB以下にしてください。`,
           },
-          orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          select: {
-            id: true,
-            status: true,
-            snapshots: {
-              where: { kind: "reported" },
-              orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-              take: 1,
-              select: { contentHash: true },
+          { status: 413 },
+        );
+      }
+
+      if (typeof userId !== "string" || !userId) {
+        return NextResponse.json(
+          { error: "userId is required" },
+          { status: 400 },
+        );
+      }
+
+      const profile = await prisma.profile.findUnique({
+        where: { userId },
+        select: {
+          id: true,
+          authId: true,
+          status: true,
+          accountModerationStatus: true,
+          audioStatus: true,
+          audioKey: true,
+          audioContentHash: true,
+          audioUrl: true,
+          moderationCases: {
+            where: {
+              targetType: "audio",
+              OR: [
+                {
+                  status: {
+                    in: [
+                      "correctionRequired",
+                      "postReviewPending",
+                      "preReviewPending",
+                    ],
+                  },
+                },
+                { retentionExpiresAt: { gt: new Date() } },
+              ],
+            },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            select: {
+              id: true,
+              status: true,
+              snapshots: {
+                where: { kind: "reported" },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                take: 1,
+                select: { contentHash: true },
+              },
             },
           },
         },
-      },
-    });
+      });
 
-    if (!profile) {
-      return NextResponse.json({ error: "profile not found" }, { status: 404 });
-    }
+      if (!profile) {
+        return NextResponse.json(
+          { error: "profile not found" },
+          { status: 404 },
+        );
+      }
 
-    if (profile.authId !== authenticatedUserId) {
-      return NextResponse.json(
-        { error: "このプロフィールに音声をアップロードする権限がありません。" },
-        { status: 403 },
-      );
-    }
+      if (profile.authId !== authenticatedUserId) {
+        return NextResponse.json(
+          {
+            error: "このプロフィールに音声をアップロードする権限がありません。",
+          },
+          { status: 403 },
+        );
+      }
 
-    if (profile.accountModerationStatus === "deletionPending") {
-      return NextResponse.json(
-        { error: "削除手続き中のため、音声をアップロードできません。" },
-        { status: 403 },
-      );
-    }
+      if (profile.accountModerationStatus === "deletionPending") {
+        return NextResponse.json(
+          { error: "削除手続き中のため、音声をアップロードできません。" },
+          { status: 403 },
+        );
+      }
 
-    if (
-      !["active", "hidden", "removed"].includes(
-        profile.audioStatus ?? "active",
-      )
-    ) {
-      return NextResponse.json(
-        { error: "音声の状態が不正なため、音声をアップロードできません。" },
-        { status: 403 },
-      );
-    }
+      if (
+        !["active", "hidden", "removed"].includes(
+          profile.audioStatus ?? "active",
+        )
+      ) {
+        return NextResponse.json(
+          { error: "音声の状態が不正なため、音声をアップロードできません。" },
+          { status: 403 },
+        );
+      }
 
       await fs.mkdir(AUDIO_TEMP_ROOT, { recursive: true });
       tempDir = await fs.mkdtemp(path.join(AUDIO_TEMP_ROOT, "upload-"));
@@ -288,9 +304,8 @@ export async function POST(request: NextRequest) {
       }
 
       const convertedMetadata = await inspectAudioFile(convertedPath);
-      const convertedPolicyResult = validateConvertedAudioMetadata(
-        convertedMetadata,
-      );
+      const convertedPolicyResult =
+        validateConvertedAudioMetadata(convertedMetadata);
       if (!convertedPolicyResult.valid) {
         throw new Error(
           `Converted audio validation failed: ${convertedPolicyResult.code}`,
@@ -310,13 +325,10 @@ export async function POST(request: NextRequest) {
               ) === "same",
           ),
       );
-      if (
-        matchingReportedAudio
-      ) {
+      if (matchingReportedAudio) {
         return NextResponse.json(
           {
-            error:
-              "非公開前と同じ音声です。別の音声へ変更してください。",
+            error: "非公開前と同じ音声です。別の音声へ変更してください。",
           },
           { status: 409 },
         );
@@ -412,10 +424,7 @@ export async function POST(request: NextRequest) {
         try {
           await deleteFromR2(audioKey);
         } catch (cleanupError) {
-          console.error(
-            "Failed to delete unlinked audio file:",
-            cleanupError,
-          );
+          console.error("Failed to delete unlinked audio file:", cleanupError);
         }
         throw databaseError;
       }
@@ -454,7 +463,10 @@ export async function POST(request: NextRequest) {
         try {
           await fs.rm(tempDir, { recursive: true, force: true });
         } catch (cleanupError) {
-          console.error("Failed to cleanup audio upload directory:", cleanupError);
+          console.error(
+            "Failed to cleanup audio upload directory:",
+            cleanupError,
+          );
         }
       }
       releaseConversionSlot();
