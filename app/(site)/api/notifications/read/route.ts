@@ -27,7 +27,7 @@ export async function PATCH(request: Request) {
     const authorization = await authorizeProfileOwnerRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const userRateLimit = consumeNotificationUpdateUserRateLimit(
+    const userRateLimit = await consumeNotificationUpdateUserRateLimit(
       authorization.userId,
     );
     if (!userRateLimit.allowed) {
@@ -39,7 +39,7 @@ export async function PATCH(request: Request) {
 
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeNotificationUpdateIpRateLimit(clientIp);
+      const ipRateLimit = await consumeNotificationUpdateIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return rateLimitResponse(
           "この接続元からの通知更新が集中しています。しばらくお待ちください。",

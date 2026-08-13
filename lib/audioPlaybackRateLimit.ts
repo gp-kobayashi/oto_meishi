@@ -1,31 +1,33 @@
-import { FixedWindowRateLimiter } from "@/lib/rateLimit";
+import { consumePersistentRateLimit } from "@/lib/persistentRateLimit";
 
 const PUBLIC_PLAYBACK_IP_LIMIT = 120;
 const PLAYBACK_WINDOW_MS = 15 * 60 * 1000;
 const ADMIN_PLAYBACK_LIMIT = 60;
 const ADMIN_PLAYBACK_IP_LIMIT = 120;
 
-const publicIpRateLimiter = new FixedWindowRateLimiter(
-  PUBLIC_PLAYBACK_IP_LIMIT,
-  PLAYBACK_WINDOW_MS,
-);
-const adminRateLimiter = new FixedWindowRateLimiter(
-  ADMIN_PLAYBACK_LIMIT,
-  PLAYBACK_WINDOW_MS,
-);
-const adminIpRateLimiter = new FixedWindowRateLimiter(
-  ADMIN_PLAYBACK_IP_LIMIT,
-  PLAYBACK_WINDOW_MS,
-);
-
 export function consumePublicPlaybackIpRateLimit(clientIp: string) {
-  return publicIpRateLimiter.consume(clientIp);
+  return consumePersistentRateLimit({
+    scope: "audio-playback:public-ip",
+    key: clientIp,
+    limit: PUBLIC_PLAYBACK_IP_LIMIT,
+    windowMs: PLAYBACK_WINDOW_MS,
+  });
 }
 
 export function consumeAdminPlaybackRateLimit(adminId: string) {
-  return adminRateLimiter.consume(adminId);
+  return consumePersistentRateLimit({
+    scope: "audio-playback:admin",
+    key: adminId,
+    limit: ADMIN_PLAYBACK_LIMIT,
+    windowMs: PLAYBACK_WINDOW_MS,
+  });
 }
 
 export function consumeAdminPlaybackIpRateLimit(clientIp: string) {
-  return adminIpRateLimiter.consume(clientIp);
+  return consumePersistentRateLimit({
+    scope: "audio-playback:admin-ip",
+    key: clientIp,
+    limit: ADMIN_PLAYBACK_IP_LIMIT,
+    windowMs: PLAYBACK_WINDOW_MS,
+  });
 }

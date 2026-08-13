@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 
   const clientIp = getClientIp(request.headers);
   if (clientIp) {
-    const rateLimit = consumePublicPlaybackIpRateLimit(clientIp);
+    const rateLimit = await consumePublicPlaybackIpRateLimit(clientIp);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const authorization = await authorizeAdminRequest(request);
   if (!authorization.ok) return authorization.response;
 
-  const rateLimit = consumeAdminPlaybackRateLimit(authorization.admin.id);
+  const rateLimit = await consumeAdminPlaybackRateLimit(authorization.admin.id);
   if (!rateLimit.allowed) {
     return NextResponse.json(
       {
@@ -36,7 +36,7 @@ export async function GET(request: Request) {
 
   const clientIp = getClientIp(request.headers);
   if (clientIp) {
-    const ipRateLimit = consumeAdminPlaybackIpRateLimit(clientIp);
+    const ipRateLimit = await consumeAdminPlaybackIpRateLimit(clientIp);
     if (!ipRateLimit.allowed) {
       return NextResponse.json(
         {
@@ -50,9 +50,7 @@ export async function GET(request: Request) {
             "Retry-After": String(ipRateLimit.retryAfterSeconds),
             "X-RateLimit-Limit": String(ipRateLimit.limit),
             "X-RateLimit-Remaining": String(ipRateLimit.remaining),
-            "X-RateLimit-Reset": String(
-              Math.ceil(ipRateLimit.resetAt / 1000),
-            ),
+            "X-RateLimit-Reset": String(Math.ceil(ipRateLimit.resetAt / 1000)),
           },
         },
       );
@@ -115,7 +113,10 @@ export async function GET(request: Request) {
   });
 
   if (!profile || (!profile.audioKey && !profile.audioUrl)) {
-    return NextResponse.json({ error: "音声が見つかりません。" }, { status: 404 });
+    return NextResponse.json(
+      { error: "音声が見つかりません。" },
+      { status: 404 },
+    );
   }
 
   try {
