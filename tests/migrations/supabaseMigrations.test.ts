@@ -17,6 +17,25 @@ describe("Supabase migrations", () => {
     expect(migrationFiles.length).toBeGreaterThan(0);
   });
 
+  it("pending R2削除キューをサービス専用で作成する", () => {
+    const file = migrationFiles.find((name) =>
+      name.includes("add_pending_r2_object_deletions"),
+    );
+    expect(file).toBeDefined();
+    const sql = fs.readFileSync(path.join(migrationsDirectory, file!), "utf8");
+    expect(sql).toContain(
+      'create table if not exists public."PendingR2ObjectDeletion"',
+    );
+    expect(sql).toContain("enable row level security");
+    expect(sql).toContain(
+      'revoke all on table public."PendingR2ObjectDeletion" from anon, authenticated',
+    );
+    expect(sql).toContain(
+      'grant select, insert, update, delete on table public."PendingR2ObjectDeletion" to service_role',
+    );
+    expect(sql).toContain("PendingR2ObjectDeletion_updatedAt_idx");
+  });
+
   it.each(migrationFiles)(
     "%sでPostgreSQL非対応のCREATE TYPE IF NOT EXISTSを使用しない",
     (fileName) => {
@@ -40,15 +59,15 @@ describe("Supabase migrations", () => {
       "utf8",
     );
 
-    expect(sql).toContain('set "status" = \'hidden\'');
-    expect(sql).toContain('profile."status" = \'active\'');
-    expect(sql).toContain('set "audioStatus" = \'hidden\'');
-    expect(sql).toContain('profile."audioStatus" = \'active\'');
+    expect(sql).toContain("set \"status\" = 'hidden'");
+    expect(sql).toContain("profile.\"status\" = 'active'");
+    expect(sql).toContain("set \"audioStatus\" = 'hidden'");
+    expect(sql).toContain("profile.\"audioStatus\" = 'active'");
     expect(sql).toContain('update public."SocialLink"');
     expect(sql).toContain('insert into public."ModerationCaseEvent"');
-    expect(sql).toContain('"reviewMode" = \'preReview\'');
-    expect(sql).toContain('"status" = \'preReviewPending\'');
-    expect(sql).toContain('where "status" = \'postReviewPending\'');
+    expect(sql).toContain("\"reviewMode\" = 'preReview'");
+    expect(sql).toContain("\"status\" = 'preReviewPending'");
+    expect(sql).toContain("where \"status\" = 'postReviewPending'");
   });
 
   it("通報状態履歴を外部非公開かつ前方向遷移だけで保存する", () => {
@@ -72,8 +91,8 @@ describe("Supabase migrations", () => {
     expect(sql).toContain(
       'constraint "ContentReportStatusEvent_transition_check"',
     );
-    expect(sql).toContain('"previousStatus" = \'pending\'');
-    expect(sql).toContain('"previousStatus" = \'reviewed\'');
+    expect(sql).toContain("\"previousStatus\" = 'pending'");
+    expect(sql).toContain("\"previousStatus\" = 'reviewed'");
     expect(sql).toContain('insert into public."ContentReportStatusEvent"');
     expect(sql).toContain('"isBackfilled"');
   });
@@ -113,9 +132,7 @@ describe("Supabase migrations", () => {
 
     expect(sql).toContain('create table public."ModerationViolationEvent"');
     expect(sql).toContain("'confirmed', 'revoked'");
-    expect(sql).toContain(
-      'constraint "ModerationViolationEvent_shape_check"',
-    );
+    expect(sql).toContain('constraint "ModerationViolationEvent_shape_check"');
     expect(sql).toContain(
       'create unique index "ModerationViolationEvent_case_confirmed_key"',
     );
@@ -180,7 +197,7 @@ describe("Supabase migrations", () => {
     );
 
     expect(sql).toContain(
-      'add column "pendingStorageObjectKeys" text[] not null default \'{}\'',
+      "add column \"pendingStorageObjectKeys\" text[] not null default '{}'",
     );
   });
 
@@ -219,7 +236,9 @@ describe("Supabase migrations", () => {
     expect(sql).toContain('create table public."RegistrationBanIdentifier"');
     expect(sql).toContain('"formerAuthId" uuid not null unique');
     expect(sql).toContain('"fingerprint" char(64) not null unique');
-    expect(sql).toContain('constraint "RegistrationBanIdentifier_provider_check"');
+    expect(sql).toContain(
+      'constraint "RegistrationBanIdentifier_provider_check"',
+    );
     expect(sql).toContain(
       'alter table public."AccountDeletionRecord" enable row level security',
     );
@@ -296,7 +315,7 @@ describe("Supabase migrations", () => {
 
     expect(sql).toContain('update public."ModerationCase"');
     expect(sql).toContain('update public."ModerationSnapshot"');
-    expect(sql).toContain('"status" = \'confirmed\'');
+    expect(sql).toContain("\"status\" = 'confirmed'");
     expect(sql).toContain("interval '60 days'");
   });
 
@@ -314,7 +333,9 @@ describe("Supabase migrations", () => {
     expect(sql).toContain(
       "create trigger prevent_invalid_content_report_status_transition",
     );
-    expect(sql).toContain('before update of "status" on public."ContentReport"');
+    expect(sql).toContain(
+      'before update of "status" on public."ContentReport"',
+    );
     expect(sql).toContain("old.\"status\" = 'pending'");
     expect(sql).toContain("old.\"status\" = 'reviewed'");
     expect(sql).toContain("errcode = 'check_violation'");

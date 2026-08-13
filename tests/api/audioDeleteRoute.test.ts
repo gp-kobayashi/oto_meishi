@@ -14,6 +14,9 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseEventCreate: vi.fn(),
     extractKeyFromUrl: vi.fn(),
     deleteFromR2: vi.fn(),
+    pendingUpsert: vi.fn(),
+    pendingDeleteMany: vi.fn(),
+    pendingUpdate: vi.fn(),
   },
 }));
 
@@ -26,6 +29,10 @@ vi.mock("@/lib/prisma", () => ({
     profile: {
       findUnique: mocks.findUnique,
       updateMany: mocks.updateMany,
+    },
+    pendingR2ObjectDeletion: {
+      deleteMany: mocks.pendingDeleteMany,
+      update: mocks.pendingUpdate,
     },
   },
 }));
@@ -61,6 +68,7 @@ describe("DELETE /api/audio", () => {
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
         profile: { updateMany: mocks.updateMany },
+        pendingR2ObjectDeletion: { upsert: mocks.pendingUpsert },
         moderationCase: {
           findFirst: mocks.moderationCaseFindFirst,
           create: mocks.moderationCaseCreate,
@@ -84,6 +92,9 @@ describe("DELETE /api/audio", () => {
     mocks.extractKeyFromUrl.mockReturnValue("audio/test/old.m4a");
     mocks.deleteFromR2.mockResolvedValue(undefined);
     mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.pendingUpsert.mockResolvedValue({ id: "pending-1" });
+    mocks.pendingDeleteMany.mockResolvedValue({ count: 1 });
+    mocks.pendingUpdate.mockResolvedValue({ id: "pending-1" });
   });
 
   it("本人のR2音源を削除してプロフィールを未登録にする", async () => {
@@ -118,6 +129,18 @@ describe("DELETE /api/audio", () => {
       },
     });
     expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/test/old.m4a");
+    expect(mocks.pendingUpsert).toHaveBeenCalledWith({
+      where: { objectKey: "audio/test/old.m4a" },
+      create: { objectKey: "audio/test/old.m4a" },
+      update: {
+        attemptCount: 0,
+        lastAttemptAt: null,
+        lastError: null,
+      },
+    });
+    expect(mocks.pendingDeleteMany).toHaveBeenCalledWith({
+      where: { objectKey: "audio/test/old.m4a" },
+    });
     expect(mocks.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.deleteFromR2.mock.invocationCallOrder[0],
     );
@@ -138,6 +161,7 @@ describe("DELETE /api/audio", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.updateMany).not.toHaveBeenCalled();
     expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+    expect(mocks.pendingUpsert).not.toHaveBeenCalled();
   });
 
   it("削除手続き中のアカウントは音声を削除できない", async () => {
@@ -193,6 +217,7 @@ describe("DELETE /api/audio", () => {
       audioStatus: "removed",
     });
     expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+    expect(mocks.pendingUpsert).not.toHaveBeenCalled();
     expect(mocks.moderationCaseCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         profileId: "profile-1",
@@ -286,7 +311,9 @@ describe("DELETE /api/audio", () => {
   });
 
   it("R2削除に失敗してもプロフィールの参照解除は成功として返す", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mocks.deleteFromR2.mockRejectedValue(new Error("R2 error"));
 
     try {
@@ -294,6 +321,15 @@ describe("DELETE /api/audio", () => {
 
       expect(response.status).toBe(200);
       expect(mocks.updateMany).toHaveBeenCalled();
+      expect(mocks.pendingUpdate).toHaveBeenCalledWith({
+        where: { objectKey: "audio/test/old.m4a" },
+        data: {
+          attemptCount: { increment: 1 },
+          lastAttemptAt: expect.any(Date),
+          lastError: "R2 error",
+        },
+      });
+      expect(mocks.pendingDeleteMany).not.toHaveBeenCalled();
       expect(consoleError).toHaveBeenCalledWith(
         "Failed to delete unreferenced audio file from R2:",
         expect.any(Error),
@@ -301,6 +337,18 @@ describe("DELETE /api/audio", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it("削除失敗の記録にも失敗してもプロフィールの参照解除は成功として返す", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mocks.deleteFromR2.mockRejectedValueOnce(new Error("R2 error"));
+    mocks.pendingUpdate.mockRejectedValueOnce(new Error("DB unavailable"));
+
+    const response = await DELETE(request());
+
+    expect(response.status).toBe(200);
+    expect(mocks.pendingUpsert).toHaveBeenCalledTimes(1);
+    expect(mocks.pendingUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("取得後に音声が更新されていた場合は削除を中止する", async () => {
@@ -316,7 +364,9 @@ describe("DELETE /api/audio", () => {
   });
 
   it("DB更新に失敗した場合はR2音声を削除しない", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mocks.updateMany.mockRejectedValueOnce(new Error("database error"));
 
     try {

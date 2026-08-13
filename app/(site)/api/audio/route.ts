@@ -4,6 +4,7 @@ import { deleteFromR2, extractKeyFromUrl } from "@/lib/r2Storage";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { getModerationDeadline } from "@/lib/moderationRemediation";
+import { markPendingR2ObjectDeletionFailure } from "@/lib/pendingR2ObjectDeletion";
 
 export async function DELETE(request: Request) {
   const authHeader = request.headers.get("Authorization");
@@ -136,7 +137,16 @@ export async function DELETE(request: Request) {
         },
       });
 
-      if (result.count !== 1 || profile.audioStatus !== "hidden") {
+      if (result.count !== 1) {
+        return result;
+      }
+
+      if (profile.audioStatus !== "hidden") {
+        await tx.pendingR2ObjectDeletion.upsert({
+          where: { objectKey: audioKey },
+          create: { objectKey: audioKey },
+          update: { attemptCount: 0, lastAttemptAt: null, lastError: null },
+        });
         return result;
       }
 
@@ -168,8 +178,16 @@ export async function DELETE(request: Request) {
   if (profile.audioStatus !== "hidden") {
     try {
       await deleteFromR2(audioKey);
+      await prisma.pendingR2ObjectDeletion.deleteMany({
+        where: { objectKey: audioKey },
+      });
     } catch (error) {
       console.error("Failed to delete unreferenced audio file from R2:", error);
+      try {
+        await markPendingR2ObjectDeletionFailure(audioKey, error);
+      } catch (recordError) {
+        console.error("Failed to record pending R2 deletion:", recordError);
+      }
     }
   }
 
@@ -216,11 +234,7 @@ async function recordModeratedAudioDeletion({
       targetType: "audio",
       targetId: profile.id,
       status: {
-        in: [
-          "correctionRequired",
-          "postReviewPending",
-          "preReviewPending",
-        ],
+        in: ["correctionRequired", "postReviewPending", "preReviewPending"],
       },
     },
     select: { id: true, status: true },

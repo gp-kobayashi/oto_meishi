@@ -273,6 +273,18 @@ model ModerationSnapshot {
   @@index([expiresAt])
 }
 
+model PendingR2ObjectDeletion {
+  id            String    @id @default(uuid()) @db.Uuid
+  objectKey     String    @unique @db.VarChar(1024)
+  attemptCount  Int       @default(0)
+  lastAttemptAt DateTime? @db.Timestamptz(3)
+  lastError     String?   @db.VarChar(2000)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([updatedAt])
+}
+
 model ModerationCaseEvent {
   id               String                  @id @default(uuid()) @db.Uuid
   moderationCase   ModerationCase          @relation(fields: [moderationCaseId], references: [id], onDelete: Cascade)
@@ -362,15 +374,15 @@ model Profile {
 }
 
 model AccountDeletionRecord {
-  id                String                      @id @default(uuid()) @db.Uuid
-  formerAuthId      String                      @unique @db.Uuid
-  reason            String                      @db.VarChar(500)
-  deletedAt         DateTime?
+  id                       String                      @id @default(uuid()) @db.Uuid
+  formerAuthId             String                      @unique @db.Uuid
+  reason                   String                      @db.VarChar(500)
+  deletedAt                DateTime?
   pendingStorageObjectKeys String[]
-  banStatus         RegistrationBanStatus       @default(active)
-  createdAt         DateTime                    @default(now())
-  updatedAt         DateTime                    @updatedAt
-  bannedIdentifiers RegistrationBanIdentifier[]
+  banStatus                RegistrationBanStatus       @default(active)
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
+  bannedIdentifiers        RegistrationBanIdentifier[]
 
   @@index([banStatus, deletedAt])
 }

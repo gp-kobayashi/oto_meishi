@@ -11,10 +11,13 @@ vi.mock("@/lib/moderationAudioEvidenceCleanup", () => ({
 import { POST } from "@/app/(site)/api/internal/moderation/audio-evidence/cleanup/route";
 
 const request = (secret?: string) =>
-  new Request("http://localhost/api/internal/moderation/audio-evidence/cleanup", {
-    method: "POST",
-    headers: secret ? { Authorization: `Bearer ${secret}` } : undefined,
-  });
+  new Request(
+    "http://localhost/api/internal/moderation/audio-evidence/cleanup",
+    {
+      method: "POST",
+      headers: secret ? { Authorization: `Bearer ${secret}` } : undefined,
+    },
+  );
 
 describe("POST /api/internal/moderation/audio-evidence/cleanup", () => {
   beforeEach(() => {
@@ -25,6 +28,7 @@ describe("POST /api/internal/moderation/audio-evidence/cleanup", () => {
       deletedObjects: 1,
       releasedReferences: 2,
       failed: 0,
+      pending: { examined: 1, deleted: 1, failed: 0, skipped: 0 },
     });
   });
 
@@ -38,6 +42,7 @@ describe("POST /api/internal/moderation/audio-evidence/cleanup", () => {
       deletedObjects: 1,
       releasedReferences: 2,
       failed: 0,
+      pending: { examined: 1, deleted: 1, failed: 0, skipped: 0 },
     });
     expect(cleanupExpiredModerationAudioEvidence).toHaveBeenCalledTimes(1);
   });

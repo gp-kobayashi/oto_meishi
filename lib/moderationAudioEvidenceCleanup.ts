@@ -4,6 +4,7 @@ import {
   canDeleteAudioObject,
   getAudioObjectReferenceState,
 } from "@/lib/moderationAudioEvidence";
+import { retryPendingR2ObjectDeletions } from "@/lib/pendingR2ObjectDeletion";
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 500;
@@ -13,6 +14,12 @@ export type AudioEvidenceCleanupResult = {
   deletedObjects: number;
   releasedReferences: number;
   failed: number;
+  pending: {
+    examined: number;
+    deleted: number;
+    failed: number;
+    skipped: number;
+  };
 };
 
 export async function cleanupExpiredModerationAudioEvidence(
@@ -40,6 +47,7 @@ export async function cleanupExpiredModerationAudioEvidence(
     deletedObjects: 0,
     releasedReferences: 0,
     failed: 0,
+    pending: { examined: 0, deleted: 0, failed: 0, skipped: 0 },
   };
 
   for (const snapshot of snapshots) {
@@ -77,5 +85,8 @@ export async function cleanupExpiredModerationAudioEvidence(
     }
   }
 
+  result.pending = await retryPendingR2ObjectDeletions(now, batchSize);
+  result.deletedObjects += result.pending.deleted;
+  result.failed += result.pending.failed;
   return result;
 }
