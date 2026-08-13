@@ -8,24 +8,7 @@ import {
   syncSocialLinks,
 } from "@/lib/profile/profileLinks";
 import { ownerModerationCasesQuery } from "@/lib/profile/queries";
-
-type ProfileSaveExistingProfile = Prisma.ProfileGetPayload<{
-  include: {
-    sns: true;
-    moderationCases: {
-      where: {
-        targetType: "socialLink";
-        retentionExpiresAt: { gt: Date };
-      };
-      select: {
-        snapshots: {
-          where: { kind: "reported" };
-          select: { content: true; contentHash: true };
-        };
-      };
-    };
-  };
-}>;
+import type { ProfileSaveExistingProfile } from "@/lib/profile/profileSavePreparation";
 
 export async function executeProfileSave({
   existingProfile,

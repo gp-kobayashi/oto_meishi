@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
-import { prisma } from "@/lib/prisma";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { sanitizeProfileData } from "@/lib/apiValidation";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
@@ -10,13 +9,9 @@ import {
   consumeProfileSaveIpRateLimit,
   consumeProfileSaveUserRateLimit,
 } from "@/lib/profileSaveRateLimit";
-import {
-  areSocialLinksUnchanged,
-  validateSocialLinks,
-} from "@/lib/profile/profileLinks";
 import { getClientIp } from "@/lib/clientIp";
-import { isRegistrationBanned } from "@/lib/registrationBan";
 import { executeProfileSave } from "@/lib/profile/profileSaveCommand";
+import { prepareProfileSave } from "@/lib/profile/profileSavePreparation";
 
 const MAX_PROFILE_REQUEST_BODY_BYTES = 64 * 1024;
 
@@ -141,122 +136,30 @@ export async function saveProfile(request: Request) {
       );
     }
 
-    const {
-      userId,
-      displayName,
-      bio,
-      audioTitle,
-      theme,
-      sns: socialLinks,
-    } = profileInput;
-
-    const existingProfile = await prisma.profile.findUnique({
-      where: { userId },
-      include: {
-        sns: true,
-        moderationCases: {
-          where: {
-            targetType: "socialLink",
-            retentionExpiresAt: { gt: new Date() },
-          },
-          select: {
-            snapshots: {
-              where: { kind: "reported" },
-              select: { content: true, contentHash: true },
-            },
-          },
-        },
-      },
+    const preparation = await prepareProfileSave({
+      profileInput,
+      hasAudioTitleInput,
+      hasSocialLinksInput,
+      supabaseUser,
+      supabaseServer,
     });
-    let audioTitleToSave = audioTitle;
-    let socialLinksToSave = socialLinks;
-    let preserveExistingLinks = false;
-    if (!existingProfile) {
-      // 新規作成時：このアカウントがすでに別のuserIdでプロフィールを作成していないか確認
-      const existingProfileByAuth = await prisma.profile.findUnique({
-        where: { authId: supabaseUser.id },
-      });
-      if (existingProfileByAuth) {
-        return NextResponse.json(
-          { error: "このアカウントはすでに別のユーザーIDで登録されています。" },
-          { status: 400 },
-        );
-      }
-
-      if (await isRegistrationBanned(supabaseUser)) {
-        const { error: deleteAuthError } =
-          await supabaseServer.auth.admin.deleteUser(supabaseUser.id);
-        if (deleteAuthError) {
-          console.error("Failed to delete a prohibited Auth registration");
-        }
-
-        return NextResponse.json(
-          { error: "このアカウントは利用できません。" },
-          { status: 403, headers: PRIVATE_NO_STORE_HEADERS },
-        );
-      }
-    } else {
-      if (!hasAudioTitleInput) {
-        audioTitleToSave = existingProfile.audioTitle;
-      }
-      if (!hasSocialLinksInput) {
-        socialLinksToSave = existingProfile.sns.map(
-          ({ id, service, url, label, sortOrder }) => ({
-            id,
-            service,
-            url,
-            label,
-            sortOrder,
-          }),
-        );
-      }
-
-      // 未紐付けプロフィールをリクエストだけで取得できないよう、所有者の完全一致を必須にする
-      if (existingProfile.authId !== supabaseUser.id) {
-        return NextResponse.json(
-          { error: "別のユーザーのプロフィールを変更する権限がありません。" },
-          { status: 403 },
-        );
-      }
-
-      if (existingProfile.accountModerationStatus === "deletionPending") {
-        return NextResponse.json(
-          { error: "削除手続き中のため、プロフィールを変更できません。" },
-          { status: 403 },
-        );
-      }
-
-      preserveExistingLinks = areSocialLinksUnchanged(
-        existingProfile.sns,
-        socialLinksToSave,
+    if (!preparation.ok) {
+      return NextResponse.json(
+        { error: preparation.error },
+        { status: preparation.status, headers: preparation.headers },
       );
-      const existingLinks = existingProfile.sns.map((link) => ({
-        ...link,
-        status: link.status ?? ("active" as const),
-      }));
-      const linkValidation = await validateSocialLinks(
-        existingLinks,
-        socialLinksToSave,
-        existingProfile.moderationCases ?? [],
-      );
-      if (!linkValidation.ok) {
-        return NextResponse.json(
-          { error: linkValidation.error },
-          { status: linkValidation.status },
-        );
-      }
     }
 
     const savedProfile = await executeProfileSave({
-      existingProfile,
-      userId,
+      existingProfile: preparation.existingProfile,
+      userId: profileInput.userId,
       authId: supabaseUser.id,
-      displayName,
-      bio,
-      audioTitle: audioTitleToSave,
-      theme,
-      socialLinks: socialLinksToSave,
-      preserveExistingLinks,
+      displayName: profileInput.displayName,
+      bio: profileInput.bio,
+      audioTitle: preparation.audioTitle,
+      theme: profileInput.theme,
+      socialLinks: preparation.socialLinks,
+      preserveExistingLinks: preparation.preserveExistingLinks,
     });
 
     return NextResponse.json(savedProfile, {
