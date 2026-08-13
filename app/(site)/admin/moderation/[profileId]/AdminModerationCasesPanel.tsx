@@ -5,13 +5,12 @@ import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import AdminAudioPlayer from "@/components/admin/AdminAudioPlayer";
 import styles from "./page.module.css";
+import {
+  moderationCaseStatusLabels,
+  moderationReasonLabels,
+  targetTypeLabels,
+} from "./moderationPresentation";
 
-export const moderationCaseStatusLabels = {
-  correctionRequired: "修正待ち",
-  postReviewPending: "管理者確認待ち（非公開）",
-  preReviewPending: "管理者確認待ち（非公開）",
-  confirmed: "確認済み",
-};
 const moderationCaseEventLabels = {
   created: "非公開対応を開始",
   contentChanged: "ユーザーが内容を変更",
@@ -24,23 +23,6 @@ const moderationCaseEventLabels = {
   accountRestored: "アカウントを復旧",
   deletionScheduled: "削除予定に変更",
   autoConfirmed: "期限経過により自動確認",
-};
-export const moderationReasonLabels = {
-  inappropriateContent: "不適切な内容",
-  copyrightConcern: "著作権に関する問題",
-  harassment: "誹謗中傷",
-  unsafeLink: "安全でないリンク",
-  serviceMismatch: "選択サービスとURLの不一致",
-  impersonation: "なりすまし",
-  threatOrPersonalData: "脅迫・第三者の個人情報",
-  unofficialThirdPartyProfile: "他人を主体としたプロフィール",
-  politicalReligiousPromotion: "政治・宗教への勧誘・宣伝",
-  other: "その他",
-};
-export const targetTypeLabels = {
-  profile: "プロフィール",
-  audio: "音声",
-  socialLink: "リンク",
 };
 const profileFieldLabels = {
   displayName: "表示名",
