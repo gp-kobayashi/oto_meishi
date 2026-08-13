@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
-    "supabase:test:start": "supabase start -x edge-runtime,imgproxy,logflare,mailpit,postgres-meta,postgrest,realtime,storage-api,studio,supavisor,vector",
+    "supabase:test:start": "supabase start -x edge-runtime,imgproxy,logflare,mailpit,postgres-meta,realtime,storage-api,studio,supavisor,vector",
     "supabase:test:status": "supabase status",
     "supabase:test:reset": "supabase db reset --local",
     "supabase:test:stop": "supabase stop",
