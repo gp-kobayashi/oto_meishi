@@ -2,6 +2,7 @@ import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import styles from "./page.module.css";
 import {
   moderationReasonLabels,
+  formatAdminDate,
   targetTypeLabels,
 } from "./moderationPresentation";
 
@@ -12,12 +13,6 @@ const actionLabels = {
   scheduleDeletion: "削除予定化",
   remove: "削除",
 };
-
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 
 interface AdminModerationHistoryPanelsProps {
   violationSummary: ModerationDetailResponse["profile"]["violationSummary"];
@@ -83,7 +78,7 @@ export default function AdminModerationHistoryPanels({
                     </strong>
                   </div>
                   <time dateTime={event.createdAt}>
-                    {formatDate(event.createdAt)}
+                    {formatAdminDate(event.createdAt)}
                   </time>
                 </div>
                 <p className={styles.historyReason}>{event.note}</p>
@@ -121,7 +116,7 @@ export default function AdminModerationHistoryPanels({
                     <strong>{actionLabels[entry.action]}</strong>
                   </div>
                   <time dateTime={entry.createdAt}>
-                    {formatDate(entry.createdAt)}
+                    {formatAdminDate(entry.createdAt)}
                   </time>
                 </div>
                 <p className={styles.statusChange}>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import styles from "./page.module.css";
+import { formatAdminDate } from "./moderationPresentation";
 
 const requestKindLabels = {
   inquiry: "モデレーション問い合わせ",
@@ -15,12 +16,6 @@ const requestStatusLabels = {
   resolved: "承認・回答済み",
   rejected: "却下",
 };
-
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 
 type Props = {
   requests: ModerationDetailResponse["profile"]["moderationRequests"];
@@ -120,7 +115,7 @@ export default function AdminModerationRequestsPanel({
                 {moderationRequest.message}
               </p>
               <time dateTime={moderationRequest.createdAt}>
-                申請日時: {formatDate(moderationRequest.createdAt)}
+                申請日時: {formatAdminDate(moderationRequest.createdAt)}
               </time>
               {moderationRequest.responseMessage ? (
                 <p className={styles.reportReviewNote}>

@@ -40,3 +40,9 @@ export const targetTypeLabels = {
   audio: "音声",
   socialLink: "リンク",
 };
+
+export const formatAdminDate = (value: string): string =>
+  new Intl.DateTimeFormat("ja-JP", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));

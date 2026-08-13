@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import styles from "./page.module.css";
+import { formatAdminDate } from "./moderationPresentation";
 
 const reportReasonLabels = {
   inappropriate_audio: "不適切な音声",
@@ -24,12 +25,6 @@ type PendingReportAction = {
   statusLabel: string;
 };
 type Reports = ModerationDetailResponse["profile"]["reports"];
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-
 export default function AdminReportsPanel({
   reports,
   onReload,
@@ -119,11 +114,11 @@ export default function AdminReportsPanel({
                   {report.details || "詳細は入力されていません。"}
                 </p>
                 <time dateTime={report.createdAt}>
-                  受付日時: {formatDate(report.createdAt)}
+                  受付日時: {formatAdminDate(report.createdAt)}
                 </time>
                 {report.reviewedAt && report.reviewerIdentifier ? (
                   <p className={styles.reportReviewer}>
-                    最終変更: {formatDate(report.reviewedAt)} /{" "}
+                    最終変更: {formatAdminDate(report.reviewedAt)} /{" "}
                     {report.reviewerRole} / {report.reviewerIdentifier}
                   </p>
                 ) : null}
@@ -150,7 +145,7 @@ export default function AdminReportsPanel({
                               {reportStatusLabels[event.newStatus]}
                             </strong>
                             <time dateTime={event.createdAt}>
-                              {formatDate(event.createdAt)}
+                              {formatAdminDate(event.createdAt)}
                             </time>
                           </div>
                           <p>{event.note || "対応メモなし"}</p>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import styles from "./page.module.css";
+import { formatAdminDate } from "./moderationPresentation";
 
 const identityVerificationStatusLabels = {
   pending: "確認待ち",
@@ -11,12 +12,6 @@ const identityVerificationStatusLabels = {
   rejected: "確認できず",
   expired: "投稿期限切れ",
 };
-
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 
 type IdentityVerificationRequests =
   ModerationDetailResponse["profile"]["identityVerificationRequests"];
@@ -131,13 +126,13 @@ export default function AdminIdentityVerificationPanel({
                 </div>
                 <div>
                   <dt>申請日時</dt>
-                  <dd>{formatDate(verificationRequest.createdAt)}</dd>
+                  <dd>{formatAdminDate(verificationRequest.createdAt)}</dd>
                 </div>
                 <div>
                   <dt>投稿期限</dt>
                   <dd>
                     <time dateTime={verificationRequest.postingDeadlineAt}>
-                      {formatDate(verificationRequest.postingDeadlineAt)}
+                      {formatAdminDate(verificationRequest.postingDeadlineAt)}
                     </time>
                   </dd>
                 </div>
@@ -157,7 +152,7 @@ export default function AdminIdentityVerificationPanel({
               ) : null}
               {verificationRequest.reviewedAt ? (
                 <p className={styles.reportReviewer}>
-                  審査日時: {formatDate(verificationRequest.reviewedAt)} /{" "}
+                  審査日時: {formatAdminDate(verificationRequest.reviewedAt)} /{" "}
                   {verificationRequest.reviewerRole ?? "不明"} /{" "}
                   {verificationRequest.reviewerIdentifier ?? "記録なし"}
                 </p>

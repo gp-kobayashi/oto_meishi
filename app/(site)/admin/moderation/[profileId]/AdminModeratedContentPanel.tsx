@@ -8,6 +8,7 @@ import AdminAudioPlayer from "@/components/admin/AdminAudioPlayer";
 import styles from "./page.module.css";
 import {
   audioStatusLabels,
+  formatAdminDate,
   linkStatusLabels,
   moderationCaseStatusLabels,
 } from "./moderationPresentation";
@@ -34,11 +35,6 @@ const pendingModerationCaseStatuses = new Set([
   "preReviewPending",
 ]);
 
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 const isSafeHttpsUrl = (value: string) => {
   try {
     return new URL(value).protocol === "https:";
@@ -163,11 +159,11 @@ export default function AdminModeratedContentPanel({
           </div>
           <div>
             <dt>登録日時</dt>
-            <dd>{formatDate(profile.createdAt)}</dd>
+            <dd>{formatAdminDate(profile.createdAt)}</dd>
           </div>
           <div>
             <dt>更新日時</dt>
-            <dd>{formatDate(profile.updatedAt)}</dd>
+            <dd>{formatAdminDate(profile.updatedAt)}</dd>
           </div>
         </dl>
         <Link
@@ -277,7 +273,7 @@ export default function AdminModeratedContentPanel({
                 <dt>削除日時</dt>
                 <dd>
                   {profile.deletedAudio.deletedAt
-                    ? formatDate(profile.deletedAudio.deletedAt)
+                    ? formatAdminDate(profile.deletedAudio.deletedAt)
                     : "確認できません"}
                 </dd>
               </div>
@@ -292,7 +288,7 @@ export default function AdminModeratedContentPanel({
               </div>
               <div>
                 <dt>確認期限</dt>
-                <dd>{formatDate(profile.deletedAudio.reviewDueAt)}</dd>
+                <dd>{formatAdminDate(profile.deletedAudio.reviewDueAt)}</dd>
               </div>
             </dl>
             <p className={styles.deletedAudioNote}>

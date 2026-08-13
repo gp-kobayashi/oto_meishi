@@ -8,6 +8,7 @@ import styles from "./page.module.css";
 import {
   moderationCaseStatusLabels,
   moderationReasonLabels,
+  formatAdminDate,
   targetTypeLabels,
 } from "./moderationPresentation";
 
@@ -29,11 +30,6 @@ const profileFieldLabels = {
   bio: "自己紹介",
   theme: "テーマ",
 } as const;
-const formatDate = (value: string) =>
-  new Intl.DateTimeFormat("ja-JP", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
 const formatSnapshotContent = (content: unknown) => {
   if (
     typeof content !== "object" ||
@@ -199,7 +195,7 @@ export default function AdminModerationCasesPanel({
                       ))}
                     </ul>
                     <time dateTime={latestContentChange.createdAt}>
-                      変更日時: {formatDate(latestContentChange.createdAt)}
+                      変更日時: {formatAdminDate(latestContentChange.createdAt)}
                     </time>
                   </div>
                 ) : null}
@@ -214,7 +210,7 @@ export default function AdminModerationCasesPanel({
                     {latestReported ? (
                       <>
                         <time dateTime={latestReported.createdAt}>
-                          {formatDate(latestReported.createdAt)}
+                          {formatAdminDate(latestReported.createdAt)}
                         </time>
                         {moderationCase.targetType === "audio" &&
                         latestReported.hasStoredAudio ? (
@@ -237,7 +233,7 @@ export default function AdminModerationCasesPanel({
                     {latestCorrected ? (
                       <>
                         <time dateTime={latestCorrected.createdAt}>
-                          {formatDate(latestCorrected.createdAt)}
+                          {formatAdminDate(latestCorrected.createdAt)}
                         </time>
                         {moderationCase.targetType === "audio" &&
                         (latestCorrected.hasStoredAudio || hasAudio) ? (
@@ -264,7 +260,7 @@ export default function AdminModerationCasesPanel({
                           {moderationCaseEventLabels[caseEvent.eventType]}
                         </strong>
                         <time dateTime={caseEvent.createdAt}>
-                          {formatDate(caseEvent.createdAt)}
+                          {formatAdminDate(caseEvent.createdAt)}
                         </time>
                         <span>
                           {caseEvent.actorType}
