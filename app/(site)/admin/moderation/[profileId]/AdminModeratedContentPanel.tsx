@@ -27,6 +27,7 @@ const moderationReasonOptions = [
   { value: "politicalReligiousPromotion", label: "政治・宗教への勧誘・宣伝" },
   { value: "other", label: "その他" },
 ] as const;
+type ModerationReasonCode = (typeof moderationReasonOptions)[number]["value"];
 const pendingModerationCaseStatuses = new Set([
   "correctionRequired",
   "postReviewPending",
@@ -67,7 +68,7 @@ export default function AdminModeratedContentPanel({
     null,
   );
   const [reason, setReason] = useState("");
-  const [reasonCode, setReasonCode] = useState<"inappropriateContent">(
+  const [reasonCode, setReasonCode] = useState<ModerationReasonCode>(
     "inappropriateContent",
   );
   const [actionError, setActionError] = useState("");
@@ -439,7 +440,7 @@ export default function AdminModeratedContentPanel({
                     id="moderation-reason-code"
                     value={reasonCode}
                     onChange={(event) =>
-                      setReasonCode(event.target.value as typeof reasonCode)
+                      setReasonCode(event.target.value as ModerationReasonCode)
                     }
                   >
                     {moderationReasonOptions.map((option) => (
