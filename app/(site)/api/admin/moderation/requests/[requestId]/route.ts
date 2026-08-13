@@ -19,7 +19,9 @@ export async function PATCH(
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const userRateLimit = consumeAdminActionRateLimit(authorization.admin.id);
+    const userRateLimit = await consumeAdminActionRateLimit(
+      authorization.admin.id,
+    );
     if (!userRateLimit.allowed) {
       return Response.json(
         { error: "管理操作の上限に達しました。しばらくお待ちください。" },
@@ -34,7 +36,7 @@ export async function PATCH(
     }
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeAdminActionIpRateLimit(clientIp);
+      const ipRateLimit = await consumeAdminActionIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return Response.json(
           {
@@ -119,10 +121,7 @@ export async function PATCH(
         } as const;
       }
 
-      if (
-        moderationRequest.kind === "accountAppeal" &&
-        status === "resolved"
-      ) {
+      if (moderationRequest.kind === "accountAppeal" && status === "resolved") {
         const incompleteCaseCount = await tx.moderationCase.count({
           where: {
             profileId: moderationRequest.profileId,
@@ -149,10 +148,7 @@ export async function PATCH(
         data: { status, responseMessage, resolvedAt },
       });
 
-      if (
-        moderationRequest.kind === "accountAppeal" &&
-        status === "resolved"
-      ) {
+      if (moderationRequest.kind === "accountAppeal" && status === "resolved") {
         await tx.profile.update({
           where: { id: moderationRequest.profileId },
           data: {

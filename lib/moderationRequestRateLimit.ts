@@ -1,11 +1,21 @@
-import { FixedWindowRateLimiter } from "@/lib/rateLimit";
+import { consumePersistentRateLimit } from "@/lib/persistentRateLimit";
 
 const REQUEST_WINDOW_MS = 24 * 60 * 60 * 1000;
-const userRateLimiter = new FixedWindowRateLimiter(5, REQUEST_WINDOW_MS);
-const ipRateLimiter = new FixedWindowRateLimiter(15, REQUEST_WINDOW_MS);
+const USER_LIMIT = 5;
+const IP_LIMIT = 15;
 
 export const consumeModerationRequestUserRateLimit = (userId: string) =>
-  userRateLimiter.consume(userId);
+  consumePersistentRateLimit({
+    scope: "moderation-request:user",
+    key: userId,
+    limit: USER_LIMIT,
+    windowMs: REQUEST_WINDOW_MS,
+  });
 
 export const consumeModerationRequestIpRateLimit = (clientIp: string) =>
-  ipRateLimiter.consume(clientIp);
+  consumePersistentRateLimit({
+    scope: "moderation-request:ip",
+    key: clientIp,
+    limit: IP_LIMIT,
+    windowMs: REQUEST_WINDOW_MS,
+  });

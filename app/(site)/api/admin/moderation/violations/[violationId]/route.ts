@@ -19,7 +19,7 @@ export async function PATCH(
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const rateLimit = consumeAdminActionRateLimit(authorization.admin.id);
+    const rateLimit = await consumeAdminActionRateLimit(authorization.admin.id);
     if (!rateLimit.allowed) {
       return Response.json(
         { error: "管理操作の回数が上限に達しました。しばらくお待ちください。" },
@@ -35,10 +35,13 @@ export async function PATCH(
 
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeAdminActionIpRateLimit(clientIp);
+      const ipRateLimit = await consumeAdminActionIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return Response.json(
-          { error: "この接続元からの管理操作が集中しています。しばらくお待ちください。" },
+          {
+            error:
+              "この接続元からの管理操作が集中しています。しばらくお待ちください。",
+          },
           {
             status: 429,
             headers: {
@@ -104,7 +107,10 @@ export async function PATCH(
         },
       });
       if (!violation || violation.eventType !== "confirmed") {
-        return { error: "取り消し対象の違反が見つかりません。", status: 404 } as const;
+        return {
+          error: "取り消し対象の違反が見つかりません。",
+          status: 404,
+        } as const;
       }
       if (violation.reasonCode !== "impersonation") {
         return {
@@ -137,7 +143,10 @@ export async function PATCH(
           select: { id: true },
         });
       if (existingRevocation) {
-        return { error: "この違反回数はすでに取り消されています。", status: 409 } as const;
+        return {
+          error: "この違反回数はすでに取り消されています。",
+          status: 409,
+        } as const;
       }
 
       const revocation = await transaction.moderationViolationEvent.create({

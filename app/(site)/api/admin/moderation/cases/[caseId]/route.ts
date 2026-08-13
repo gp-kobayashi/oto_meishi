@@ -22,8 +22,7 @@ const decisions = ["approve", "continueHidden", "requestChanges"] as const;
 type Decision = (typeof decisions)[number];
 
 const isDecision = (value: unknown): value is Decision =>
-  typeof value === "string" &&
-  decisions.includes(value as Decision);
+  typeof value === "string" && decisions.includes(value as Decision);
 
 export async function PATCH(
   request: Request,
@@ -33,13 +32,15 @@ export async function PATCH(
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const userRateLimit = consumeAdminActionRateLimit(authorization.admin.id);
+    const userRateLimit = await consumeAdminActionRateLimit(
+      authorization.admin.id,
+    );
     if (!userRateLimit.allowed) {
       return rateLimitResponse(userRateLimit.retryAfterSeconds);
     }
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeAdminActionIpRateLimit(clientIp);
+      const ipRateLimit = await consumeAdminActionIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return rateLimitResponse(ipRateLimit.retryAfterSeconds);
       }
@@ -82,7 +83,9 @@ export async function PATCH(
         : "";
     if (!isDecision(body.decision) || !reason || reason.length > 500) {
       return Response.json(
-        { error: "審査結果と500文字以内のユーザー向け理由を入力してください。" },
+        {
+          error: "審査結果と500文字以内のユーザー向け理由を入力してください。",
+        },
         { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
       );
     }
@@ -135,7 +138,10 @@ export async function PATCH(
         },
       });
       if (!moderationCase) {
-        return { error: "審査対象が見つかりません。", httpStatus: 404 } as const;
+        return {
+          error: "審査対象が見つかりません。",
+          httpStatus: 404,
+        } as const;
       }
       if (
         moderationCase.status !== "postReviewPending" &&
@@ -352,9 +358,7 @@ async function doesCurrentTargetMatchSnapshot(
       }[];
     };
   },
-  snapshot:
-    | { content: unknown; contentHash: string | null }
-    | undefined,
+  snapshot: { content: unknown; contentHash: string | null } | undefined,
 ): Promise<boolean> {
   if (!snapshot || !isRecord(snapshot.content)) return false;
   if (snapshot.content.deleted === true) {
@@ -364,10 +368,12 @@ async function doesCurrentTargetMatchSnapshot(
       );
     }
     if (moderationCase.targetType === "socialLink") {
-      return (await tx.socialLink.findUnique({
-        where: { id: moderationCase.targetId },
-        select: { id: true },
-      })) === null;
+      return (
+        (await tx.socialLink.findUnique({
+          where: { id: moderationCase.targetId },
+          select: { id: true },
+        })) === null
+      );
     }
     return false;
   }

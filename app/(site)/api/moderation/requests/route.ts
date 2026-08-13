@@ -122,10 +122,10 @@ export async function GET(request: Request) {
           kind: isDeletionPending
             ? null
             : isSuspended
-            ? "accountAppeal"
-            : hasModeratedContent
-              ? "inquiry"
-              : null,
+              ? "accountAppeal"
+              : hasModeratedContent
+                ? "inquiry"
+                : null,
           suspensionAppealDueAt:
             profile.suspensionAppealDueAt?.toISOString() ?? null,
           deletionScheduledAt:
@@ -149,7 +149,7 @@ export async function POST(request: Request) {
     const authorization = await authorizeProfileOwnerRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const userRateLimit = consumeModerationRequestUserRateLimit(
+    const userRateLimit = await consumeModerationRequestUserRateLimit(
       authorization.userId,
     );
     if (!userRateLimit.allowed) {
@@ -160,7 +160,7 @@ export async function POST(request: Request) {
     }
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeModerationRequestIpRateLimit(clientIp);
+      const ipRateLimit = await consumeModerationRequestIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return rateLimitResponse(
           "この接続元からの申請が集中しています。時間をおいて再度お試しください。",

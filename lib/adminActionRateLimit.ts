@@ -1,22 +1,23 @@
-import { FixedWindowRateLimiter } from "@/lib/rateLimit";
+import { consumePersistentRateLimit } from "@/lib/persistentRateLimit";
 
 const ADMIN_ACTION_LIMIT = 60;
 const ADMIN_ACTION_WINDOW_MS = 15 * 60 * 1000;
 const ADMIN_ACTION_IP_LIMIT = 120;
 
-const adminRateLimiter = new FixedWindowRateLimiter(
-  ADMIN_ACTION_LIMIT,
-  ADMIN_ACTION_WINDOW_MS,
-);
-const ipRateLimiter = new FixedWindowRateLimiter(
-  ADMIN_ACTION_IP_LIMIT,
-  ADMIN_ACTION_WINDOW_MS,
-);
-
 export function consumeAdminActionRateLimit(adminId: string) {
-  return adminRateLimiter.consume(adminId);
+  return consumePersistentRateLimit({
+    scope: "admin-action:admin",
+    key: adminId,
+    limit: ADMIN_ACTION_LIMIT,
+    windowMs: ADMIN_ACTION_WINDOW_MS,
+  });
 }
 
 export function consumeAdminActionIpRateLimit(clientIp: string) {
-  return ipRateLimiter.consume(clientIp);
+  return consumePersistentRateLimit({
+    scope: "admin-action:ip",
+    key: clientIp,
+    limit: ADMIN_ACTION_IP_LIMIT,
+    windowMs: ADMIN_ACTION_WINDOW_MS,
+  });
 }

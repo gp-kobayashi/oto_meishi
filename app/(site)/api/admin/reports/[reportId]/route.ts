@@ -37,7 +37,7 @@ export async function PATCH(
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const rateLimit = consumeAdminActionRateLimit(authorization.admin.id);
+    const rateLimit = await consumeAdminActionRateLimit(authorization.admin.id);
     if (!rateLimit.allowed) {
       return Response.json(
         { error: "管理操作の回数が上限に達しました。しばらくお待ちください。" },
@@ -53,10 +53,13 @@ export async function PATCH(
 
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeAdminActionIpRateLimit(clientIp);
+      const ipRateLimit = await consumeAdminActionIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return Response.json(
-          { error: "この接続元からの管理操作が集中しています。しばらくお待ちください。" },
+          {
+            error:
+              "この接続元からの管理操作が集中しています。しばらくお待ちください。",
+          },
           {
             status: 429,
             headers: {
@@ -124,9 +127,7 @@ export async function PATCH(
           httpStatus: 409,
         } as const;
       }
-      if (
-        !allowedReportStatusTransitions[report.status].includes(nextStatus)
-      ) {
+      if (!allowedReportStatusTransitions[report.status].includes(nextStatus)) {
         return {
           error: "完了した通報の状態は変更できません。",
           httpStatus: 409,

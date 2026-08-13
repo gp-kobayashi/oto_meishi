@@ -104,13 +104,13 @@ export async function PATCH(
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const rateLimit = consumeAdminActionRateLimit(authorization.admin.id);
+    const rateLimit = await consumeAdminActionRateLimit(authorization.admin.id);
     if (!rateLimit.allowed) {
       return rateLimitResponse(rateLimit.retryAfterSeconds);
     }
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeAdminActionIpRateLimit(clientIp);
+      const ipRateLimit = await consumeAdminActionIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return rateLimitResponse(ipRateLimit.retryAfterSeconds);
       }
@@ -210,8 +210,7 @@ export async function PATCH(
           data: { status: "expired" },
         });
         return {
-          error:
-            "投稿期限を過ぎているため、この本人確認申請は審査できません。",
+          error: "投稿期限を過ぎているため、この本人確認申請は審査できません。",
           httpStatus: 409,
         } as const;
       }

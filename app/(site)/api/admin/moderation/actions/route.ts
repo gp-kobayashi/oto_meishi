@@ -53,7 +53,7 @@ export async function PATCH(request: Request) {
     const authorization = await authorizeAdminRequest(request);
     if (!authorization.ok) return authorization.response;
 
-    const rateLimit = consumeAdminActionRateLimit(authorization.admin.id);
+    const rateLimit = await consumeAdminActionRateLimit(authorization.admin.id);
     if (!rateLimit.allowed) {
       return Response.json(
         {
@@ -74,7 +74,7 @@ export async function PATCH(request: Request) {
 
     const clientIp = getClientIp(request.headers);
     if (clientIp) {
-      const ipRateLimit = consumeAdminActionIpRateLimit(clientIp);
+      const ipRateLimit = await consumeAdminActionIpRateLimit(clientIp);
       if (!ipRateLimit.allowed) {
         return Response.json(
           {
@@ -158,7 +158,10 @@ export async function PATCH(request: Request) {
     const action = body.action;
     const nextStatus = getNextStatus(targetType, action);
     if (!nextStatus) {
-      return Response.json({ error: "この操作は実行できません。" }, { status: 400 });
+      return Response.json(
+        { error: "この操作は実行できません。" },
+        { status: 400 },
+      );
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -168,10 +171,7 @@ export async function PATCH(request: Request) {
       let reportedContentHash: string | null = null;
       let reportedStorageObjectKey: string | null = null;
       let accountModerationStatus:
-        | "active"
-        | "suspended"
-        | "deletionPending"
-        | null = null;
+        "active" | "suspended" | "deletionPending" | null = null;
       let profileStatus: string | null = null;
       let deletionProcessingStartedAt: Date | null = null;
 
@@ -204,7 +204,8 @@ export async function PATCH(request: Request) {
             },
           },
         });
-        if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
+        if (!target)
+          return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
         accountModerationStatus = target.accountModerationStatus;
         deletionProcessingStartedAt = target.deletionProcessingStartedAt;
@@ -232,7 +233,10 @@ export async function PATCH(request: Request) {
           })),
         };
         if (previousStatus === nextStatus) {
-          return { error: "公開状態はすでに変更されています。", status: 409 } as const;
+          return {
+            error: "公開状態はすでに変更されています。",
+            status: 409,
+          } as const;
         }
       } else if (targetType === "audio") {
         const target = await tx.profile.findUnique({
@@ -249,7 +253,8 @@ export async function PATCH(request: Request) {
             deletionProcessingStartedAt: true,
           },
         });
-        if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
+        if (!target)
+          return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.id;
         profileStatus = target.status;
         accountModerationStatus = target.accountModerationStatus;
@@ -263,7 +268,10 @@ export async function PATCH(request: Request) {
         reportedStorageObjectKey = target.audioKey || null;
         reportedContentHash = target.audioContentHash;
         if (previousStatus === nextStatus) {
-          return { error: "公開状態はすでに変更されています。", status: 409 } as const;
+          return {
+            error: "公開状態はすでに変更されています。",
+            status: 409,
+          } as const;
         }
       } else {
         const target = await tx.socialLink.findUnique({
@@ -280,7 +288,8 @@ export async function PATCH(request: Request) {
             },
           },
         });
-        if (!target) return { error: "対象が見つかりません。", status: 404 } as const;
+        if (!target)
+          return { error: "対象が見つかりません。", status: 404 } as const;
         profileId = target.profileId;
         deletionProcessingStartedAt =
           target.profile?.deletionProcessingStartedAt ?? null;
@@ -293,22 +302,23 @@ export async function PATCH(request: Request) {
         };
         reportedContentHash = await createModeratedUrlHash(target.url);
         if (previousStatus === nextStatus) {
-          return { error: "公開状態はすでに変更されています。", status: 409 } as const;
+          return {
+            error: "公開状態はすでに変更されています。",
+            status: 409,
+          } as const;
         }
       }
 
       if (action === "restore") {
         if (deletionProcessingStartedAt) {
           return {
-            error: "アカウントの削除処理が開始されているため、再公開できません。",
+            error:
+              "アカウントの削除処理が開始されているため、再公開できません。",
             status: 409,
           } as const;
         }
 
-        if (
-          targetType === "profile" &&
-          accountModerationStatus !== "active"
-        ) {
+        if (targetType === "profile" && accountModerationStatus !== "active") {
           return {
             error:
               "利用停止中のプロフィールは、解除申請の審査操作からのみ復旧できます。",
@@ -333,7 +343,8 @@ export async function PATCH(request: Request) {
         });
         if (openCase) {
           return {
-            error: "未完了の審査ケースがあるため、ケースの審査操作から再公開してください。",
+            error:
+              "未完了の審査ケースがあるため、ケースの審査操作から再公開してください。",
             status: 409,
           } as const;
         }
@@ -357,10 +368,7 @@ export async function PATCH(request: Request) {
             originalViolationEventId: true,
           },
         });
-        const decision = decideViolationSuspension(
-          violationEvents,
-          reasonCode,
-        );
+        const decision = decideViolationSuspension(violationEvents, reasonCode);
         if (targetType === "socialLink") {
           const profile = await tx.profile.findUnique({
             where: { id: profileId },
@@ -507,7 +515,10 @@ export async function PATCH(request: Request) {
           select: { id: true },
         });
       }
-      const notification = getModerationNotification(targetType, effectiveAction);
+      const notification = getModerationNotification(
+        targetType,
+        effectiveAction,
+      );
       await tx.userNotification.create({
         data: {
           profileId,
