@@ -153,18 +153,18 @@
     max-width: none;
     overflow: visible;
     text-overflow: clip;
-    animation: title-scroll 10s linear infinite;
+    animation: title-scroll 8s linear infinite;
   }
 }
 
 @keyframes title-scroll {
   0%,
-  30% {
+  25% {
     transform: translateX(0);
   }
 
-  60%,
-  90% {
+  62.5%,
+  87.5% {
     transform: translateX(calc(-1 * var(--title-scroll-distance)));
   }
 
