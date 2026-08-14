@@ -76,7 +76,7 @@ describe("AudioPlayer", () => {
       (viewport as HTMLElement).style.getPropertyValue(
         "--title-scroll-distance",
       ),
-    ).toBe("120px");
+    ).toBe("124px");
   });
 
   it.each([

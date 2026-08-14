@@ -11,6 +11,8 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+const TITLE_SCROLL_END_PADDING = 4;
+
 const AudioPlayer = ({
   userId,
   audioTitle,
@@ -49,9 +51,14 @@ const AudioPlayer = ({
       "(prefers-reduced-motion: reduce)",
     );
     const updateTitleScrolling = () => {
-      const distance = Math.max(0, text.scrollWidth - viewport.clientWidth);
-      const shouldScroll = !reducedMotionQuery.matches && distance > 1;
-      setTitleScrollDistance(distance);
+      const overflowDistance = Math.max(
+        0,
+        text.scrollWidth - viewport.clientWidth,
+      );
+      const shouldScroll = !reducedMotionQuery.matches && overflowDistance > 1;
+      setTitleScrollDistance(
+        shouldScroll ? overflowDistance + TITLE_SCROLL_END_PADDING : 0,
+      );
       setIsTitleScrolling(shouldScroll);
     };
 
