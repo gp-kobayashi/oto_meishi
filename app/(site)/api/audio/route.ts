@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { deleteFromR2, extractKeyFromUrl } from "@/lib/r2Storage";
+import { extractKeyFromUrl } from "@/lib/r2Storage";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { getModerationDeadline } from "@/lib/moderationRemediation";
-import { markPendingR2ObjectDeletionFailure } from "@/lib/pendingR2ObjectDeletion";
+import { processPendingR2ObjectDeletion } from "@/lib/pendingR2ObjectDeletion";
 
 export async function DELETE(request: Request) {
   const authHeader = request.headers.get("Authorization");
@@ -144,8 +144,8 @@ export async function DELETE(request: Request) {
       if (profile.audioStatus !== "hidden") {
         await tx.pendingR2ObjectDeletion.upsert({
           where: { objectKey: audioKey },
-          create: { objectKey: audioKey },
-          update: { attemptCount: 0, lastAttemptAt: null, lastError: null },
+          create: { objectKey: audioKey, nextAttemptAt: new Date() },
+          update: { attemptCount: 0, lastAttemptAt: null, lastError: null, nextAttemptAt: new Date() },
         });
         return result;
       }
@@ -177,17 +177,9 @@ export async function DELETE(request: Request) {
 
   if (profile.audioStatus !== "hidden") {
     try {
-      await deleteFromR2(audioKey);
-      await prisma.pendingR2ObjectDeletion.deleteMany({
-        where: { objectKey: audioKey },
-      });
+      await processPendingR2ObjectDeletion(audioKey);
     } catch (error) {
       console.error("Failed to delete unreferenced audio file from R2:", error);
-      try {
-        await markPendingR2ObjectDeletionFailure(audioKey, error);
-      } catch (recordError) {
-        console.error("Failed to record pending R2 deletion:", recordError);
-      }
     }
   }
 

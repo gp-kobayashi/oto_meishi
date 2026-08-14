@@ -4,7 +4,6 @@ import {
   MAX_CONVERTED_AUDIO_FILE_SIZE_BYTES,
 } from "@/lib/audioConverter";
 import {
-  deleteFromR2,
   extractKeyFromUrl,
   generateAudioKey,
   uploadToR2,
@@ -36,10 +35,7 @@ import {
   createModerationContentHash,
   getModerationDeadline,
 } from "@/lib/moderationRemediation";
-import {
-  canDeleteAudioObject,
-  getAudioObjectReferenceState,
-} from "@/lib/moderationAudioEvidence";
+import { requestR2ObjectDeletion } from "@/lib/pendingR2ObjectDeletion";
 
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 const MAX_REQUEST_BODY_SIZE_BYTES =
@@ -422,7 +418,7 @@ export async function POST(request: NextRequest) {
         });
       } catch (databaseError) {
         try {
-          await deleteFromR2(audioKey);
+          await requestR2ObjectDeletion(audioKey);
         } catch (cleanupError) {
           console.error("Failed to delete unlinked audio file:", cleanupError);
         }
@@ -434,13 +430,7 @@ export async function POST(request: NextRequest) {
         (profile.audioUrl ? extractKeyFromUrl(profile.audioUrl) : "");
       if (oldAudioKey && oldAudioKey !== audioKey) {
         try {
-          const referenceState = await getAudioObjectReferenceState(
-            prisma,
-            oldAudioKey,
-          );
-          if (canDeleteAudioObject(referenceState)) {
-            await deleteFromR2(oldAudioKey);
-          }
+          await requestR2ObjectDeletion(oldAudioKey);
         } catch (cleanupError) {
           console.error(
             "Failed to safely delete replaced audio file:",

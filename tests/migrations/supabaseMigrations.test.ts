@@ -61,6 +61,20 @@ describe("Supabase migrations", () => {
     );
     expect(sql).toContain("PendingR2ObjectDeletion_updatedAt_idx");
   });
+  it("pending R2削除キューへ再試行スケジュールを追加する", () => {
+    const file = migrationFiles.find((name) =>
+      name.endsWith("_add_pending_r2_deletion_schedule.sql"),
+    );
+    expect(file).toBeDefined();
+    const sql = fs.readFileSync(path.join(migrationsDirectory, file!), "utf8");
+    expect(sql).toContain('add column if not exists "nextAttemptAt"');
+    expect(sql).toContain(
+      "PendingR2ObjectDeletion_nextAttemptAt_updatedAt_idx",
+    );
+    expect(sql).toContain(
+      'drop index if exists "PendingR2ObjectDeletion_updatedAt_idx"',
+    );
+  });
   it.each(migrationFiles)(
     "%sでPostgreSQL非対応のCREATE TYPE IF NOT EXISTSを使用しない",
     (fileName) => {

@@ -36,6 +36,7 @@ const { mocks } = vi.hoisted(() => ({
     deleteFromR2: vi.fn(),
     extractKeyFromUrl: vi.fn(),
     readMultipartFormData: vi.fn(),
+    requestR2ObjectDeletion: vi.fn(),
   },
 }));
 
@@ -84,6 +85,9 @@ vi.mock("@/lib/r2Storage", () => ({
   generateAudioKey: mocks.generateAudioKey,
   deleteFromR2: mocks.deleteFromR2,
   extractKeyFromUrl: mocks.extractKeyFromUrl,
+}));
+vi.mock("@/lib/pendingR2ObjectDeletion", () => ({
+  requestR2ObjectDeletion: mocks.requestR2ObjectDeletion,
 }));
 
 vi.mock("@/lib/audioUploadRateLimit", () => ({
@@ -205,6 +209,7 @@ describe("/api/audio/upload route", () => {
     mocks.moderationSnapshotCreate.mockResolvedValue({ id: "snapshot-1" });
     mocks.moderationCaseEventCreate.mockResolvedValue({ id: "event-1" });
     mocks.deleteFromR2.mockResolvedValue(undefined);
+    mocks.requestR2ObjectDeletion.mockResolvedValue("deleted");
     mocks.extractKeyFromUrl.mockReturnValue("audio/testuser/legacy.m4a");
     mocks.consumeAudioUploadUserRateLimit.mockReturnValue({
       allowed: true,
@@ -1034,7 +1039,7 @@ describe("/api/audio/upload route", () => {
       const response = await POST(uploadRequest(formDataWithFile()));
 
       expect(response.status).toBe(500);
-      expect(mocks.deleteFromR2).toHaveBeenCalledWith(
+      expect(mocks.requestR2ObjectDeletion).toHaveBeenCalledWith(
         "audio/testuser/voice-123.m4a",
       );
     } finally {
@@ -1056,9 +1061,8 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(200);
-    expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/testuser/old.m4a");
-    expect(mocks.updateProfile.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.deleteFromR2.mock.invocationCallOrder[0],
+    expect(mocks.requestR2ObjectDeletion).toHaveBeenCalledWith(
+      "audio/testuser/old.m4a",
     );
   });
 
@@ -1084,14 +1088,9 @@ describe("/api/audio/upload route", () => {
     const response = await POST(uploadRequest(formDataWithFile()));
 
     expect(response.status).toBe(200);
-    expect(mocks.findFirstSnapshot).toHaveBeenCalledWith({
-      where: {
-        storageObjectKey: "audio/testuser/reported.m4a",
-        expiresAt: { gt: expect.any(Date) },
-      },
-      select: { id: true },
-    });
-    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+    expect(mocks.requestR2ObjectDeletion).toHaveBeenCalledWith(
+      "audio/testuser/reported.m4a",
+    );
   });
 
   it("証拠参照の確認に失敗した場合は安全側で旧音声を残す", async () => {
@@ -1113,10 +1112,8 @@ describe("/api/audio/upload route", () => {
       const response = await POST(uploadRequest(formDataWithFile()));
 
       expect(response.status).toBe(200);
-      expect(mocks.deleteFromR2).not.toHaveBeenCalled();
-      expect(consoleError).toHaveBeenCalledWith(
-        "Failed to safely delete replaced audio file:",
-        expect.any(Error),
+      expect(mocks.requestR2ObjectDeletion).toHaveBeenCalledWith(
+        "audio/testuser/old.m4a",
       );
     } finally {
       consoleError.mockRestore();
@@ -1136,7 +1133,9 @@ describe("/api/audio/upload route", () => {
       audioUrl: "",
       moderationCases: [],
     });
-    mocks.deleteFromR2.mockRejectedValueOnce(new Error("delete failed"));
+    mocks.requestR2ObjectDeletion.mockRejectedValueOnce(
+      new Error("delete failed"),
+    );
 
     try {
       const response = await POST(uploadRequest(formDataWithFile()));

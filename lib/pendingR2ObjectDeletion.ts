@@ -11,10 +11,98 @@ export type PendingDeletionResult = {
   failed: number;
   skipped: number;
 };
+export type R2DeletionOutcome = "deleted" | "failed" | "skipped";
 
-function errorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return message.slice(0, 2000);
+function errorMessage(error: unknown) {
+  return (error instanceof Error ? error.message : String(error)).slice(
+    0,
+    2000,
+  );
+}
+
+function nextRetryAt(now: Date, attemptCount: number) {
+  const hours = Math.min(24, Math.pow(2, Math.max(0, attemptCount - 1)));
+  return new Date(now.getTime() + hours * 60 * 60 * 1000);
+}
+
+async function recordFailure(
+  objectKey: string,
+  now: Date,
+  error: unknown,
+  attemptCount?: number,
+) {
+  const nextAttempt = nextRetryAt(now, (attemptCount ?? 0) + 1);
+  try {
+    await prisma.pendingR2ObjectDeletion.update({
+      where: { objectKey },
+      data: {
+        attemptCount: { increment: 1 },
+        lastAttemptAt: now,
+        lastError: errorMessage(error),
+        nextAttemptAt: nextAttempt,
+      },
+    });
+  } catch (updateError) {
+    console.error("Failed to record pending R2 deletion attempt:", updateError);
+  }
+}
+
+export async function processPendingR2ObjectDeletion(
+  objectKey: string,
+  now = new Date(),
+): Promise<R2DeletionOutcome> {
+  let attemptCount = 0;
+  try {
+    const item = await prisma.pendingR2ObjectDeletion.findUnique({
+      where: { objectKey },
+    });
+    if (!item) {
+      return "skipped";
+    }
+    attemptCount = item.attemptCount;
+    const refs = await getAudioObjectReferenceState(prisma, objectKey, now);
+    if (!canDeleteAudioObject(refs)) {
+      await prisma.pendingR2ObjectDeletion.update({
+        where: { objectKey },
+        data: { nextAttemptAt: new Date(now.getTime() + 24 * 60 * 60 * 1000) },
+      });
+      return "skipped";
+    }
+    await deleteFromR2(objectKey);
+    await prisma.pendingR2ObjectDeletion.deleteMany({ where: { objectKey } });
+    return "deleted";
+  } catch (error) {
+    await recordFailure(objectKey, now, error, attemptCount);
+    return "failed";
+  }
+}
+
+export async function requestR2ObjectDeletion(
+  objectKey: string,
+  now = new Date(),
+): Promise<R2DeletionOutcome> {
+  try {
+    await prisma.pendingR2ObjectDeletion.upsert({
+      where: { objectKey },
+      create: {
+        objectKey,
+        attemptCount: 0,
+        lastAttemptAt: null,
+        lastError: null,
+        nextAttemptAt: now,
+      },
+      update: {
+        attemptCount: 0,
+        lastAttemptAt: null,
+        lastError: null,
+        nextAttemptAt: now,
+      },
+    });
+  } catch (error) {
+    console.error("Failed to enqueue pending R2 deletion:", error);
+    return "failed";
+  }
+  return processPendingR2ObjectDeletion(objectKey, now);
 }
 
 export async function retryPendingR2ObjectDeletions(
@@ -22,63 +110,19 @@ export async function retryPendingR2ObjectDeletions(
   batchSize = 100,
 ): Promise<PendingDeletionResult> {
   const pending = await prisma.pendingR2ObjectDeletion.findMany({
+    where: { nextAttemptAt: { lte: now } },
     take: Math.min(Math.max(Math.trunc(batchSize), 1), 500),
-    orderBy: { updatedAt: "asc" },
+    orderBy: [{ nextAttemptAt: "asc" }, { updatedAt: "asc" }],
   });
-  const result = {
+  const result: PendingDeletionResult = {
     examined: pending.length,
     deleted: 0,
     failed: 0,
     skipped: 0,
   };
   for (const item of pending) {
-    try {
-      const refs = await getAudioObjectReferenceState(
-        prisma,
-        item.objectKey,
-        now,
-      );
-      if (!canDeleteAudioObject(refs)) {
-        result.skipped++;
-        continue;
-      }
-      await deleteFromR2(item.objectKey);
-      await prisma.pendingR2ObjectDeletion.deleteMany({
-        where: { objectKey: item.objectKey },
-      });
-      result.deleted++;
-    } catch (error) {
-      result.failed++;
-      try {
-        await prisma.pendingR2ObjectDeletion.update({
-          where: { objectKey: item.objectKey },
-          data: {
-            attemptCount: { increment: 1 },
-            lastAttemptAt: now,
-            lastError: errorMessage(error),
-          },
-        });
-      } catch (updateError) {
-        console.error(
-          "Failed to record pending R2 deletion attempt:",
-          updateError,
-        );
-      }
-    }
+    const outcome = await processPendingR2ObjectDeletion(item.objectKey, now);
+    result[outcome]++;
   }
   return result;
-}
-
-export async function markPendingR2ObjectDeletionFailure(
-  objectKey: string,
-  error: unknown,
-) {
-  return prisma.pendingR2ObjectDeletion.update({
-    where: { objectKey },
-    data: {
-      attemptCount: { increment: 1 },
-      lastAttemptAt: new Date(),
-      lastError: errorMessage(error),
-    },
-  });
 }

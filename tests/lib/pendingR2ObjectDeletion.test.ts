@@ -2,125 +2,121 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findMany: vi.fn(),
+  findUnique: vi.fn(),
+  upsert: vi.fn(),
   deleteMany: vi.fn(),
   update: vi.fn(),
   deleteFromR2: vi.fn(),
   getReferenceState: vi.fn(),
 }));
-
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    pendingR2ObjectDeletion: {
-      findMany: mocks.findMany,
-      deleteMany: mocks.deleteMany,
-      update: mocks.update,
-    },
-  },
-}));
+vi.mock("@/lib/prisma", () => ({ prisma: { pendingR2ObjectDeletion: mocks } }));
 vi.mock("@/lib/r2Storage", () => ({ deleteFromR2: mocks.deleteFromR2 }));
 vi.mock("@/lib/moderationAudioEvidence", () => ({
   getAudioObjectReferenceState: mocks.getReferenceState,
-  canDeleteAudioObject: (state: {
-    referencedByCurrentProfile: boolean;
-    referencedByUnexpiredSnapshot: boolean;
-    referencedByUnresolvedCase: boolean;
-  }) =>
-    !state.referencedByCurrentProfile &&
-    !state.referencedByUnexpiredSnapshot &&
-    !state.referencedByUnresolvedCase,
+  canDeleteAudioObject: (s: ReferenceState) =>
+    !s.referencedByCurrentProfile &&
+    !s.referencedByUnexpiredSnapshot &&
+    !s.referencedByUnresolvedCase,
 }));
-
-import { retryPendingR2ObjectDeletions } from "@/lib/pendingR2ObjectDeletion";
-
+type ReferenceState = {
+  referencedByCurrentProfile: boolean;
+  referencedByUnexpiredSnapshot: boolean;
+  referencedByUnresolvedCase: boolean;
+};
+import {
+  processPendingR2ObjectDeletion,
+  requestR2ObjectDeletion,
+  retryPendingR2ObjectDeletions,
+} from "@/lib/pendingR2ObjectDeletion";
 const NOW = new Date("2026-08-13T07:00:00.000Z");
-const UNREFERENCED = {
+const FREE = {
   referencedByCurrentProfile: false,
   referencedByUnexpiredSnapshot: false,
   referencedByUnresolvedCase: false,
 };
-
-describe("R2オブジェクト削除の再試行", () => {
+describe("R2削除待機キュー", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.findMany.mockResolvedValue([{ objectKey: "audio/user/old.m4a" }]);
-    mocks.getReferenceState.mockResolvedValue(UNREFERENCED);
-    mocks.deleteFromR2.mockResolvedValue(undefined);
+    mocks.findMany.mockResolvedValue([]);
+    mocks.findUnique.mockResolvedValue({ objectKey: "k", attemptCount: 0 });
+    mocks.upsert.mockResolvedValue({});
     mocks.deleteMany.mockResolvedValue({ count: 1 });
-    mocks.update.mockResolvedValue({ id: "pending-1" });
+    mocks.update.mockResolvedValue({});
+    mocks.deleteFromR2.mockResolvedValue(undefined);
+    mocks.getReferenceState.mockResolvedValue(FREE);
   });
-
-  it("未参照のオブジェクトを削除して待機レコードを解消する", async () => {
-    await expect(retryPendingR2ObjectDeletions(NOW, 25)).resolves.toEqual({
-      examined: 1,
-      deleted: 1,
-      failed: 0,
-      skipped: 0,
-    });
-    expect(mocks.findMany).toHaveBeenCalledWith({
-      take: 25,
-      orderBy: { updatedAt: "asc" },
-    });
-    expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/user/old.m4a");
+  it("キュー登録を削除より先に実行する", async () => {
+    await requestR2ObjectDeletion("k", NOW);
+    expect(mocks.upsert).toHaveBeenCalled();
+    expect(mocks.deleteFromR2).toHaveBeenCalledWith("k");
+    expect(mocks.upsert.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.deleteFromR2.mock.invocationCallOrder[0],
+    );
     expect(mocks.deleteMany).toHaveBeenCalledWith({
-      where: { objectKey: "audio/user/old.m4a" },
+      where: { objectKey: "k" },
     });
-    expect(mocks.update).not.toHaveBeenCalled();
   });
-
-  it("R2削除失敗を次回の再試行用に記録する", async () => {
-    mocks.deleteFromR2.mockRejectedValueOnce(new Error("R2 unavailable"));
-
-    await expect(retryPendingR2ObjectDeletions(NOW)).resolves.toEqual({
-      examined: 1,
-      deleted: 0,
-      failed: 1,
-      skipped: 0,
-    });
-    expect(mocks.update).toHaveBeenCalledWith({
-      where: { objectKey: "audio/user/old.m4a" },
-      data: {
-        attemptCount: { increment: 1 },
-        lastAttemptAt: NOW,
-        lastError: "R2 unavailable",
-      },
-    });
-    expect(mocks.deleteMany).not.toHaveBeenCalled();
-  });
-
-  it("参照確認失敗も記録して他の処理を止めない", async () => {
-    mocks.getReferenceState.mockRejectedValueOnce(new Error("DB unavailable"));
-
-    await expect(retryPendingR2ObjectDeletions(NOW)).resolves.toEqual({
-      examined: 1,
-      deleted: 0,
-      failed: 1,
-      skipped: 0,
-    });
-    expect(mocks.update).toHaveBeenCalledWith({
-      where: { objectKey: "audio/user/old.m4a" },
-      data: {
-        attemptCount: { increment: 1 },
-        lastAttemptAt: NOW,
-        lastError: "DB unavailable",
-      },
-    });
+  it("キュー登録失敗時はR2削除を実行しない", async () => {
+    mocks.upsert.mockRejectedValue(new Error("db"));
+    await expect(requestR2ObjectDeletion("k", NOW)).resolves.toBe("failed");
     expect(mocks.deleteFromR2).not.toHaveBeenCalled();
   });
-
-  it("再参照されたオブジェクトは待機状態のまま削除しない", async () => {
-    mocks.getReferenceState.mockResolvedValueOnce({
-      ...UNREFERENCED,
+  it("参照中のオブジェクトは24時間後へ延期する", async () => {
+    mocks.getReferenceState.mockResolvedValue({
+      ...FREE,
       referencedByCurrentProfile: true,
     });
-
-    await expect(retryPendingR2ObjectDeletions(NOW)).resolves.toEqual({
-      examined: 1,
-      deleted: 0,
-      failed: 0,
-      skipped: 1,
+    await expect(processPendingR2ObjectDeletion("k", NOW)).resolves.toBe(
+      "skipped",
+    );
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { nextAttemptAt: new Date("2026-08-14T07:00:00.000Z") },
+      }),
+    );
+  });
+  it("削除失敗は1時間後へ再試行する", async () => {
+    mocks.deleteFromR2.mockRejectedValue(new Error("r2"));
+    await processPendingR2ObjectDeletion("k", NOW);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          nextAttemptAt: new Date("2026-08-13T08:00:00.000Z"),
+        }),
+      }),
+    );
+  });
+  it("findUnique失敗は1時間後の再試行を記録する", async () => {
+    mocks.findUnique.mockRejectedValueOnce(new Error("db unavailable"));
+    await expect(processPendingR2ObjectDeletion("k", NOW)).resolves.toBe(
+      "failed",
+    );
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          nextAttemptAt: new Date("2026-08-13T08:00:00.000Z"),
+        }),
+      }),
+    );
+  });
+  it("試行回数が多い場合も再試行間隔を24時間に制限する", async () => {
+    mocks.findUnique.mockResolvedValueOnce({ objectKey: "k", attemptCount: 5 });
+    mocks.deleteFromR2.mockRejectedValueOnce(new Error("r2"));
+    await processPendingR2ObjectDeletion("k", NOW);
+    expect(mocks.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          nextAttemptAt: new Date("2026-08-14T07:00:00.000Z"),
+        }),
+      }),
+    );
+  });
+  it("期限到来分を指定順序で選択する", async () => {
+    await retryPendingR2ObjectDeletions(NOW, 25);
+    expect(mocks.findMany).toHaveBeenCalledWith({
+      where: { nextAttemptAt: { lte: NOW } },
+      take: 25,
+      orderBy: [{ nextAttemptAt: "asc" }, { updatedAt: "asc" }],
     });
-    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
-    expect(mocks.deleteMany).not.toHaveBeenCalled();
-    expect(mocks.update).not.toHaveBeenCalled();
   });
 });
