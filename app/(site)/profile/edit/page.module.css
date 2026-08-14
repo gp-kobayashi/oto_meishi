@@ -63,7 +63,8 @@
   align-items: center;
   padding: 8px 14px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid #2563eb;
+  background: #ffffff;
   color: #1d4ed8;
   font-size: 0.85rem;
   font-weight: 700;
@@ -290,6 +291,7 @@
   justify-self: start;
   border: 1px solid #b91c1c;
   border-radius: 12px;
+  margin-top: 6px;
   padding: 10px 16px;
   background: #dc2626;
   color: #ffffff;
