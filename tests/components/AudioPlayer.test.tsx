@@ -32,9 +32,9 @@ describe("AudioPlayer", () => {
     );
   });
 
-  const setMediaPreferences = (mobile: boolean, reducedMotion: boolean) => {
+  const setMediaPreferences = (reducedMotion: boolean) => {
     vi.stubGlobal("matchMedia", (query: string) => ({
-      matches: query.includes("max-width") ? mobile : reducedMotion,
+      matches: query.includes("prefers-reduced-motion") && reducedMotion,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }));
@@ -62,8 +62,8 @@ describe("AudioPlayer", () => {
     act(() => resizeObserverCallback?.([], {} as ResizeObserver));
   };
 
-  it("モバイルでタイトルが溢れる場合はスクロール設定を付与する", () => {
-    setMediaPreferences(true, false);
+  it("タイトルが溢れる場合はスクロール設定を付与する", () => {
+    setMediaPreferences(false);
     const { container } = render(
       <AudioPlayer userId="sample-user" audioTitle="とても長い音声タイトル" />,
     );
@@ -80,12 +80,12 @@ describe("AudioPlayer", () => {
   });
 
   it.each([
-    ["短いタイトル", true, false, 100, 100],
-    ["reduced motion", true, true, 100, 220],
+    ["短いタイトル", false, 100, 100],
+    ["reduced motion", true, 100, 220],
   ])(
     "%sではタイトルをスクロールしない",
-    (_label, mobile, reducedMotion, width, scrollWidth) => {
-      setMediaPreferences(mobile, reducedMotion);
+    (_label, reducedMotion, width, scrollWidth) => {
+      setMediaPreferences(reducedMotion);
       const { container } = render(
         <AudioPlayer userId="sample-user" audioTitle="タイトル" />,
       );

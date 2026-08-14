@@ -45,14 +45,12 @@ const AudioPlayer = ({
       return;
     }
 
-    const mobileQuery = window.matchMedia("(max-width: 780px)");
     const reducedMotionQuery = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     );
     const updateTitleScrolling = () => {
       const distance = Math.max(0, text.scrollWidth - viewport.clientWidth);
-      const shouldScroll =
-        mobileQuery.matches && !reducedMotionQuery.matches && distance > 1;
+      const shouldScroll = !reducedMotionQuery.matches && distance > 1;
       setTitleScrollDistance(distance);
       setIsTitleScrolling(shouldScroll);
     };
@@ -65,13 +63,11 @@ const AudioPlayer = ({
     resizeObserver?.observe(viewport);
     resizeObserver?.observe(text);
     window.addEventListener("resize", updateTitleScrolling);
-    mobileQuery.addEventListener?.("change", updateTitleScrolling);
     reducedMotionQuery.addEventListener?.("change", updateTitleScrolling);
 
     return () => {
       resizeObserver?.disconnect();
       window.removeEventListener("resize", updateTitleScrolling);
-      mobileQuery.removeEventListener?.("change", updateTitleScrolling);
       reducedMotionQuery.removeEventListener?.("change", updateTitleScrolling);
     };
   }, [audioTitle]);

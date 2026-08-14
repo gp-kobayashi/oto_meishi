@@ -148,7 +148,7 @@
   vertical-align: top;
 }
 
-@media (max-width: 780px) and (prefers-reduced-motion: no-preference) {
+@media (prefers-reduced-motion: no-preference) {
   .titleViewportScrolling .titleText {
     max-width: none;
     overflow: visible;
