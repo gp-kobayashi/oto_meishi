@@ -347,16 +347,19 @@
   gap: 10px;
 }
 
-.fixedSaveControls {
-  position: fixed;
-  right: max(24px, env(safe-area-inset-right));
-  bottom: max(24px, env(safe-area-inset-bottom));
+.stickySaveControls {
+  position: sticky;
+  top: 16px;
+  justify-self: end;
+  margin-right: max(5%, calc((100% - 980px) / 2));
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
-  max-width: calc(100vw - 48px);
+  width: fit-content;
+  max-width: 100%;
   box-sizing: border-box;
   padding: 10px;
   border: 3px solid rgba(148, 163, 184, 0.3);
@@ -366,14 +369,16 @@
   backdrop-filter: blur(12px);
 }
 
-.fixedSaveControls .saveButton {
+.stickySaveControls .saveButton {
   order: 2;
   flex: none;
 }
 
-.fixedSaveControls .saveMessage {
+.stickySaveControls .saveMessage {
   order: 1;
+  flex: 1 1 12rem;
   min-width: 0;
+  max-width: min(28rem, 100%);
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -688,23 +693,21 @@
     padding: 22px 12px 120px;
   }
 
-  .fixedSaveControls {
-    right: max(12px, env(safe-area-inset-right));
-    left: max(12px, env(safe-area-inset-left));
-    bottom: max(12px, env(safe-area-inset-bottom));
+  .stickySaveControls {
+    top: 12px;
+    width: fit-content;
+    max-width: 100%;
+    margin-right: 0;
+  }
+
+  .stickySaveControls .saveButton {
     width: auto;
-    max-width: none;
-    flex-direction: column;
-    align-items: stretch;
+    max-width: 100%;
   }
 
-  .fixedSaveControls .saveButton {
-    width: 100%;
-    max-width: none;
-  }
-
-  .fixedSaveControls .saveMessage {
-    width: 100%;
+  .stickySaveControls .saveMessage {
+    width: auto;
+    max-width: 100%;
   }
 
   .cardEditor {

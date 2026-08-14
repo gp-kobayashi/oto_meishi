@@ -650,43 +650,44 @@ export default function ProfileEditPage() {
         ) : !profile ? (
           <p className={styles.error}>ユーザーIDが設定されていません。</p>
         ) : (
-          <article className={`${styles.cardEditor} ${styles[profile.theme]}`}>
+          <>
             <ProfileSaveControls
               state={saveState}
               message={saveMessage}
               onSave={handleSave}
-              className={styles.fixedSaveControls}
+              className={styles.stickySaveControls}
             />
-            <div className={styles.cardTopBar}>
-              <div>
-                <p className={styles.cardBadge}>編集モード</p>
-              </div>
-              <div className={styles.actionsRow}>
-                <button
-                  type="button"
-                  className={styles.previewButton}
-                  onClick={() => setPreviewOpen(true)}
-                >
-                  公開表示をプレビュー
-                </button>
-                <div className={styles.themeOptions}>
-                  {themeOptions.map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`${styles.themeButton} ${
-                        profile.theme === option.value ? styles.active : ""
-                      }`}
-                      onClick={() => updateField("theme", option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  ))}
+            <article className={`${styles.cardEditor} ${styles[profile.theme]}`}>
+              <div className={styles.cardTopBar}>
+                <div>
+                  <p className={styles.cardBadge}>編集モード</p>
+                </div>
+                <div className={styles.actionsRow}>
+                  <button
+                    type="button"
+                    className={styles.previewButton}
+                    onClick={() => setPreviewOpen(true)}
+                  >
+                    公開表示をプレビュー
+                  </button>
+                  <div className={styles.themeOptions}>
+                    {themeOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={`${styles.themeButton} ${
+                          profile.theme === option.value ? styles.active : ""
+                        }`}
+                        onClick={() => updateField("theme", option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className={styles.cardBody}>
+              <div className={styles.cardBody}>
               {profileModerationCase ? (
                 <ModerationNotice moderationCase={profileModerationCase} />
               ) : null}
@@ -1003,7 +1004,8 @@ export default function ProfileEditPage() {
                 </section>
               </div>
             ) : null}
-          </article>
+            </article>
+          </>
         )}
       </section>
     </section>
