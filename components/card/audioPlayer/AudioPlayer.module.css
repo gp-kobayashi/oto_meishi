@@ -38,7 +38,11 @@
   background: var(--player-button-bg);
   color: var(--player-button-color);
   cursor: pointer;
-  transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease, color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease,
+    background 0.2s ease,
+    color 0.2s ease;
 }
 
 .playButton:hover {
@@ -75,7 +79,9 @@
   height: 100%;
   background: var(--player-bar-fill);
   border-radius: 3px;
-  transition: width 0.15s linear, background 0.5s ease;
+  transition:
+    width 0.15s linear,
+    background 0.5s ease;
 }
 
 .progressThumb {
@@ -89,7 +95,9 @@
   transform: translate(-50%, -50%);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   opacity: 0;
-  transition: opacity 0.2s, background 0.5s ease;
+  transition:
+    opacity 0.2s,
+    background 0.5s ease;
 }
 
 .progressBar:hover .progressThumb {
@@ -121,8 +129,46 @@
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   transition: color 0.5s ease;
+}
+
+.titleViewport {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.titleText {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: top;
+}
+
+@media (max-width: 780px) and (prefers-reduced-motion: no-preference) {
+  .titleViewportScrolling .titleText {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+    animation: title-scroll 10s linear infinite;
+  }
+}
+
+@keyframes title-scroll {
+  0%,
+  30% {
+    transform: translateX(0);
+  }
+
+  60%,
+  90% {
+    transform: translateX(calc(-1 * var(--title-scroll-distance)));
+  }
+
+  100% {
+    transform: translateX(0);
+  }
 }

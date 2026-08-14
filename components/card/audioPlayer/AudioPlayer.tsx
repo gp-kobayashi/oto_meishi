@@ -22,12 +22,59 @@ const AudioPlayer = ({
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
+  const titleViewportRef = useRef<HTMLSpanElement>(null);
+  const titleTextRef = useRef<HTMLSpanElement>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [playbackError, setPlaybackError] = useState("");
+
+  const [isTitleScrolling, setIsTitleScrolling] = useState(false);
+  const [titleScrollDistance, setTitleScrollDistance] = useState(0);
+
+  useEffect(() => {
+    const viewport = titleViewportRef.current;
+    const text = titleTextRef.current;
+    if (!viewport || !text || typeof window === "undefined") {
+      return;
+    }
+
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mobileQuery = window.matchMedia("(max-width: 780px)");
+    const reducedMotionQuery = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
+    const updateTitleScrolling = () => {
+      const distance = Math.max(0, text.scrollWidth - viewport.clientWidth);
+      const shouldScroll =
+        mobileQuery.matches && !reducedMotionQuery.matches && distance > 1;
+      setTitleScrollDistance(distance);
+      setIsTitleScrolling(shouldScroll);
+    };
+
+    updateTitleScrolling();
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(updateTitleScrolling);
+    resizeObserver?.observe(viewport);
+    resizeObserver?.observe(text);
+    window.addEventListener("resize", updateTitleScrolling);
+    mobileQuery.addEventListener?.("change", updateTitleScrolling);
+    reducedMotionQuery.addEventListener?.("change", updateTitleScrolling);
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", updateTitleScrolling);
+      mobileQuery.removeEventListener?.("change", updateTitleScrolling);
+      reducedMotionQuery.removeEventListener?.("change", updateTitleScrolling);
+    };
+  }, [audioTitle]);
 
   /* ---------- audio イベント ---------- */
   useEffect(() => {
@@ -75,7 +122,9 @@ const AudioPlayer = ({
           audio.src = result.audioUrl;
         } catch (error) {
           setPlaybackError(
-            error instanceof Error ? error.message : "音声を再生できませんでした。",
+            error instanceof Error
+              ? error.message
+              : "音声を再生できませんでした。",
           );
           return;
         } finally {
@@ -101,7 +150,10 @@ const AudioPlayer = ({
       if (!audio || !bar || !duration) return;
 
       const rect = bar.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      const ratio = Math.max(
+        0,
+        Math.min(1, (e.clientX - rect.left) / rect.width),
+      );
       audio.currentTime = ratio * duration;
     },
     [duration],
@@ -129,13 +181,21 @@ const AudioPlayer = ({
         >
           {isPlaying ? (
             /* Pause アイコン */
-            <svg viewBox="0 0 24 24" className={styles.icon} fill="currentColor">
+            <svg
+              viewBox="0 0 24 24"
+              className={styles.icon}
+              fill="currentColor"
+            >
               <rect x="6" y="4" width="4" height="16" rx="1" />
               <rect x="14" y="4" width="4" height="16" rx="1" />
             </svg>
           ) : (
             /* Play アイコン */
-            <svg viewBox="0 0 24 24" className={styles.icon} fill="currentColor">
+            <svg
+              viewBox="0 0 24 24"
+              className={styles.icon}
+              fill="currentColor"
+            >
               <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11.06-6.86a1 1 0 0 0 0-1.72L9.5 4.28a1 1 0 0 0-1.5.86z" />
             </svg>
           )}
@@ -168,11 +228,28 @@ const AudioPlayer = ({
           {formatTime(duration)}
         </p>
       </div>
-      <p className={styles.title}>{audioTitle}</p>
+      <p className={styles.title}>
+        <span
+          ref={titleViewportRef}
+          className={`${styles.titleViewport} ${isTitleScrolling ? styles.titleViewportScrolling : ""}`}
+          style={
+            isTitleScrolling
+              ? ({
+                  "--title-scroll-distance": `${titleScrollDistance}px`,
+                } as React.CSSProperties)
+              : undefined
+          }
+        >
+          <span ref={titleTextRef} className={styles.titleText}>
+            {audioTitle}
+          </span>
+        </span>
+      </p>
       {playbackError ? (
-        <p className={styles.title} role="alert">{playbackError}</p>
+        <p className={styles.title} role="alert">
+          {playbackError}
+        </p>
       ) : null}
-
     </div>
   );
 };
