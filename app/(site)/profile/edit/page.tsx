@@ -801,7 +801,7 @@ export default function ProfileEditPage() {
                     </p>
                   ) : null}
                   {(audioPreviewUrl || profile.audioKey || profile.audioUrl) && (
-                    <div>
+                    <div className={styles.audioPreview}>
                       {audioPreviewUrl ? (
                         <audio
                           controls

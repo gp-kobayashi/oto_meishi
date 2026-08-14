@@ -234,8 +234,20 @@
   max-width: 100%;
   box-sizing: border-box;
   border-radius: 16px;
-  background: #f8fafc;
+  border: 1px solid var(--editor-input-border);
+  background: var(--editor-input-bg);
   margin-top: 10px;
+}
+
+.audioPreview {
+  --card-text-secondary: #334155;
+  --player-bg: #f8fafc;
+  --player-border: 1px solid #cbd5e1;
+  --player-button-bg: #ffffff;
+  --player-button-border: 2px solid #64748b;
+  --player-button-color: #1e3a8a;
+  --player-bar-bg: #cbd5e1;
+  --player-bar-fill: #2563eb;
 }
 
 .uploadZoneLabel {
@@ -796,8 +808,30 @@
   color: #e2e8f0;
 }
 
+.dark .audioPreview {
+  --card-text-secondary: #e2e8f0;
+  --player-bg: #1e293b;
+  --player-border: 1px solid #64748b;
+  --player-button-bg: #0f172a;
+  --player-button-border: 2px solid #a78bfa;
+  --player-button-color: #c4b5fd;
+  --player-bar-bg: #475569;
+  --player-bar-fill: #a78bfa;
+}
+
 .light {
   background: linear-gradient(180deg, rgba(255, 249, 236, 0.95), #fef3c7);
+}
+
+.light .audioPreview {
+  --card-text-secondary: #78350f;
+  --player-bg: #fffbeb;
+  --player-border: 1px solid #f59e0b;
+  --player-button-bg: #ffffff;
+  --player-button-border: 2px solid #d97706;
+  --player-button-color: #92400e;
+  --player-bar-bg: #fde68a;
+  --player-bar-fill: #d97706;
 }
 
 .colorful {
@@ -813,6 +847,17 @@
   --editor-error: #fecaca;
   background: linear-gradient(180deg, rgba(14, 12, 73, 0.9), #4338ca);
   color: #f8fafc;
+}
+
+.colorful .audioPreview {
+  --card-text-secondary: #e0e7ff;
+  --player-bg: #1e1b4b;
+  --player-border: 1px solid #818cf8;
+  --player-button-bg: #312e81;
+  --player-button-border: 2px solid #f9a8d4;
+  --player-button-color: #fbcfe8;
+  --player-bar-bg: #4338ca;
+  --player-bar-fill: #22d3ee;
 }
 
 @media (max-width: 960px) {
