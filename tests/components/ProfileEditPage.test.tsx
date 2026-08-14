@@ -218,6 +218,11 @@ describe("ProfileEditPage", () => {
         .getByRole("button", { name: "PC表示" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+    expect(
+      dialog
+        .querySelector("[data-display-mode]")
+        ?.getAttribute("data-display-mode"),
+    ).toBe("responsive");
 
     fireEvent.click(
       within(dialog).getByRole("button", {
@@ -229,6 +234,17 @@ describe("ProfileEditPage", () => {
         .getByRole("button", { name: "スマートフォン表示" })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+    expect(
+      dialog
+        .querySelector("[data-display-mode]")
+        ?.getAttribute("data-display-mode"),
+    ).toBe("mobile");
+    fireEvent.click(within(dialog).getByRole("button", { name: "PC表示" }));
+    expect(
+      dialog
+        .querySelector("[data-display-mode]")
+        ?.getAttribute("data-display-mode"),
+    ).toBe("responsive");
     expect(
       fetchMock.mock.calls.filter(([, init]) => init?.method === "POST"),
     ).toHaveLength(0);

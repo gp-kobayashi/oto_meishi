@@ -994,6 +994,9 @@ export default function ProfileEditPage() {
                       <Card
                         link={previewProfile}
                         previewAudioUrl={audioPreviewUrl}
+                        displayMode={
+                          previewMode === "mobile" ? "mobile" : "responsive"
+                        }
                       />
                     </div>
                   </div>

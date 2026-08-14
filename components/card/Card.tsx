@@ -11,10 +11,12 @@ const Card = ({
   link,
   showReportMenu = false,
   previewAudioUrl = "",
+  displayMode = "responsive",
 }: {
   link: ProfileData;
   showReportMenu?: boolean;
   previewAudioUrl?: string;
+  displayMode?: "responsive" | "mobile";
 }) => {
   const {
     userId,
@@ -30,7 +32,12 @@ const Card = ({
   const themeClass = styles[theme] || styles.normal;
 
   return (
-    <div className={`${styles.card} ${themeClass}`}>
+    <div
+      className={`${styles.card} ${themeClass} ${
+        displayMode === "mobile" ? styles.mobileMode : ""
+      }`}
+      data-display-mode={displayMode}
+    >
       <Background theme={theme} />
       {showReportMenu ? <ReportMenu profileId={link.id} /> : null}
       <h2 id="profile-title" className={styles.title}>

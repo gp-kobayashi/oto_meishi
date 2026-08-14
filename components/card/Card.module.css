@@ -53,6 +53,11 @@
   }
 }
 
+.mobileMode {
+  padding: 24px;
+  border-radius: 32px;
+}
+
 /* Theme Custom Variables */
 .normal {
   --card-bg: rgba(255, 255, 255, 0.45);
