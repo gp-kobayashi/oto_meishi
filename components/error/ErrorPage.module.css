@@ -1,0 +1,152 @@
+.page {
+  display: grid;
+  min-height: 100svh;
+  box-sizing: border-box;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--background, #ffffff);
+  color: var(--foreground, #171717);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.card {
+  width: min(100%, 560px);
+  box-sizing: border-box;
+  padding: clamp(28px, 6vw, 52px);
+  border: 1px solid #dbe7f1;
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(15, 67, 105, 0.12);
+  text-align: center;
+}
+
+.brand {
+  margin: 0 0 16px;
+  color: #1677c2;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+}
+
+.card h1 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(1.45rem, 4vw, 2rem);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.description {
+  max-width: 38rem;
+  margin: 16px auto 0;
+  color: #475569;
+  font-size: 1rem;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.homeLink,
+.retryButton {
+  display: inline-flex;
+  min-height: 44px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.homeLink {
+  border: 1px solid #1677c2;
+  background: #1677c2;
+  color: #ffffff;
+}
+
+.homeLink:hover {
+  border-color: #135f9e;
+  background: #135f9e;
+}
+
+.retryButton {
+  border: 1px solid #bfd7ea;
+  background: #eef6fd;
+  color: #135f9e;
+}
+
+.retryButton:hover {
+  border-color: #8ab9dc;
+  background: #dceefb;
+}
+
+.homeLink:focus-visible,
+.retryButton:focus-visible {
+  outline: 3px solid rgba(22, 119, 194, 0.38);
+  outline-offset: 3px;
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 20px 12px;
+  }
+
+  .card {
+    padding: 30px 20px;
+    border-radius: 18px;
+  }
+
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .homeLink,
+  .retryButton {
+    width: 100%;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .page {
+    background: var(--background, #0a0a0a);
+  }
+
+  .card {
+    border-color: #334155;
+    background: #111827;
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+  }
+
+  .card h1 {
+    color: #f8fafc;
+  }
+
+  .description {
+    color: #cbd5e1;
+  }
+
+  .retryButton {
+    border-color: #416b8b;
+    background: #172b3b;
+    color: #b9dcf5;
+  }
+
+  .retryButton:hover {
+    border-color: #6b9bc0;
+    background: #1d3c54;
+  }
+}
