@@ -25,6 +25,10 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
   const testRunId = crypto.randomUUID();
   const testUserId = `integration-moderation-${testRunId}`;
   const testAdminAuthId = `integration-moderation-admin-${testRunId}`;
+  const audioKey = `audio/${testRunId}/evidence.m4a`;
+  const audioContentHash = "a".repeat(64);
+  const initialSnapshotExpiresAt = new Date("2026-08-02T00:00:00.000Z");
+  const initialLifecycleRetainUntil = new Date("2026-08-03T00:00:00.000Z");
   let profileId = "";
   let caseId = "";
   let snapshotId = "";
@@ -55,12 +59,15 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
     const profile = await prisma.profile.create({
       data: {
         userId: testUserId,
-        status: "hidden",
+        status: "active",
         displayName: "ロールバック確認用",
         bio: "統合テスト用データ",
         theme: "normal",
         audioUrl: "",
+        audioKey,
+        audioContentHash,
         audioTitle: "",
+        audioStatus: "hidden",
       },
       select: { id: true },
     });
@@ -69,7 +76,7 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
     const moderationCase = await prisma.moderationCase.create({
       data: {
         profileId,
-        targetType: "profile",
+        targetType: "audio",
         targetId: profileId,
         reasonCode: "other",
         reviewMode: "preReview",
@@ -84,16 +91,20 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
       data: {
         moderationCaseId: caseId,
         kind: "corrected",
-        content: {
-          displayName: "ロールバック確認用",
-          bio: "統合テスト用データ",
-          theme: "normal",
-        },
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        content: { audioKey },
+        contentHash: audioContentHash,
+        storageObjectKey: audioKey,
+        expiresAt: initialSnapshotExpiresAt,
       },
       select: { id: true },
     });
     snapshotId = snapshot.id;
+    await prisma.moderationSnapshotEvidenceLifecycle.create({
+      data: {
+        snapshotId,
+        retainUntil: initialLifecycleRetainUntil,
+      },
+    });
   });
 
   afterAll(async () => {
@@ -148,10 +159,17 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
       error: "審査結果を保存できませんでした。",
     });
 
-    const [profile, moderationCase, actionCount, eventCount] = await Promise.all([
+    const [
+      profile,
+      moderationCase,
+      actionCount,
+      eventCount,
+      snapshot,
+      evidenceLifecycle,
+    ] = await Promise.all([
       prisma.profile.findUnique({
         where: { id: profileId },
-        select: { status: true },
+        select: { audioStatus: true },
       }),
       prisma.moderationCase.findUnique({
         where: { id: caseId },
@@ -159,15 +177,28 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
       }),
       prisma.moderationAction.count({ where: { profileId } }),
       prisma.moderationCaseEvent.count({ where: { moderationCaseId: caseId } }),
+      prisma.moderationSnapshot.findUnique({
+        where: { id: snapshotId },
+        select: { expiresAt: true },
+      }),
+      prisma.moderationSnapshotEvidenceLifecycle.findUnique({
+        where: { snapshotId },
+        select: { retainUntil: true, deletedAt: true },
+      }),
     ]);
 
-    expect(profile?.status).toBe("hidden");
+    expect(profile?.audioStatus).toBe("hidden");
     expect(moderationCase).toEqual({
       status: "preReviewPending",
       resolvedAt: null,
     });
     expect(actionCount).toBe(0);
     expect(eventCount).toBe(0);
+    expect(snapshot).toEqual({ expiresAt: initialSnapshotExpiresAt });
+    expect(evidenceLifecycle).toEqual({
+      retainUntil: initialLifecycleRetainUntil,
+      deletedAt: null,
+    });
   });
 
   it("500文字の審査理由でケース・履歴・通知を保存する", async () => {
@@ -195,11 +226,19 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
 
     expect(response.status).toBe(200);
 
-    const [profile, moderationCase, moderationAction, notification, event] =
+    const [
+      profile,
+      moderationCase,
+      moderationAction,
+      notification,
+      event,
+      snapshotAfterReview,
+      evidenceLifecycle,
+    ] =
       await Promise.all([
         prisma.profile.findUnique({
           where: { id: profileId },
-          select: { status: true },
+          select: { audioStatus: true },
         }),
         prisma.moderationCase.findUnique({
           where: { id: caseId },
@@ -217,9 +256,17 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
           where: { moderationCaseId: caseId },
           select: { eventType: true },
         }),
+        prisma.moderationSnapshot.findUnique({
+          where: { id: snapshotId },
+          select: { storageObjectKey: true, expiresAt: true },
+        }),
+        prisma.moderationSnapshotEvidenceLifecycle.findUnique({
+          where: { snapshotId },
+          select: { retainUntil: true, deletedAt: true },
+        }),
       ]);
 
-    expect(profile?.status).toBe("active");
+    expect(profile?.audioStatus).toBe("active");
     expect(moderationCase).toEqual({
       status: "confirmed",
       resolvedAt: expect.any(Date),
@@ -227,5 +274,20 @@ describe("管理者ケース審査のロールバック統合テスト", () => {
     expect(moderationAction).toEqual({ reason });
     expect(notification).toEqual({ message: reason });
     expect(event).toEqual({ eventType: "reviewApproved" });
+    expect(snapshotAfterReview).toEqual({
+      storageObjectKey: audioKey,
+      expiresAt: initialSnapshotExpiresAt,
+    });
+    expect(evidenceLifecycle).toEqual({
+      retainUntil: expect.any(Date),
+      deletedAt: null,
+    });
+    expect(moderationCase?.resolvedAt).toEqual(expect.any(Date));
+    expect(
+      evidenceLifecycle?.retainUntil?.getTime(),
+    ).toBe(
+      (moderationCase?.resolvedAt?.getTime() ?? 0) +
+        60 * 24 * 60 * 60 * 1000,
+    );
   });
 });

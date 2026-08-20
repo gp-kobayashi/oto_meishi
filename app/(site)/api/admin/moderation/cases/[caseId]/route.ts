@@ -226,12 +226,12 @@ export async function PATCH(
             retentionExpiresAt: evidenceRetentionExpiresAt,
           },
         });
-        await tx.moderationSnapshot.updateMany({
+        await tx.moderationSnapshotEvidenceLifecycle.updateMany({
           where: {
-            moderationCaseId: moderationCase.id,
-            storageObjectKey: { not: null },
+            snapshot: { moderationCaseId: moderationCase.id },
+            deletedAt: null,
           },
-          data: { expiresAt: evidenceRetentionExpiresAt },
+          data: { retainUntil: evidenceRetentionExpiresAt },
         });
         await tx.moderationCaseEvent.create({
           data: {

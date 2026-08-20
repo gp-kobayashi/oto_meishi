@@ -6,7 +6,7 @@ const { mocks } = vi.hoisted(() => ({
     transaction: vi.fn(),
     caseFindUnique: vi.fn(),
     caseUpdate: vi.fn(),
-    snapshotUpdateMany: vi.fn(),
+    evidenceLifecycleUpdateMany: vi.fn(),
     eventCreate: vi.fn(),
     profileUpdate: vi.fn(),
     linkFindUnique: vi.fn(),
@@ -100,7 +100,9 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
           findUnique: mocks.caseFindUnique,
           update: mocks.caseUpdate,
         },
-        moderationSnapshot: { updateMany: mocks.snapshotUpdateMany },
+        moderationSnapshotEvidenceLifecycle: {
+          updateMany: mocks.evidenceLifecycleUpdateMany,
+        },
         moderationCaseEvent: { create: mocks.eventCreate },
         profile: { update: mocks.profileUpdate },
         socialLink: {
@@ -141,12 +143,12 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
         retentionExpiresAt: expect.any(Date),
       },
     });
-    expect(mocks.snapshotUpdateMany).toHaveBeenCalledWith({
+    expect(mocks.evidenceLifecycleUpdateMany).toHaveBeenCalledWith({
       where: {
-        moderationCaseId: "case-1",
-        storageObjectKey: { not: null },
+        snapshot: { moderationCaseId: "case-1" },
+        deletedAt: null,
       },
-      data: { expiresAt: expect.any(Date) },
+      data: { retainUntil: expect.any(Date) },
     });
     expect(mocks.eventCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
