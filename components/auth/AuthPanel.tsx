@@ -3,6 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import {
+  getAuthErrorPresentation,
+  type AuthErrorContext,
+} from "@/lib/authErrorMessages";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./AuthPanel.module.css";
 
@@ -22,6 +26,12 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
     "google" | "facebook" | null
   >(null);
 
+  const handleAuthError = (error: unknown, context: AuthErrorContext) => {
+    const presentation = getAuthErrorPresentation(error, context);
+    setError(presentation.message);
+    console.error(presentation.logContext);
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -30,8 +40,9 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
 
     try {
       if (!supabase) {
-        setError(
-          "Supabase の環境変数が設定されていません。まずは .env.local に URL と anon key を設定してください。",
+        handleAuthError(
+          { code: "client_not_configured" },
+          isSignup ? "signup" : "login",
         );
         return;
       }
@@ -62,7 +73,7 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
         router.replace("/profile");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "認証に失敗しました。");
+      handleAuthError(err, isSignup ? "signup" : "login");
     } finally {
       setIsSubmitting(false);
     }
@@ -74,27 +85,29 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
     setIsProviderLoading(provider);
 
     if (!supabase) {
-      setError(
-        "Supabase の環境変数が設定されていません。まずは .env.local に URL と anon key を設定してください。",
-      );
+      handleAuthError({ code: "client_not_configured" }, "oauth");
       setIsProviderLoading(null);
       return;
     }
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/profile`,
-        queryParams:
-          provider === "google" ? { prompt: "select_account" } : undefined,
-      },
-    });
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/profile`,
+          queryParams:
+            provider === "google" ? { prompt: "select_account" } : undefined,
+        },
+      });
 
-    if (error) {
-      setError(error.message);
+      if (error) {
+        handleAuthError(error, "oauth");
+      }
+    } catch (err) {
+      handleAuthError(err, "oauth");
+    } finally {
+      setIsProviderLoading(null);
     }
-
-    setIsProviderLoading(null);
   };
 
   return (
@@ -174,7 +187,11 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
           onChange={(event) => setPassword(event.target.value)}
         />
 
-        {error && <p className={styles.error}>{error}</p>}
+        {error && (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        )}
         {message && <p className={styles.message}>{message}</p>}
 
         <button
@@ -194,7 +211,8 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
       {isSignup && (
         <p className={styles.terms}>
           登録することで、<Link href="/terms">利用規約</Link>と
-          <Link href="/privacy">プライバシーポリシー</Link>に同意したことになります。
+          <Link href="/privacy">プライバシーポリシー</Link>
+          に同意したことになります。
         </p>
       )}
 
