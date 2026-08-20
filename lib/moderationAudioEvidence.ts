@@ -2,7 +2,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 
 type AudioEvidenceReferenceClient = Pick<
   Prisma.TransactionClient,
-  "profile" | "moderationSnapshot"
+  "profile" | "moderationSnapshotEvidenceLifecycle"
 >;
 
 export type AudioObjectReferenceState = {
@@ -36,19 +36,23 @@ export async function getAudioObjectReferenceState(
       },
       select: { id: true },
     }),
-    client.moderationSnapshot.findFirst({
+    client.moderationSnapshotEvidenceLifecycle.findFirst({
       where: {
-        storageObjectKey: normalizedKey,
-        expiresAt: { gt: now },
+        deletedAt: null,
+        retainUntil: { gt: now },
+        snapshot: { storageObjectKey: normalizedKey },
       },
-      select: { id: true },
+      select: { snapshotId: true },
     }),
-      client.moderationSnapshot.findFirst({
+      client.moderationSnapshotEvidenceLifecycle.findFirst({
         where: {
-          storageObjectKey: normalizedKey,
-          moderationCase: { status: { not: "confirmed" } },
+          deletedAt: null,
+          snapshot: {
+            storageObjectKey: normalizedKey,
+            moderationCase: { status: { not: "confirmed" } },
+          },
         },
-        select: { id: true },
+        select: { snapshotId: true },
       }),
     ]);
 

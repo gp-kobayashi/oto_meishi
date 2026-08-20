@@ -8,8 +8,16 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   deleteFromR2: vi.fn(),
   getReferenceState: vi.fn(),
+  lifecycleUpdateMany: vi.fn(),
 }));
-vi.mock("@/lib/prisma", () => ({ prisma: { pendingR2ObjectDeletion: mocks } }));
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    pendingR2ObjectDeletion: mocks,
+    moderationSnapshotEvidenceLifecycle: {
+      updateMany: mocks.lifecycleUpdateMany,
+    },
+  },
+}));
 vi.mock("@/lib/r2Storage", () => ({ deleteFromR2: mocks.deleteFromR2 }));
 vi.mock("@/lib/moderationAudioEvidence", () => ({
   getAudioObjectReferenceState: mocks.getReferenceState,
@@ -117,6 +125,27 @@ describe("R2削除待機キュー", () => {
       where: { nextAttemptAt: { lte: NOW } },
       take: 25,
       orderBy: [{ nextAttemptAt: "asc" }, { updatedAt: "asc" }],
+    });
+  });
+  it("再試行成功後に期限切れの音声証拠を削除済みとして記録する", async () => {
+    mocks.findMany.mockResolvedValueOnce([{ objectKey: "audio/evidence.m4a" }]);
+
+    await expect(retryPendingR2ObjectDeletions(NOW, 25)).resolves.toEqual({
+      examined: 1,
+      deleted: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(mocks.lifecycleUpdateMany).toHaveBeenCalledWith({
+      where: {
+        deletedAt: null,
+        retainUntil: { lte: NOW },
+        snapshot: {
+          storageObjectKey: "audio/evidence.m4a",
+          moderationCase: { status: "confirmed" },
+        },
+      },
+      data: { deletedAt: NOW },
     });
   });
 });

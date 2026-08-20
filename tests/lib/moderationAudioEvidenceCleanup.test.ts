@@ -5,8 +5,10 @@ const { mocks } = vi.hoisted(() => ({
     findMany: vi.fn(),
     updateMany: vi.fn(),
     profileFindFirst: vi.fn(),
-    snapshotFindFirst: vi.fn(),
-    deleteFromR2: vi.fn(),
+    lifecycleFindFirst: vi.fn(),
+    lifecycleUpdateMany: vi.fn(),
+    requestR2ObjectDeletion: vi.fn(),
+    retryPendingR2ObjectDeletions: vi.fn(),
     pendingFindMany: vi.fn(),
     pendingDeleteMany: vi.fn(),
     pendingUpdate: vi.fn(),
@@ -16,10 +18,10 @@ const { mocks } = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     profile: { findFirst: mocks.profileFindFirst },
-    moderationSnapshot: {
+    moderationSnapshotEvidenceLifecycle: {
       findMany: mocks.findMany,
-      findFirst: mocks.snapshotFindFirst,
-      updateMany: mocks.updateMany,
+      findFirst: mocks.lifecycleFindFirst,
+      updateMany: mocks.lifecycleUpdateMany,
     },
     pendingR2ObjectDeletion: {
       findMany: mocks.pendingFindMany,
@@ -28,8 +30,9 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }));
-vi.mock("@/lib/r2Storage", () => ({
-  deleteFromR2: mocks.deleteFromR2,
+vi.mock("@/lib/pendingR2ObjectDeletion", () => ({
+  requestR2ObjectDeletion: mocks.requestR2ObjectDeletion,
+  retryPendingR2ObjectDeletions: mocks.retryPendingR2ObjectDeletions,
 }));
 
 import { cleanupExpiredModerationAudioEvidence } from "@/lib/moderationAudioEvidenceCleanup";
@@ -40,13 +43,19 @@ describe("期限切れモデレーション音声の削除", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.findMany.mockResolvedValue([
-      { storageObjectKey: "audio/user/expired.m4a" },
+      { snapshot: { storageObjectKey: "audio/user/expired.m4a" } },
     ]);
     mocks.profileFindFirst.mockResolvedValue(null);
-    mocks.snapshotFindFirst.mockResolvedValue(null);
-    mocks.deleteFromR2.mockResolvedValue(undefined);
+    mocks.lifecycleFindFirst.mockResolvedValue(null);
+    mocks.lifecycleUpdateMany.mockResolvedValue({ count: 2 });
+    mocks.requestR2ObjectDeletion.mockResolvedValue("deleted");
+    mocks.retryPendingR2ObjectDeletions.mockResolvedValue({
+      examined: 0,
+      deleted: 0,
+      failed: 0,
+      skipped: 0,
+    });
     mocks.pendingFindMany.mockResolvedValue([]);
-    mocks.updateMany.mockResolvedValue({ count: 2 });
   });
 
   it("参照されていない期限切れ音声を削除してDB参照を外す", async () => {
@@ -57,14 +66,20 @@ describe("期限切れモデレーション音声の削除", () => {
       failed: 0,
       pending: { examined: 0, deleted: 0, failed: 0, skipped: 0 },
     });
-    expect(mocks.deleteFromR2).toHaveBeenCalledWith("audio/user/expired.m4a");
-    expect(mocks.updateMany).toHaveBeenCalledWith({
+    expect(mocks.requestR2ObjectDeletion).toHaveBeenCalledWith(
+      "audio/user/expired.m4a",
+      now,
+    );
+    expect(mocks.lifecycleUpdateMany).toHaveBeenCalledWith({
       where: {
-        storageObjectKey: "audio/user/expired.m4a",
-        expiresAt: { lte: now },
-        moderationCase: { status: "confirmed" },
+        deletedAt: null,
+        retainUntil: { lte: now },
+        snapshot: {
+          storageObjectKey: "audio/user/expired.m4a",
+          moderationCase: { status: "confirmed" },
+        },
       },
-      data: { storageObjectKey: null },
+      data: { deletedAt: now },
     });
   });
 
@@ -74,17 +89,17 @@ describe("期限切れモデレーション音声の削除", () => {
     await expect(cleanupExpiredModerationAudioEvidence(now)).resolves.toEqual({
       examined: 1,
       deletedObjects: 0,
-      releasedReferences: 2,
+      releasedReferences: 0,
       failed: 0,
       pending: { examined: 0, deleted: 0, failed: 0, skipped: 0 },
     });
-    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
-    expect(mocks.updateMany).toHaveBeenCalledTimes(1);
+    expect(mocks.requestR2ObjectDeletion).not.toHaveBeenCalled();
+    expect(mocks.lifecycleUpdateMany).not.toHaveBeenCalled();
   });
 
   it("R2削除に失敗した場合はDB参照を残して次回再試行できる", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    mocks.deleteFromR2.mockRejectedValueOnce(new Error("R2 unavailable"));
+    mocks.requestR2ObjectDeletion.mockResolvedValueOnce("failed");
 
     await expect(cleanupExpiredModerationAudioEvidence(now)).resolves.toEqual({
       examined: 1,
@@ -93,20 +108,20 @@ describe("期限切れモデレーション音声の削除", () => {
       failed: 1,
       pending: { examined: 0, deleted: 0, failed: 0, skipped: 0 },
     });
-    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.lifecycleUpdateMany).not.toHaveBeenCalled();
   });
 
   it("未完了ケースが同じ音声を参照中ならR2を削除しない", async () => {
-    mocks.snapshotFindFirst.mockResolvedValueOnce(null);
-    mocks.snapshotFindFirst.mockResolvedValueOnce({ id: "snapshot-open" });
+    mocks.lifecycleFindFirst.mockResolvedValueOnce(null);
+    mocks.lifecycleFindFirst.mockResolvedValueOnce({ id: "lifecycle-open" });
 
     await expect(cleanupExpiredModerationAudioEvidence(now)).resolves.toEqual({
       examined: 1,
       deletedObjects: 0,
-      releasedReferences: 2,
+      releasedReferences: 0,
       failed: 0,
       pending: { examined: 0, deleted: 0, failed: 0, skipped: 0 },
     });
-    expect(mocks.deleteFromR2).not.toHaveBeenCalled();
+    expect(mocks.requestR2ObjectDeletion).not.toHaveBeenCalled();
   });
 });

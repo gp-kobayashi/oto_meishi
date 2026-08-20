@@ -123,6 +123,19 @@ export async function retryPendingR2ObjectDeletions(
   for (const item of pending) {
     const outcome = await processPendingR2ObjectDeletion(item.objectKey, now);
     result[outcome]++;
+    if (outcome === "deleted") {
+      await prisma.moderationSnapshotEvidenceLifecycle.updateMany({
+        where: {
+          deletedAt: null,
+          retainUntil: { lte: now },
+          snapshot: {
+            storageObjectKey: item.objectKey,
+            moderationCase: { status: "confirmed" },
+          },
+        },
+        data: { deletedAt: now },
+      });
+    }
   }
   return result;
 }

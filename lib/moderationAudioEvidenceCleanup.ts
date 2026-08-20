@@ -1,10 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { deleteFromR2 } from "@/lib/r2Storage";
 import {
   canDeleteAudioObject,
   getAudioObjectReferenceState,
 } from "@/lib/moderationAudioEvidence";
-import { retryPendingR2ObjectDeletions } from "@/lib/pendingR2ObjectDeletion";
+import {
+  requestR2ObjectDeletion,
+  retryPendingR2ObjectDeletions,
+} from "@/lib/pendingR2ObjectDeletion";
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 500;
@@ -30,30 +32,36 @@ export async function cleanupExpiredModerationAudioEvidence(
     Math.max(Math.trunc(requestedBatchSize), 1),
     MAX_BATCH_SIZE,
   );
-  const snapshots = await prisma.moderationSnapshot.findMany({
+  const lifecycleRows = await prisma.moderationSnapshotEvidenceLifecycle.findMany({
     where: {
-      storageObjectKey: { not: null },
-      expiresAt: { lte: now },
-      moderationCase: { status: "confirmed" },
+      deletedAt: null,
+      retainUntil: { lte: now },
+      snapshot: {
+        storageObjectKey: { not: null },
+        moderationCase: { status: "confirmed" },
+      },
     },
-    select: { storageObjectKey: true },
-    distinct: ["storageObjectKey"],
-    orderBy: { storageObjectKey: "asc" },
+    select: { snapshot: { select: { storageObjectKey: true } } },
+    orderBy: { retainUntil: "asc" },
     take: batchSize,
   });
+  const objectKeys = [
+    ...new Set(
+      lifecycleRows
+        .map((row) => row.snapshot.storageObjectKey)
+        .filter((key): key is string => Boolean(key)),
+    ),
+  ];
 
   const result: AudioEvidenceCleanupResult = {
-    examined: snapshots.length,
+    examined: objectKeys.length,
     deletedObjects: 0,
     releasedReferences: 0,
     failed: 0,
     pending: { examined: 0, deleted: 0, failed: 0, skipped: 0 },
   };
 
-  for (const snapshot of snapshots) {
-    const objectKey = snapshot.storageObjectKey;
-    if (!objectKey) continue;
-
+  for (const objectKey of objectKeys) {
     try {
       const references = await getAudioObjectReferenceState(
         prisma,
@@ -62,20 +70,26 @@ export async function cleanupExpiredModerationAudioEvidence(
       );
 
       if (canDeleteAudioObject(references)) {
-        // R2の削除成功後に参照を外す。DB更新失敗時は次回実行で再試行できる。
-        await deleteFromR2(objectKey);
-        result.deletedObjects += 1;
+        const deletionOutcome = await requestR2ObjectDeletion(objectKey, now);
+        if (deletionOutcome === "deleted") {
+          result.deletedObjects += 1;
+          const updateResult =
+            await prisma.moderationSnapshotEvidenceLifecycle.updateMany({
+              where: {
+                deletedAt: null,
+                retainUntil: { lte: now },
+                snapshot: {
+                  storageObjectKey: objectKey,
+                  moderationCase: { status: "confirmed" },
+                },
+              },
+              data: { deletedAt: now },
+            });
+          result.releasedReferences += updateResult.count;
+        } else if (deletionOutcome === "failed") {
+          result.failed += 1;
+        }
       }
-
-      const updateResult = await prisma.moderationSnapshot.updateMany({
-        where: {
-          storageObjectKey: objectKey,
-          expiresAt: { lte: now },
-          moderationCase: { status: "confirmed" },
-        },
-        data: { storageObjectKey: null },
-      });
-      result.releasedReferences += updateResult.count;
     } catch (error) {
       result.failed += 1;
       console.error("Failed to cleanup expired moderation audio evidence:", {

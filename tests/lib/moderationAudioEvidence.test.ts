@@ -6,24 +6,24 @@ import {
 } from "@/lib/moderationAudioEvidence";
 
 const profileFindFirst = vi.fn();
-const snapshotFindFirst = vi.fn();
+const lifecycleFindFirst = vi.fn();
 const client = {
   profile: { findFirst: profileFindFirst },
-  moderationSnapshot: { findFirst: snapshotFindFirst },
+  moderationSnapshotEvidenceLifecycle: { findFirst: lifecycleFindFirst },
 } as unknown as Parameters<typeof getAudioObjectReferenceState>[0];
 
 describe("モデレーション音声の参照判定", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     profileFindFirst.mockResolvedValue(null);
-    snapshotFindFirst.mockResolvedValue(null);
+    lifecycleFindFirst.mockResolvedValue(null);
   });
 
   it("現在のプロフィールと期限内スナップショットを同時に確認する", async () => {
     const now = new Date("2026-08-03T00:00:00.000Z");
     profileFindFirst.mockResolvedValueOnce({ id: "profile-1" });
-    snapshotFindFirst.mockResolvedValueOnce({ id: "snapshot-1" });
-    snapshotFindFirst.mockResolvedValueOnce({ id: "snapshot-2" });
+    lifecycleFindFirst.mockResolvedValueOnce({ id: "lifecycle-1" });
+    lifecycleFindFirst.mockResolvedValueOnce({ id: "lifecycle-2" });
 
     await expect(
       getAudioObjectReferenceState(
@@ -45,19 +45,23 @@ describe("モデレーション音声の参照判定", () => {
       },
       select: { id: true },
     });
-    expect(snapshotFindFirst).toHaveBeenCalledWith({
+    expect(lifecycleFindFirst).toHaveBeenCalledWith({
       where: {
-        storageObjectKey: "audio/testuser/reported.m4a",
-        expiresAt: { gt: now },
+        deletedAt: null,
+        retainUntil: { gt: now },
+        snapshot: { storageObjectKey: "audio/testuser/reported.m4a" },
       },
-      select: { id: true },
+      select: { snapshotId: true },
     });
-    expect(snapshotFindFirst).toHaveBeenCalledWith({
+    expect(lifecycleFindFirst).toHaveBeenCalledWith({
       where: {
-        storageObjectKey: "audio/testuser/reported.m4a",
-        moderationCase: { status: { not: "confirmed" } },
+        deletedAt: null,
+        snapshot: {
+          storageObjectKey: "audio/testuser/reported.m4a",
+          moderationCase: { status: { not: "confirmed" } },
+        },
       },
-      select: { id: true },
+      select: { snapshotId: true },
     });
   });
 
@@ -91,6 +95,6 @@ describe("モデレーション音声の参照判定", () => {
       referencedByUnresolvedCase: false,
     });
     expect(profileFindFirst).not.toHaveBeenCalled();
-    expect(snapshotFindFirst).not.toHaveBeenCalled();
+    expect(lifecycleFindFirst).not.toHaveBeenCalled();
   });
 });
