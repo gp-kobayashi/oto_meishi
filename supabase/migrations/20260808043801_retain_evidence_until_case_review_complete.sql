@@ -2,10 +2,3 @@
 update public."ModerationCase" as moderation_case
 set "retentionExpiresAt" = coalesce(moderation_case."resolvedAt", moderation_case."updatedAt") + interval '60 days'
 where moderation_case."status" = 'confirmed';
-
-update public."ModerationSnapshot" as snapshot
-set "expiresAt" = coalesce(moderation_case."resolvedAt", moderation_case."updatedAt") + interval '60 days'
-from public."ModerationCase" as moderation_case
-where snapshot."moderationCaseId" = moderation_case.id
-  and snapshot."storageObjectKey" is not null
-  and moderation_case."status" = 'confirmed';

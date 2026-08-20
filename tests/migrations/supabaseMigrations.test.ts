@@ -313,9 +313,46 @@ describe("Supabase migrations", () => {
       "utf8",
     );
     expect(sql).toContain('update public."ModerationCase"');
-    expect(sql).toContain('update public."ModerationSnapshot"');
+    expect(sql).not.toContain('update public."ModerationSnapshot"');
     expect(sql).toContain("\"status\" = 'confirmed'");
     expect(sql).toContain("interval '60 days'");
+  });
+  it("不変な音声証拠と可変な保持状態を分離する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_separate_moderation_snapshot_evidence_lifecycle.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+    expect(sql).toContain(
+      'create table public."ModerationSnapshotEvidenceLifecycle"',
+    );
+    expect(sql).toContain(
+      'references public."ModerationSnapshot" ("id") on delete cascade',
+    );
+    expect(sql).toContain('"retainUntil" timestamp(3)');
+    expect(sql).toContain('"deletedAt" timestamp(3)');
+    expect(sql).toContain(
+      'create index "ModerationSnapshotEvidenceLifecycle_due_idx"',
+    );
+    expect(sql).toContain(
+      'alter table public."ModerationSnapshotEvidenceLifecycle" enable row level security',
+    );
+    expect(sql).toContain(
+      'revoke all on table public."ModerationSnapshotEvidenceLifecycle" from anon, authenticated',
+    );
+    expect(sql).toContain(
+      'grant select, insert, update, delete\n  on table public."ModerationSnapshotEvidenceLifecycle" to service_role',
+    );
+    expect(sql).toContain(
+      'where snapshot."storageObjectKey" is not null',
+    );
+    expect(sql).toContain(
+      'coalesce(moderation_case."resolvedAt", moderation_case."updatedAt")',
+    );
+    expect(sql).toContain("on conflict (\"snapshotId\") do nothing");
   });
   it("終了済み通報を含む状態の逆遷移をDBで禁止する", () => {
     const migrationFile = migrationFiles.find((fileName) =>

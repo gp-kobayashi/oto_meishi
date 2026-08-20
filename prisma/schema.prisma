@@ -259,18 +259,30 @@ model ModerationViolationEvent {
 }
 
 model ModerationSnapshot {
-  id               String                 @id @default(uuid()) @db.Uuid
-  moderationCase   ModerationCase         @relation(fields: [moderationCaseId], references: [id], onDelete: Cascade)
-  moderationCaseId String                 @db.Uuid
-  kind             ModerationSnapshotKind
-  content          Json
-  contentHash      String?                @db.VarChar(128)
-  storageObjectKey String?                @db.VarChar(1024)
-  expiresAt        DateTime
-  createdAt        DateTime               @default(now())
+  id                String                               @id @default(uuid()) @db.Uuid
+  moderationCase    ModerationCase                       @relation(fields: [moderationCaseId], references: [id], onDelete: Cascade)
+  moderationCaseId  String                               @db.Uuid
+  kind              ModerationSnapshotKind
+  content           Json
+  contentHash       String?                              @db.VarChar(128)
+  storageObjectKey  String?                              @db.VarChar(1024)
+  expiresAt         DateTime
+  createdAt         DateTime                             @default(now())
+  evidenceLifecycle ModerationSnapshotEvidenceLifecycle?
 
   @@index([moderationCaseId, kind, createdAt])
   @@index([expiresAt])
+}
+
+model ModerationSnapshotEvidenceLifecycle {
+  snapshot    ModerationSnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  snapshotId  String             @id @db.Uuid
+  retainUntil DateTime?
+  deletedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([deletedAt, retainUntil], map: "ModerationSnapshotEvidenceLifecycle_due_idx")
 }
 
 model PendingR2ObjectDeletion {
