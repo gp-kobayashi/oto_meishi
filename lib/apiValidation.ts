@@ -1,4 +1,5 @@
 import type { SocialLink, SocialService } from "./mock/profileData";
+import { isReservedUserId } from "./userIdPolicy";
 
 const allowedThemes = ["normal", "dark", "light", "colorful"] as const;
 type ProfileTheme = (typeof allowedThemes)[number];
@@ -60,6 +61,10 @@ export function validateUserId(userId: string): ApiValidationError | null {
       field: "userId",
       message: "userId must only contain letters, numbers, hyphen, and underscore.",
     };
+  }
+
+  if (isReservedUserId(userId)) {
+    return { field: "userId", message: "userId is reserved" };
   }
 
   return null;
