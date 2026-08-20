@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { OTO_MEISHI_USER_ID_KEY } from "@/lib/storageKeys";
 import { getSiteUrl } from "@/lib/siteUrl";
+import { isReservedUserId } from "@/lib/userIdPolicy";
 import styles from "./page.module.css";
+
+const RESERVED_USER_ID_MESSAGE =
+  "このユーザーIDは使用できません。別のユーザーIDを入力してください。";
 
 export default function UserIdInputPage() {
   const router = useRouter();
@@ -29,6 +33,11 @@ export default function UserIdInputPage() {
 
     if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
       setError("ユーザーIDは英数字と-_のみ使用できます。");
+      return;
+    }
+
+    if (isReservedUserId(trimmed)) {
+      setError(RESERVED_USER_ID_MESSAGE);
       return;
     }
 
@@ -71,7 +80,11 @@ export default function UserIdInputPage() {
       }
 
       if (!response.ok) {
-        setError(data?.error || text || "保存に失敗しました。");
+        setError(
+          data?.error === "userId is reserved"
+            ? RESERVED_USER_ID_MESSAGE
+            : data?.error || text || "保存に失敗しました。",
+        );
         setIsSaving(false);
         return;
       }
@@ -111,7 +124,7 @@ export default function UserIdInputPage() {
             />
           </div>
           <p id="userIdHelp" className={styles.hint}>
-            英数字、ハイフン、アンダースコアが使えます。
+            英数字、ハイフン、アンダースコアが使えます。一部のシステム予約済みIDは使用できません。
           </p>
           {error && <p className={styles.error}>{error}</p>}
           <button
