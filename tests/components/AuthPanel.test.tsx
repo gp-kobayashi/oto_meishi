@@ -130,13 +130,7 @@ describe("AuthPanel", () => {
           screen.queryByText("Invalid credentials: internal details"),
         ).toBeNull();
         expect(replaceMock).not.toHaveBeenCalled();
-        expect(consoleError).toHaveBeenCalledWith(
-          expect.objectContaining({
-            context: "login",
-            code,
-            status: 400,
-          }),
-        );
+        expect(consoleError).not.toHaveBeenCalled();
       });
     },
   );
@@ -349,9 +343,7 @@ describe("AuthPanel", () => {
         expect(screen.getByRole("alert").textContent).not.toContain(
           "test@example.com",
         );
-        expect(consoleError).toHaveBeenCalledWith(
-          expect.objectContaining({ context: "signup", code, status: 400 }),
-        );
+        expect(consoleError).not.toHaveBeenCalled();
       });
     },
   );

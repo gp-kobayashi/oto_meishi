@@ -11,6 +11,7 @@ export type AuthErrorPresentation = {
   kind: "error" | "success";
   message: string;
   retryable: boolean;
+  shouldLog: boolean;
   logContext: AuthErrorLogContext;
 };
 
@@ -68,17 +69,39 @@ function createPresentation(
   context: AuthErrorContext,
   shape: AuthErrorShape,
   message: string,
-  options?: { kind?: "error" | "success"; retryable?: boolean },
+  options?: {
+    kind?: "error" | "success";
+    retryable?: boolean;
+    shouldLog?: boolean;
+  },
 ): AuthErrorPresentation {
+  const shouldLog = options?.shouldLog ?? true;
+  const safeName =
+    shape.name && /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/.test(shape.name)
+      ? shape.name
+      : undefined;
+  const safeCode =
+    shape.code && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}$/.test(shape.code)
+      ? shape.code
+      : undefined;
+  const safeStatus =
+    typeof shape.status === "number" &&
+    Number.isInteger(shape.status) &&
+    shape.status >= 100 &&
+    shape.status <= 599
+      ? shape.status
+      : undefined;
+
   return {
     kind: options?.kind ?? "error",
     message,
     retryable: options?.retryable ?? true,
+    shouldLog,
     logContext: {
       context,
-      ...(shape.name ? { name: shape.name } : {}),
-      ...(shape.code ? { code: shape.code } : {}),
-      ...(typeof shape.status === "number" ? { status: shape.status } : {}),
+      ...(shouldLog && safeName ? { name: safeName } : {}),
+      ...(shouldLog && safeCode ? { code: safeCode } : {}),
+      ...(shouldLog && safeStatus ? { status: safeStatus } : {}),
     },
   };
 }
@@ -111,6 +134,7 @@ export function getAuthErrorPresentation(
         {
           kind: "success",
           retryable: false,
+          shouldLog: false,
         },
       );
     }
@@ -126,6 +150,7 @@ export function getAuthErrorPresentation(
     ) {
       return createPresentation(context, shape, LOGIN_CREDENTIAL_MESSAGE, {
         retryable: false,
+        shouldLog: false,
       });
     }
 
@@ -154,7 +179,7 @@ export function getAuthErrorPresentation(
         context,
         shape,
         "登録を完了できませんでした。入力内容を確認して、もう一度お試しください。",
-        { retryable: false },
+        { retryable: false, shouldLog: false },
       );
     }
   }

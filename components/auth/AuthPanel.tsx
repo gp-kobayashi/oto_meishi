@@ -29,7 +29,9 @@ export default function AuthPanel({ mode }: AuthPanelProps) {
   const handleAuthError = (error: unknown, context: AuthErrorContext) => {
     const presentation = getAuthErrorPresentation(error, context);
     setError(presentation.message);
-    console.error(presentation.logContext);
+    if (presentation.shouldLog) {
+      console.error(presentation.logContext);
+    }
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

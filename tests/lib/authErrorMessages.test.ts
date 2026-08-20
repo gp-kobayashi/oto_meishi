@@ -14,6 +14,8 @@ describe("getAuthErrorPresentation", () => {
         "メールアドレスまたはパスワードが正しくありません。",
       );
       expect(result.kind).toBe("error");
+      expect(result.shouldLog).toBe(false);
+      expect(result.logContext).toEqual({ context: "login" });
     },
   );
 
@@ -35,6 +37,7 @@ describe("getAuthErrorPresentation", () => {
     expect(result.kind).toBe("success");
     expect(result.message).toContain("登録されている場合");
     expect(result.retryable).toBe(false);
+    expect(result.shouldLog).toBe(false);
 
     for (const code of ["email_address_not_authorized", "email_not_found"]) {
       const unknownResult = getAuthErrorPresentation(
@@ -66,6 +69,8 @@ describe("getAuthErrorPresentation", () => {
 
       expect(result.message).toContain("登録を完了できませんでした");
       expect(result.message).not.toContain("すでに登録");
+      expect(result.shouldLog).toBe(false);
+      expect(result.logContext).toEqual({ context: "signup" });
     }
     expect(
       getAuthErrorPresentation({ code: "bad_oauth_callback" }, "oauth").message,
@@ -91,19 +96,32 @@ describe("getAuthErrorPresentation", () => {
     const result = getAuthErrorPresentation(
       {
         name: "AuthApiError",
-        code: "invalid_credentials",
+        code: "bad_oauth_callback",
         status: 400,
         message: "メールアドレス=test@example.com",
         stack: "password=secret",
       },
-      "login",
+      "oauth",
     );
 
     expect(result.logContext).toEqual({
-      context: "login",
+      context: "oauth",
       name: "AuthApiError",
-      code: "invalid_credentials",
+      code: "bad_oauth_callback",
       status: 400,
     });
+  });
+
+  it("ログ用の名前・コード・状態を安全な形式に限定すること", () => {
+    const result = getAuthErrorPresentation(
+      {
+        name: "<script>alert(1)</script>",
+        code: "bad code with secret",
+        status: 999,
+      },
+      "oauth",
+    );
+
+    expect(result.logContext).toEqual({ context: "oauth" });
   });
 });
