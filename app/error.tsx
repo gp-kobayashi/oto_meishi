@@ -2,32 +2,16 @@
 
 import { useEffect } from "react";
 import ErrorPage from "@/components/error/ErrorPage";
+import { logErrorBoundary } from "@/lib/errorBoundaryLog";
 
 type ErrorBoundaryProps = {
   error: Error & { digest?: string };
   retry: () => void;
 };
 
-const getSafeDigest = (value: unknown): string | undefined => {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value.length > 128 ||
-    !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(value)
-  ) {
-    return undefined;
-  }
-
-  return value;
-};
-
 export default function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   useEffect(() => {
-    const digest = getSafeDigest(error.digest);
-    console.error("oto_meishi error boundary", {
-      scope: "route",
-      digest,
-    });
+    logErrorBoundary(error, "route");
   }, [error]);
 
   return (

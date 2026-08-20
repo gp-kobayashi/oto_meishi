@@ -1,6 +1,5 @@
-"use client";
-
 import Link from "next/link";
+import ErrorPageRetryButton from "./ErrorPageRetryButton";
 import styles from "./ErrorPage.module.css";
 
 export type ErrorPageProps = {
@@ -36,13 +35,7 @@ export default function ErrorPage({
             トップページへ戻る
           </Link>
           {retry ? (
-            <button
-              className={styles.retryButton}
-              type="button"
-              onClick={retry}
-            >
-              {retryLabel}
-            </button>
+            <ErrorPageRetryButton onRetry={retry} label={retryLabel} />
           ) : null}
         </div>
       </section>
