@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { getAuthErrorPresentation } from "@/lib/authErrorMessages";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./PasswordResetRequestForm.module.css";
 
@@ -30,25 +31,29 @@ export default function PasswordResetForm() {
 
     try {
       if (!supabase) {
-        setError(
-          "Supabase の環境変数が設定されていません。まずは .env.local に URL と anon key を設定してください。",
+        const presentation = getAuthErrorPresentation(
+          { code: "client_not_configured" },
+          "passwordUpdate",
         );
+        setError(presentation.message);
+        console.error(presentation.logContext);
         return;
       }
 
       const { error } = await supabase.auth.updateUser({ password });
 
       if (error) {
-        throw error;
+        const presentation = getAuthErrorPresentation(error, "passwordUpdate");
+        setError(presentation.message);
+        console.error(presentation.logContext);
+        return;
       }
 
       setIsComplete(true);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "パスワードの更新に失敗しました。",
-      );
+      const presentation = getAuthErrorPresentation(err, "passwordUpdate");
+      setError(presentation.message);
+      console.error(presentation.logContext);
     } finally {
       setIsSubmitting(false);
     }

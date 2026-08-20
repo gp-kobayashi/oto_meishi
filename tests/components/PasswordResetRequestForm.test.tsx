@@ -1,6 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { AuthError } from "@supabase/supabase-js";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PasswordResetRequestForm from "@/components/auth/PasswordResetRequestForm";
 
 vi.mock("@/lib/supabaseClient", () => ({
@@ -18,6 +23,10 @@ describe("PasswordResetRequestForm", () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("再設定メールを指定したリダイレクト先で送信すること", async () => {
     const resetPasswordForEmail = vi.mocked(
       supabase!.auth.resetPasswordForEmail,
@@ -32,9 +41,7 @@ describe("PasswordResetRequestForm", () => {
     fireEvent.change(screen.getByLabelText("メールアドレス"), {
       target: { value: "test@example.com" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "再設定メールを送信" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "再設定メールを送信" }));
 
     await waitFor(() => {
       expect(resetPasswordForEmail).toHaveBeenCalledWith("test@example.com", {
@@ -48,26 +55,94 @@ describe("PasswordResetRequestForm", () => {
     });
   });
 
-  it("送信失敗時にエラーメッセージを表示すること", async () => {
+  it("ユーザー未存在でも成功時と同じ表示にすること", async () => {
     const resetPasswordForEmail = vi.mocked(
       supabase!.auth.resetPasswordForEmail,
     );
     resetPasswordForEmail.mockResolvedValueOnce({
       data: null,
-      error: new AuthError("メールを送信できませんでした。"),
-    });
+      error: {
+        code: "user_not_found",
+        status: 404,
+        message: "user not found: test@example.com",
+      },
+    } as Awaited<ReturnType<typeof resetPasswordForEmail>>);
 
     render(<PasswordResetRequestForm />);
 
     fireEvent.change(screen.getByLabelText("メールアドレス"), {
       target: { value: "test@example.com" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "再設定メールを送信" }),
+    fireEvent.click(screen.getByRole("button", { name: "再設定メールを送信" }));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe(
+      "入力したメールアドレスが登録されている場合、パスワード再設定メールを送信しました。",
     );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByText("user not found: test@example.com")).toBeNull();
+  });
+
+  it("ユーザー未存在が例外として返っても成功表示にして記録しないこと", async () => {
+    const resetPasswordForEmail = vi.mocked(
+      supabase!.auth.resetPasswordForEmail,
+    );
+    resetPasswordForEmail.mockRejectedValueOnce({
+      code: "user_not_found",
+      status: 404,
+      message: "user not found: test@example.com",
+    });
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    render(<PasswordResetRequestForm />);
+    fireEvent.change(screen.getByLabelText("メールアドレス"), {
+      target: { value: "test@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "再設定メールを送信" }));
+
+    const status = await screen.findByRole("status");
+    expect(status.textContent).toBe(
+      "入力したメールアドレスが登録されている場合、パスワード再設定メールを送信しました。",
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(consoleError).not.toHaveBeenCalled();
+  });
+
+  it("運用エラーはrawメッセージを表示せず安全なログだけを記録すること", async () => {
+    const resetPasswordForEmail = vi.mocked(
+      supabase!.auth.resetPasswordForEmail,
+    );
+    resetPasswordForEmail.mockResolvedValueOnce({
+      data: null,
+      error: {
+        code: "unexpected_failure",
+        status: 500,
+        message: "SMTP secret for test@example.com",
+        stack: "password=secret",
+      },
+    } as Awaited<ReturnType<typeof resetPasswordForEmail>>);
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    render(<PasswordResetRequestForm />);
+    fireEvent.change(screen.getByLabelText("メールアドレス"), {
+      target: { value: "test@example.com" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "再設定メールを送信" }));
 
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe("メールを送信できませんでした。");
+    expect(alert.textContent).toContain("認証に失敗しました");
+    expect(alert.textContent).not.toContain("SMTP secret");
+    expect(alert.textContent).not.toContain("test@example.com");
+    expect(alert.textContent).not.toContain("password=secret");
+    expect(consoleError).toHaveBeenCalledWith({
+      context: "passwordResetRequest",
+      code: "unexpected_failure",
+      status: 500,
+    });
   });
 
   it("送信中はボタンを無効にして多重送信を防ぐこと", async () => {
@@ -89,14 +164,11 @@ describe("PasswordResetRequestForm", () => {
     fireEvent.change(screen.getByLabelText("メールアドレス"), {
       target: { value: "test@example.com" },
     });
-    fireEvent.click(
-      screen.getByRole("button", { name: "再設定メールを送信" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "再設定メールを送信" }));
 
-    const pendingButton = await screen.findByRole<HTMLButtonElement>(
-      "button",
-      { name: "送信中..." },
-    );
+    const pendingButton = await screen.findByRole<HTMLButtonElement>("button", {
+      name: "送信中...",
+    });
     expect(pendingButton.disabled).toBe(true);
 
     fireEvent.click(pendingButton);

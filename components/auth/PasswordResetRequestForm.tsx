@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { getAuthErrorPresentation } from "@/lib/authErrorMessages";
 import { supabase } from "@/lib/supabaseClient";
 import styles from "./PasswordResetRequestForm.module.css";
 
@@ -14,6 +15,21 @@ export default function PasswordResetRequestForm() {
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const applyErrorPresentation = (error: unknown) => {
+    const presentation = getAuthErrorPresentation(
+      error,
+      "passwordResetRequest",
+    );
+
+    if (presentation.kind === "success") {
+      setMessage(presentation.message);
+      return;
+    }
+
+    setError(presentation.message);
+    console.error(presentation.logContext);
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
@@ -22,9 +38,12 @@ export default function PasswordResetRequestForm() {
 
     try {
       if (!supabase) {
-        setError(
-          "Supabase の環境変数が設定されていません。まずは .env.local に URL と anon key を設定してください。",
+        const presentation = getAuthErrorPresentation(
+          { code: "client_not_configured" },
+          "passwordResetRequest",
         );
+        setError(presentation.message);
+        console.error(presentation.logContext);
         return;
       }
 
@@ -33,16 +52,13 @@ export default function PasswordResetRequestForm() {
       });
 
       if (error) {
-        throw error;
+        applyErrorPresentation(error);
+        return;
       }
 
       setMessage(successMessage);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "パスワード再設定メールの送信に失敗しました。",
-      );
+      applyErrorPresentation(err);
     } finally {
       setIsSubmitting(false);
     }
