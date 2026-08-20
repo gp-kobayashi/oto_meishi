@@ -343,16 +343,15 @@ describe("Supabase migrations", () => {
     expect(sql).toContain(
       'revoke all on table public."ModerationSnapshotEvidenceLifecycle" from anon, authenticated',
     );
-    expect(sql).toContain(
+    const normalizedSql = sql.replace(/\r\n/g, "\n");
+    expect(normalizedSql).toContain(
       'grant select, insert, update, delete\n  on table public."ModerationSnapshotEvidenceLifecycle" to service_role',
     );
-    expect(sql).toContain(
-      'where snapshot."storageObjectKey" is not null',
-    );
+    expect(sql).toContain('where snapshot."storageObjectKey" is not null');
     expect(sql).toContain(
       'coalesce(moderation_case."resolvedAt", moderation_case."updatedAt")',
     );
-    expect(sql).toContain("on conflict (\"snapshotId\") do nothing");
+    expect(sql).toContain('on conflict ("snapshotId") do nothing');
   });
   it("終了済み通報を含む状態の逆遷移をDBで禁止する", () => {
     const migrationFile = migrationFiles.find((fileName) =>
