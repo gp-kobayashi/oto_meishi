@@ -11,6 +11,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseUpdate: vi.fn(),
     moderationSnapshotFindFirst: vi.fn(),
     moderationSnapshotCreate: vi.fn(),
+    moderationSnapshotEvidenceLifecycleCreate: vi.fn(),
     moderationCaseEventCreate: vi.fn(),
     extractKeyFromUrl: vi.fn(),
     deleteFromR2: vi.fn(),
@@ -81,6 +82,9 @@ describe("DELETE /api/audio", () => {
         moderationSnapshot: {
           findFirst: mocks.moderationSnapshotFindFirst,
           create: mocks.moderationSnapshotCreate,
+        },
+        moderationSnapshotEvidenceLifecycle: {
+          create: mocks.moderationSnapshotEvidenceLifecycleCreate,
         },
         moderationCaseEvent: {
           create: mocks.moderationCaseEventCreate,

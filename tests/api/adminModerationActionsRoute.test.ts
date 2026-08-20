@@ -15,6 +15,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseFindMany: vi.fn(),
     moderationCaseUpdate: vi.fn(),
     moderationSnapshotCreate: vi.fn(),
+    moderationSnapshotEvidenceLifecycleCreate: vi.fn(),
     moderationCaseEventCreate: vi.fn(),
     moderationViolationEventCreate: vi.fn(),
     moderationViolationEventFindMany: vi.fn(),
@@ -54,6 +55,9 @@ const tx = {
     update: mocks.moderationCaseUpdate,
   },
   moderationSnapshot: { create: mocks.moderationSnapshotCreate },
+  moderationSnapshotEvidenceLifecycle: {
+    create: mocks.moderationSnapshotEvidenceLifecycleCreate,
+  },
   moderationCaseEvent: { create: mocks.moderationCaseEventCreate },
   moderationViolationEvent: {
     create: mocks.moderationViolationEventCreate,
@@ -65,7 +69,10 @@ const tx = {
 const request = (body: unknown) =>
   new Request("http://localhost/api/admin/moderation/actions", {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Authorization: "Bearer token" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer token",
+    },
     body: JSON.stringify(body),
   });
 
@@ -107,6 +114,10 @@ describe("PATCH /api/admin/moderation/actions", () => {
     mocks.moderationCaseFindFirst.mockResolvedValue(null);
     mocks.moderationCaseFindMany.mockResolvedValue([]);
     mocks.moderationCaseUpdate.mockResolvedValue({});
+    mocks.moderationSnapshotCreate.mockResolvedValue({ id: "snapshot-1" });
+    mocks.moderationSnapshotEvidenceLifecycleCreate.mockResolvedValue({
+      snapshotId: "snapshot-1",
+    });
     mocks.moderationViolationEventCreate.mockResolvedValue({
       id: "violation-event-1",
     });
@@ -159,8 +170,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
         profileId: "profile-1",
         moderationActionId: "action-1",
         title: "プロフィールの公開状態について",
-        message:
-          "規約違反が確認されたため、プロフィールを非公開にしました。",
+        message: "規約違反が確認されたため、プロフィールを非公開にしました。",
       },
     });
     expect(mocks.moderationCaseCreate).toHaveBeenCalledWith({
@@ -281,17 +291,16 @@ describe("PATCH /api/admin/moderation/actions", () => {
   });
 
   it("音声違反で停止基準に達した場合は音声非公開とアカウント停止を両方記録する", async () => {
-    mocks.profileFindUnique
-      .mockResolvedValueOnce({
-        id: "profile-1",
-        audioKey: "audio/user/voice.m4a",
-        audioContentHash: "audio-hash",
-        audioUrl: "",
-        audioTitle: "自己紹介音声",
-        audioStatus: "active",
-        status: "active",
-        accountModerationStatus: "active",
-      });
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      audioKey: "audio/user/voice.m4a",
+      audioContentHash: "audio-hash",
+      audioUrl: "",
+      audioTitle: "自己紹介音声",
+      audioStatus: "active",
+      status: "active",
+      accountModerationStatus: "active",
+    });
     mocks.moderationViolationEventFindMany.mockResolvedValue([
       {
         id: "violation-1",
@@ -470,11 +479,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
         targetType: "profile",
         targetId: "profile-1",
         status: {
-          in: [
-            "correctionRequired",
-            "postReviewPending",
-            "preReviewPending",
-          ],
+          in: ["correctionRequired", "postReviewPending", "preReviewPending"],
         },
       },
       select: { id: true },
@@ -619,7 +624,12 @@ describe("PATCH /api/admin/moderation/actions", () => {
 
   it("理由が空の場合は400を返す", async () => {
     const response = await PATCH(
-      request({ targetType: "audio", targetId: "profile-1", action: "hide", reason: " " }),
+      request({
+        targetType: "audio",
+        targetId: "profile-1",
+        action: "hide",
+        reason: " ",
+      }),
     );
 
     expect(response.status).toBe(400);
@@ -831,7 +841,12 @@ describe("PATCH /api/admin/moderation/actions", () => {
     });
 
     const response = await PATCH(
-      request({ targetType: "profile", targetId: "profile-1", action: "hide", reason: "確認" }),
+      request({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "hide",
+        reason: "確認",
+      }),
     );
 
     expect(response.status).toBe(409);

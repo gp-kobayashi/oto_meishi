@@ -13,6 +13,7 @@ import fs from "fs/promises";
 import { AUDIO_TEMP_ROOT } from "@/lib/audioTempDirectory";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { prisma } from "@/lib/prisma";
+import { createModerationSnapshot } from "@/lib/moderationSnapshot";
 import { inspectAudioFile } from "@/lib/audioInspector";
 import {
   validateAudioMetadata,
@@ -75,7 +76,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rateLimit = await consumeAudioUploadUserRateLimit(authenticatedUserId);
+    const rateLimit =
+      await consumeAudioUploadUserRateLimit(authenticatedUserId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {
@@ -391,17 +393,15 @@ export async function POST(request: NextRequest) {
                 select: { id: true },
               });
 
-          await tx.moderationSnapshot.create({
-            data: {
-              moderationCaseId: moderationCase.id,
-              kind: "corrected",
-              content: {
-                audioKey,
-                replacedDeletedAudio: true,
-              },
-              contentHash,
-              expiresAt: deadline,
+          await createModerationSnapshot(tx, {
+            moderationCaseId: moderationCase.id,
+            kind: "corrected",
+            content: {
+              audioKey,
+              replacedDeletedAudio: true,
             },
+            contentHash,
+            expiresAt: deadline,
           });
 
           await tx.moderationCaseEvent.create({

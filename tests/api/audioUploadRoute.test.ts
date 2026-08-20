@@ -32,6 +32,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseUpdate: vi.fn(),
     moderationCaseCreate: vi.fn(),
     moderationSnapshotCreate: vi.fn(),
+    moderationSnapshotEvidenceLifecycleCreate: vi.fn(),
     moderationCaseEventCreate: vi.fn(),
     deleteFromR2: vi.fn(),
     extractKeyFromUrl: vi.fn(),
@@ -201,6 +202,9 @@ describe("/api/audio/upload route", () => {
           create: mocks.moderationCaseCreate,
         },
         moderationSnapshot: { create: mocks.moderationSnapshotCreate },
+        moderationSnapshotEvidenceLifecycle: {
+          create: mocks.moderationSnapshotEvidenceLifecycleCreate,
+        },
         moderationCaseEvent: { create: mocks.moderationCaseEventCreate },
       }),
     );

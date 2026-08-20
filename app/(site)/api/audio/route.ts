@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createModerationSnapshot } from "@/lib/moderationSnapshot";
 import { extractKeyFromUrl } from "@/lib/r2Storage";
 import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
@@ -145,7 +146,12 @@ export async function DELETE(request: Request) {
         await tx.pendingR2ObjectDeletion.upsert({
           where: { objectKey: audioKey },
           create: { objectKey: audioKey, nextAttemptAt: new Date() },
-          update: { attemptCount: 0, lastAttemptAt: null, lastError: null, nextAttemptAt: new Date() },
+          update: {
+            attemptCount: 0,
+            lastAttemptAt: null,
+            lastError: null,
+            nextAttemptAt: new Date(),
+          },
         });
         return result;
       }
@@ -265,30 +271,26 @@ async function recordModeratedAudioDeletion({
   });
 
   if (!reportedSnapshot) {
-    await tx.moderationSnapshot.create({
-      data: {
-        moderationCaseId: moderationCase.id,
-        kind: "reported",
-        content: {
-          audioUrl: profile.audioUrl,
-          audioTitle: profile.audioTitle,
-          audioStatus: profile.audioStatus,
-          legacyMissingAudio: !audioKey,
-        },
-        storageObjectKey: audioKey,
-        contentHash: profile.audioContentHash,
-        expiresAt: deadline,
+    await createModerationSnapshot(tx, {
+      moderationCaseId: moderationCase.id,
+      kind: "reported",
+      content: {
+        audioUrl: profile.audioUrl,
+        audioTitle: profile.audioTitle,
+        audioStatus: profile.audioStatus,
+        legacyMissingAudio: !audioKey,
       },
+      storageObjectKey: audioKey,
+      contentHash: profile.audioContentHash,
+      expiresAt: deadline,
     });
   }
 
-  await tx.moderationSnapshot.create({
-    data: {
-      moderationCaseId: moderationCase.id,
-      kind: "corrected",
-      content: { deleted: true },
-      expiresAt: deadline,
-    },
+  await createModerationSnapshot(tx, {
+    moderationCaseId: moderationCase.id,
+    kind: "corrected",
+    content: { deleted: true },
+    expiresAt: deadline,
   });
 
   await tx.moderationCaseEvent.create({

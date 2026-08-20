@@ -1,6 +1,7 @@
 import { authorizeAdminRequest } from "@/lib/adminAuth";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
+import { createModerationSnapshot } from "@/lib/moderationSnapshot";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
@@ -479,15 +480,13 @@ export async function PATCH(request: Request) {
           },
           select: { id: true },
         });
-        await tx.moderationSnapshot.create({
-          data: {
-            moderationCaseId: moderationCase.id,
-            kind: "reported",
-            content: reportedContent,
-            contentHash: reportedContentHash,
-            storageObjectKey: reportedStorageObjectKey,
-            expiresAt: deadline,
-          },
+        await createModerationSnapshot(tx, {
+          moderationCaseId: moderationCase.id,
+          kind: "reported",
+          content: reportedContent,
+          contentHash: reportedContentHash,
+          storageObjectKey: reportedStorageObjectKey,
+          expiresAt: deadline,
         });
         await tx.moderationCaseEvent.create({
           data: {

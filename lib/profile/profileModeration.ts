@@ -8,6 +8,7 @@ import {
   getModerationDeadline,
   type ModeratedProfileContent,
 } from "@/lib/moderationRemediation";
+import { createModerationSnapshot } from "@/lib/moderationSnapshot";
 import type {
   ComparableSocialLink,
   ExistingSocialLink,
@@ -62,14 +63,12 @@ async function appendCorrectionAudit({
   previousStatus: ModerationCaseStatus;
   details: Prisma.InputJsonValue;
 }) {
-  await transaction.moderationSnapshot.create({
-    data: {
-      moderationCaseId: caseId,
-      kind: "corrected",
-      content: correctedContent,
-      ...(contentHash !== undefined ? { contentHash } : {}),
-      expiresAt,
-    },
+  await createModerationSnapshot(transaction, {
+    moderationCaseId: caseId,
+    kind: "corrected",
+    content: correctedContent,
+    ...(contentHash !== undefined ? { contentHash } : {}),
+    expiresAt,
   });
   await transaction.moderationCaseEvent.create({
     data: {
@@ -139,14 +138,12 @@ async function recordModeratedLinkCorrection({
     select: { id: true },
   });
   if (!reportedSnapshot) {
-    await transaction.moderationSnapshot.create({
-      data: {
-        moderationCaseId: moderationCase.id,
-        kind: "reported",
-        content: { service: link.service, url: link.url, label: link.label },
-        contentHash: await createModeratedUrlHash(link.url),
-        expiresAt: deadline,
-      },
+    await createModerationSnapshot(transaction, {
+      moderationCaseId: moderationCase.id,
+      kind: "reported",
+      content: { service: link.service, url: link.url, label: link.label },
+      contentHash: await createModeratedUrlHash(link.url),
+      expiresAt: deadline,
     });
   }
   await appendCorrectionAudit({
