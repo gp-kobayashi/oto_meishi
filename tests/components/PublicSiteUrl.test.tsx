@@ -37,6 +37,29 @@ describe("公開URLを使用する画面", () => {
     expect(screen.getByText("https://oto-meishi.com/")).toBeDefined();
   });
 
+  it("予約済みユーザーIDを送信せずにエラー表示する", () => {
+    const fetchMock = vi.fn();
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      render(<UserIdInputPage />);
+      fireEvent.change(screen.getByLabelText("ユーザーID"), {
+        target: { value: "Admin" },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "保存してマイページへ" }));
+
+      expect(
+        screen.getByText(
+          "このユーザーIDは使用できません。別のユーザーIDを入力してください。",
+        ),
+      ).toBeDefined();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal("fetch", originalFetch);
+    }
+  });
+
   it("QRコードに共通設定から生成したプロフィールURLを設定する", () => {
     render(<QRCode username="sample-user" />);
 

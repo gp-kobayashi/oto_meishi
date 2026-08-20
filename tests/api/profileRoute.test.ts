@@ -492,6 +492,21 @@ describe("/api/profile route", () => {
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
   });
 
+  it("予約済みユーザーIDの保存を400で拒否し、DBにアクセスしない", async () => {
+    const response = await POST(
+      postRequest({ userId: "Admin", displayName: "Admin" }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "userId is reserved",
+    });
+    expect(mocks.profileFindUnique).not.toHaveBeenCalled();
+    expect(mocks.profileCreate).not.toHaveBeenCalled();
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("プロフィールJSONが64KBを超える場合は413を返す", async () => {
     const response = await POST(
       postRequest({ userId: "testuser", bio: "a".repeat(64 * 1024) }),

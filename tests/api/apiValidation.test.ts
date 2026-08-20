@@ -21,6 +21,13 @@ describe('APIバリデーション関数', () => {
       expect(validateUserId('Test123')).toBeNull();
     });
 
+    it('予約済みのuserIdはエラーを返す', () => {
+      expect(validateUserId('Admin')).toEqual({
+        field: 'userId',
+        message: 'userId is reserved',
+      });
+    });
+
     it('空文字はエラーを返す', () => {
       const result = validateUserId('');
       expect(result).toEqual({ field: 'userId', message: 'userId is required' });
