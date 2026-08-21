@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findUniqueMock, notFoundMock } = vi.hoisted(() => ({
-  findUniqueMock: vi.fn(),
+const { findFirstMock, notFoundMock } = vi.hoisted(() => ({
+  findFirstMock: vi.fn(),
   notFoundMock: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -10,7 +10,7 @@ const { findUniqueMock, notFoundMock } = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     profile: {
-      findUnique: findUniqueMock,
+      findFirst: findFirstMock,
     },
   },
 }));
@@ -27,21 +27,7 @@ describe("公開プロフィールページ", () => {
   });
 
   it("アカウントが利用停止中ならプロフィール状態が公開中でも表示しない", async () => {
-    findUniqueMock.mockResolvedValue({
-      id: "profile-1",
-      userId: "suspended-user",
-      authId: "auth-1",
-      displayName: "停止中ユーザー",
-      bio: "",
-      theme: "green",
-      status: "active",
-      accountModerationStatus: "suspended",
-      audioStatus: "active",
-      audioKey: "audio/profile-1.m4a",
-      audioUrl: null,
-      audioTitle: "自己紹介",
-      sns: [],
-    });
+    findFirstMock.mockResolvedValue(null);
 
     await expect(
       PublicProfilePage({
@@ -50,5 +36,13 @@ describe("公開プロフィールページ", () => {
     ).rejects.toThrow("NEXT_NOT_FOUND");
 
     expect(notFoundMock).toHaveBeenCalledOnce();
+    expect(findFirstMock).toHaveBeenCalledWith({
+      where: {
+        userId: "suspended-user",
+        status: "active",
+        accountModerationStatus: "active",
+      },
+      include: { sns: true },
+    });
   });
 });

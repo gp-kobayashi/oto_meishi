@@ -3,8 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Card from "@/components/card/Card";
 import styles from "./page.module.css";
-import { prisma } from "@/lib/prisma";
-import type { ProfileData } from "@/lib/mock/profileData";
+import { getPublicProfile } from "@/lib/publicProfile";
 
 const UserIdPage = async ({
   params,
@@ -12,35 +11,9 @@ const UserIdPage = async ({
   params: Promise<{ userId: string }>;
 }) => {
   const { userId } = await params;
-  const profile = await prisma.profile.findUnique({
-    where: { userId },
-    include: { sns: true },
-  });
+  const publicProfile = await getPublicProfile(userId);
 
-  if (
-    !profile ||
-    profile.status !== "active" ||
-    profile.accountModerationStatus !== "active"
-  ) {
-    notFound();
-  }
-
-  const hasAudio =
-    profile.audioStatus === "active" &&
-    Boolean(profile.audioKey || profile.audioUrl);
-  const publicProfile: ProfileData = {
-    id: profile.id,
-    userId: profile.userId,
-    theme: profile.theme,
-    displayName: profile.displayName,
-    bio: profile.bio,
-    audioUrl: "",
-    hasAudio,
-    audioTitle: hasAudio ? profile.audioTitle : "",
-    sns: profile.sns
-      .filter((link) => link.status === "active")
-      .map(({ service, url, label }) => ({ service, url, label })),
-  };
+  if (!publicProfile) notFound();
 
   return (
     <main className={styles.main}>
