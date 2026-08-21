@@ -4,7 +4,7 @@ import { buildSiteUrl } from "@/lib/siteUrl";
 
 export const PROFILE_DESCRIPTION_LIMIT = 160;
 
-const normalizeText = (value: string) =>
+export const normalizeProfileText = (value: string) =>
   value
     .replace(/[\u0000-\u001f\u007f]/gu, " ")
     .replace(/\s+/gu, " ")
@@ -14,8 +14,8 @@ export function createProfileDescription(
   displayName: string,
   bio: string,
 ): string {
-  const normalizedBio = normalizeText(bio);
-  const fallback = `${normalizeText(displayName) || "oto_meishi"}さんの公開プロフィール`;
+  const normalizedBio = normalizeProfileText(bio);
+  const fallback = `${normalizeProfileText(displayName) || "oto_meishi"}さんの公開プロフィール`;
   const description = normalizedBio || fallback;
 
   return Array.from(description).slice(0, PROFILE_DESCRIPTION_LIMIT).join("");
@@ -25,7 +25,7 @@ export function createPublicProfileMetadata(
   profile: Pick<ProfileData, "displayName" | "bio">,
   userId: string,
 ): Metadata {
-  const displayName = normalizeText(profile.displayName) || "oto_meishi";
+  const displayName = normalizeProfileText(profile.displayName) || "oto_meishi";
   const title = `${displayName} | oto_meishi`;
   const description = createProfileDescription(displayName, profile.bio);
   const url = buildSiteUrl(encodeURIComponent(userId));
