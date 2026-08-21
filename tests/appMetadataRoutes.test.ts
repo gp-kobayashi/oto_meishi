@@ -12,12 +12,16 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-import sitemap from "@/app/sitemap";
+import sitemap, { dynamic } from "@/app/sitemap";
 import robots from "@/app/robots";
 
 describe("サイトマップとrobots.txt", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it("サイトマップをビルド時に静的生成しない", () => {
+    expect(dynamic).toBe("force-dynamic");
   });
 
   it("公開中のプロフィールだけを決定的な順序でサイトマップへ追加する", async () => {
