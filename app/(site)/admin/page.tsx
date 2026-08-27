@@ -39,6 +39,7 @@ function formatAttentionCount(count: number) {
 export default function AdminPage() {
   const router = useRouter();
   const [data, setData] = useState<ModerationListResponse | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<ModerationFilter>("all");
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState("");
@@ -77,7 +78,9 @@ export default function AdminPage() {
       }
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result.error || "管理対象の一覧を取得できませんでした。");
+        throw new Error(
+          result.error || "管理対象の一覧を取得できませんでした。",
+        );
       }
 
       setData(result as ModerationListResponse);
@@ -102,6 +105,15 @@ export default function AdminPage() {
     event.preventDefault();
     setPage(1);
     setQuery(searchInput.trim());
+  };
+
+  const toggleItem = (itemId: string) => {
+    setExpandedItems((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
   };
 
   return (
@@ -168,79 +180,105 @@ export default function AdminPage() {
           </div>
         ) : data?.items.length ? (
           <div className={styles.list}>
-            {data.items.map((item) => (
-              <article className={styles.item} key={item.id}>
-                <div className={styles.userInfo}>
-                  <div>
-                    <p className={styles.userId}>@{item.userId}</p>
-                    <h2>{item.displayName}</h2>
-                  </div>
-                  <span className={`${styles.badge} ${styles[item.status]}`}>
-                    {profileStatusLabels[item.status]}
-                  </span>
-                </div>
+            {data.items.map((item) => {
+              const isExpanded = expandedItems.has(item.id);
+              const detailsId = `moderation-details-${item.id}`;
 
-                <div className={styles.contentGrid}>
-                  <div>
-                    <p className={styles.label}>音声</p>
-                    <div className={styles.audioHeader}>
-                      <span>{item.audioTitle || "未登録"}</span>
-                      <span className={`${styles.smallBadge} ${styles[item.audioStatus]}`}>
-                        {audioStatusLabels[item.audioStatus]}
-                      </span>
+              return (
+                <article className={styles.item} key={item.id}>
+                  <div className={styles.primaryRow}>
+                    <div className={styles.userInfo}>
+                      <div>
+                        <p className={styles.userId}>@{item.userId}</p>
+                        <h2>{item.displayName}</h2>
+                      </div>
                     </div>
-                    {item.hasAudio ? <AdminAudioPlayer profileId={item.id} /> : null}
+                    <div className={styles.itemActions}>
+                      <span
+                        className={
+                          item.pendingReviewCount > 0
+                            ? styles.reviewAttention
+                            : styles.reviewSummary
+                        }
+                      >
+                        審査待ち {item.pendingReviewCount}件
+                      </span>
+                      <span
+                        className={`${styles.badge} ${styles[item.status]}`}
+                      >
+                        {profileStatusLabels[item.status]}
+                      </span>
+                      <Link
+                        href={`/admin/moderation/${encodeURIComponent(item.id)}`}
+                      >
+                        詳細を確認
+                      </Link>
+                      <button
+                        type="button"
+                        className={styles.expandButton}
+                        aria-expanded={isExpanded}
+                        aria-controls={detailsId}
+                        aria-label={`${item.displayName}の詳細を${isExpanded ? "閉じる" : "開く"}`}
+                        onClick={() => toggleItem(item.id)}
+                      >
+                        {isExpanded ? "▲" : "▼"}
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <p className={styles.label}>リンク</p>
-                    <p className={styles.linkSummary}>
-                      {item.linkCount}件
-                      {item.hiddenLinkCount > 0
-                        ? `（非公開 ${item.hiddenLinkCount}件）`
-                        : ""}
-                    </p>
-                  </div>
-                  <div>
-                    <p className={styles.label}>未確認の通報</p>
-                    <p
-                      className={
-                        item.pendingReportCount > 0
-                          ? styles.reportAttention
-                          : styles.reportSummary
-                      }
-                    >
-                      {item.pendingReportCount}件
-                    </p>
-                  </div>
-                  <div>
-                    <p className={styles.label}>審査待ち</p>
-                    <p
-                      className={
-                        item.pendingReviewCount > 0
-                          ? styles.reportAttention
-                          : styles.reportSummary
-                      }
-                    >
-                      {item.pendingReviewCount}件
-                    </p>
-                  </div>
-                  <div>
-                    <p className={styles.label}>最終更新</p>
-                    <time dateTime={item.updatedAt}>
-                      {new Intl.DateTimeFormat("ja-JP", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      }).format(new Date(item.updatedAt))}
-                    </time>
-                  </div>
-                </div>
-                <div className={styles.itemFooter}>
-                  <Link href={`/admin/moderation/${encodeURIComponent(item.id)}`}>
-                    詳細を確認
-                  </Link>
-                </div>
-              </article>
-            ))}
+
+                  {isExpanded ? (
+                    <div className={styles.details} id={detailsId}>
+                      <div className={styles.audioSection}>
+                        <p className={styles.label}>音声</p>
+                        <div className={styles.audioHeader}>
+                          <span>{item.audioTitle || "未登録"}</span>
+                          <span
+                            className={`${styles.smallBadge} ${styles[item.audioStatus]}`}
+                          >
+                            {audioStatusLabels[item.audioStatus]}
+                          </span>
+                        </div>
+                        {item.hasAudio ? (
+                          <AdminAudioPlayer profileId={item.id} />
+                        ) : null}
+                      </div>
+                      <div className={styles.contentGrid}>
+                        <div>
+                          <p className={styles.label}>リンク</p>
+                          <p className={styles.linkSummary}>
+                            {item.linkCount}件
+                            {item.hiddenLinkCount > 0
+                              ? `（非公開 ${item.hiddenLinkCount}件）`
+                              : ""}
+                          </p>
+                        </div>
+                        <div>
+                          <p className={styles.label}>未確認の通報</p>
+                          <p
+                            className={
+                              item.pendingReportCount > 0
+                                ? styles.reportAttention
+                                : styles.reportSummary
+                            }
+                          >
+                            {item.pendingReportCount}件
+                          </p>
+                        </div>
+                        <div>
+                          <p className={styles.label}>最終更新</p>
+                          <time dateTime={item.updatedAt}>
+                            {new Intl.DateTimeFormat("ja-JP", {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }).format(new Date(item.updatedAt))}
+                          </time>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         ) : (
           <p className={styles.message}>該当するプロフィールはありません。</p>

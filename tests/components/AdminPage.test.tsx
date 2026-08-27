@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mocks } = vi.hoisted(() => ({
@@ -35,7 +35,7 @@ describe("AdminPage", () => {
               userId: "sample-user",
               displayName: "サンプル",
               status: "hidden",
-              hasAudio: false,
+              hasAudio: true,
               audioTitle: "",
               audioStatus: "active",
               linkCount: 2,
@@ -54,12 +54,33 @@ describe("AdminPage", () => {
 
     render(<AdminPage />);
 
-    expect(await screen.findByRole("heading", { name: "サンプル" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { name: "サンプル" }),
+    ).toBeDefined();
     expect(screen.getByText("@sample-user")).toBeDefined();
+    expect(screen.getByText("審査待ち 1件")).toBeDefined();
+    expect(screen.queryByText("未確認の通報")).toBeNull();
+    const expandButton = screen.getByRole("button", {
+      name: "サンプルの詳細を開く",
+    });
+    expect(expandButton.getAttribute("aria-expanded")).toBe("false");
+    expect(expandButton.getAttribute("aria-controls")).toBe(
+      "moderation-details-profile-1",
+    );
+    expect(screen.getByRole("link", { name: "詳細を確認" })).toBeDefined();
+
+    fireEvent.click(expandButton);
+
+    expect(expandButton.getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "音声を確認" })).toBeDefined();
     expect(screen.getByText("2件（非公開 1件）")).toBeDefined();
     expect(screen.getByText("未確認の通報")).toBeDefined();
-    expect(screen.getByText("審査待ち")).toBeDefined();
-    expect(screen.getByText("2件", { selector: "p" })).toBeDefined();
+    expect(screen.getByText("最終更新")).toBeDefined();
+    expect(screen.getByRole("link", { name: "詳細を確認" })).toBeDefined();
+
+    fireEvent.click(expandButton);
+    expect(expandButton.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText("未確認の通報")).toBeNull();
     expect(
       screen.getByRole("heading", { name: "管理対象一覧" }).parentElement
         ?.textContent,
@@ -71,27 +92,30 @@ describe("AdminPage", () => {
     [0, false, ""],
     [1, true, "1"],
     [10, true, "9+"],
-  ])("要対応件数 %s の表示を制御する", async (attentionTotal, visible, label) => {
-    vi.spyOn(global, "fetch").mockResolvedValue(
-      Response.json({
-        items: [],
-        attentionTotal,
-        pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
-      }),
-    );
+  ])(
+    "要対応件数 %s の表示を制御する",
+    async (attentionTotal, visible, label) => {
+      vi.spyOn(global, "fetch").mockResolvedValue(
+        Response.json({
+          items: [],
+          attentionTotal,
+          pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+        }),
+      );
 
-    render(<AdminPage />);
+      render(<AdminPage />);
 
-    const button = await screen.findByRole("button", {
-      name: visible ? `要対応 ${label}件` : "要対応",
-    });
-    if (visible) {
-      expect(button.textContent).toContain(`要対応${label}`);
-    } else {
-      expect(button.textContent).toContain("要対応");
-      expect(button.textContent).not.toContain("0");
-    }
-  });
+      const button = await screen.findByRole("button", {
+        name: visible ? `要対応 ${label}件` : "要対応",
+      });
+      if (visible) {
+        expect(button.textContent).toContain(`要対応${label}`);
+      } else {
+        expect(button.textContent).toContain("要対応");
+        expect(button.textContent).not.toContain("0");
+      }
+    },
+  );
 
   it("未ログインの場合は管理者ログインを求める", async () => {
     mocks.getSession.mockResolvedValue({ data: { session: null } });
@@ -108,10 +132,7 @@ describe("AdminPage", () => {
 
   it("ログイン済みの非管理者はプロフィールへ移動する", async () => {
     vi.spyOn(global, "fetch").mockResolvedValue(
-      Response.json(
-        { error: "管理者権限がありません。" },
-        { status: 403 },
-      ),
+      Response.json({ error: "管理者権限がありません。" }, { status: 403 }),
     );
 
     render(<AdminPage />);
@@ -119,8 +140,6 @@ describe("AdminPage", () => {
     await waitFor(() => {
       expect(mocks.router.replace).toHaveBeenCalledWith("/profile");
     });
-    expect(
-      screen.queryByText("管理者権限がありません。"),
-    ).toBeNull();
+    expect(screen.queryByText("管理者権限がありません。")).toBeNull();
   });
 });
