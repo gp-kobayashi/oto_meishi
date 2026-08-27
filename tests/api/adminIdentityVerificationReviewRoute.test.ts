@@ -17,6 +17,7 @@ const { mocks } = vi.hoisted(() => ({
     socialLinkFindFirst: vi.fn(),
     socialLinkUpdate: vi.fn(),
     violationFindFirst: vi.fn(),
+    violationFindMany: vi.fn(),
     violationCreate: vi.fn(),
     actionCreate: vi.fn(),
     notificationCreate: vi.fn(),
@@ -48,7 +49,9 @@ const moderationCase = {
   profile: {
     status: "hidden" as const,
     audioStatus: "active" as const,
-    accountModerationStatus: "active" as const,
+    accountModerationStatus: "suspended" as const,
+    suspensionAppealDueAt: new Date("2999-01-01T00:00:00.000Z"),
+    deletionProcessingStartedAt: null,
   },
 };
 
@@ -98,7 +101,22 @@ describe("管理者の本人確認審査API", () => {
     mocks.violationFindFirst.mockResolvedValue({
       id: "violation-1",
       reasonCode: "impersonation",
+      suspensionTriggered: true,
     });
+    mocks.violationFindMany.mockResolvedValue([
+      {
+        id: "violation-1",
+        eventType: "confirmed",
+        reasonCode: "impersonation",
+        originalViolationEventId: null,
+      },
+      {
+        id: "revocation-1",
+        eventType: "revoked",
+        reasonCode: "impersonation",
+        originalViolationEventId: "violation-1",
+      },
+    ]);
     mocks.violationCreate.mockResolvedValue({ id: "revocation-1" });
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
@@ -121,6 +139,7 @@ describe("管理者の本人確認審査API", () => {
         },
         moderationViolationEvent: {
           findFirst: mocks.violationFindFirst,
+          findMany: mocks.violationFindMany,
           create: mocks.violationCreate,
         },
         moderationAction: { create: mocks.actionCreate },
@@ -129,7 +148,7 @@ describe("管理者の本人確認審査API", () => {
     );
   });
 
-  it("本人確認成功時にケースを完了し違反回数を取り消して公開する", async () => {
+  it("本人確認成功時にケースを完了し停止状態を訂正する", async () => {
     const response = await PATCH(reviewRequest("verified", "本人の投稿を確認しました。"), {
       params: Promise.resolve({ requestId }),
     });
@@ -138,8 +157,9 @@ describe("管理者の本人確認審査API", () => {
     await expect(response.json()).resolves.toMatchObject({
       status: "verified",
       caseStatus: "confirmed",
-      restored: true,
+      restored: false,
       revocationId: "revocation-1",
+      accountCorrection: { corrected: true, reason: "corrected" },
     });
     expect(mocks.requestUpdate).toHaveBeenCalledWith({
       where: { id: requestId },
@@ -151,7 +171,10 @@ describe("管理者の本人確認審査API", () => {
     });
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { id: "profile-1" },
-      data: { status: "active" },
+      data: {
+        accountModerationStatus: "active",
+        suspensionAppealDueAt: null,
+      },
     });
     expect(mocks.violationCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -162,11 +185,21 @@ describe("管理者の本人確認審査API", () => {
       }),
     );
     expect(mocks.notificationCreate).toHaveBeenCalledWith({
-      data: expect.objectContaining({ title: "本人確認が完了しました" }),
+      data: expect.objectContaining({ title: "利用停止状態を訂正しました" }),
+    });
+    expect(mocks.actionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        targetType: "profile",
+        targetId: "profile-1",
+        action: "restore",
+        previousStatus: "suspended",
+        newStatus: "active",
+      }),
+      select: { id: true },
     });
   });
 
-  it("別の未完了ケースがあれば本人確認成功後も公開しない", async () => {
+  it("別の未完了ケースがあっても停止状態の訂正は行う", async () => {
     mocks.caseCount.mockResolvedValueOnce(1);
 
     const response = await PATCH(reviewRequest("verified", "本人の投稿を確認しました。"), {
@@ -176,8 +209,9 @@ describe("管理者の本人確認審査API", () => {
     await expect(response.json()).resolves.toMatchObject({
       status: "verified",
       restored: false,
+      accountCorrection: { corrected: true },
     });
-    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.profileUpdate).toHaveBeenCalled();
   });
 
   it("確認できない場合はケースを修正待ちにして理由を通知する", async () => {
@@ -200,6 +234,175 @@ describe("管理者の本人確認審査API", () => {
         title: "本人確認を完了できませんでした",
       }),
     });
+  });
+
+  it("別の有効な違反が停止条件を満たす場合は停止状態を維持する", async () => {
+    mocks.violationFindMany.mockResolvedValue([
+      {
+        id: "violation-1",
+        eventType: "confirmed",
+        reasonCode: "impersonation",
+        originalViolationEventId: null,
+      },
+      {
+        id: "revocation-1",
+        eventType: "revoked",
+        reasonCode: "impersonation",
+        originalViolationEventId: "violation-1",
+      },
+      {
+        id: "violation-2",
+        eventType: "confirmed",
+        reasonCode: "unsafeLink",
+        originalViolationEventId: null,
+      },
+      {
+        id: "violation-3",
+        eventType: "confirmed",
+        reasonCode: "unsafeLink",
+        originalViolationEventId: null,
+      },
+    ]);
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      restored: false,
+      accountCorrection: { corrected: false, reason: "otherActiveViolations" },
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it("削除処理中のアカウントは停止状態を訂正しない", async () => {
+    mocks.requestFindUnique.mockResolvedValueOnce({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
+      moderationCase: {
+        ...moderationCase,
+        profile: {
+          ...moderationCase.profile,
+          deletionProcessingStartedAt: new Date("2025-01-01T00:00:00.000Z"),
+        },
+      },
+    });
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      restored: false,
+      accountCorrection: { corrected: false, reason: "deletionPending" },
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+  });
+
+  it("削除保留中のアカウントは停止状態を訂正しない", async () => {
+    mocks.requestFindUnique.mockResolvedValueOnce({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
+      moderationCase: {
+        ...moderationCase,
+        profile: {
+          ...moderationCase.profile,
+          accountModerationStatus: "deletionPending",
+        },
+      },
+    });
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      restored: false,
+      accountCorrection: { corrected: false, reason: "deletionPending" },
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it("対応するなりすまし違反が見つからない場合は停止状態を訂正しない", async () => {
+    mocks.violationFindFirst.mockResolvedValueOnce(null);
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      restored: false,
+      accountCorrection: { corrected: false, reason: "matchingViolationMissing" },
+    });
+    expect(mocks.violationCreate).not.toHaveBeenCalled();
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it("停止を発生させていない本人確認違反は停止状態を訂正しない", async () => {
+    mocks.violationFindFirst.mockResolvedValueOnce({
+      id: "violation-1",
+      reasonCode: "impersonation",
+      suspensionTriggered: false,
+    });
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      restored: false,
+      accountCorrection: {
+        corrected: false,
+        reason: "matchingViolationNotSuspensionTrigger",
+      },
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it("すでに有効なアカウントでは訂正記録を重複作成しない", async () => {
+    mocks.requestFindUnique.mockResolvedValueOnce({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
+      moderationCase: {
+        ...moderationCase,
+        profile: {
+          ...moderationCase.profile,
+          accountModerationStatus: "active",
+        },
+      },
+    });
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      restored: false,
+      accountCorrection: { corrected: false, reason: "alreadyActive" },
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
   it("審査済み申請の再操作を拒否する", async () => {
