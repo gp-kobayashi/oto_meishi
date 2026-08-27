@@ -277,6 +277,7 @@ describe("管理者の本人確認審査API", () => {
         ...moderationCase,
         targetType: "socialLink",
         targetId: "link-1",
+        profile: { ...moderationCase.profile, status: "suspended" },
       },
     });
     mocks.socialLinkFindFirst.mockResolvedValueOnce({ status: "hidden" });
@@ -286,7 +287,10 @@ describe("管理者の本人確認審査API", () => {
       { params: Promise.resolve({ requestId }) },
     );
 
-    await expect(response.json()).resolves.toMatchObject({ restored: true });
+    await expect(response.json()).resolves.toMatchObject({
+      restored: true,
+      profileSurfaceRestoration: { restored: true },
+    });
     expect(mocks.socialLinkFindFirst).toHaveBeenCalledWith({
       where: { id: "link-1", profileId: "profile-1" },
       select: { status: true },
@@ -306,6 +310,12 @@ describe("管理者の本人確認審査API", () => {
       where: { id: "link-1" },
       data: { status: "active" },
     });
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { status: "active" },
+    });
+    expect(mocks.actionCreate).toHaveBeenCalledTimes(3);
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(3);
   });
 
   it("対象リンクが存在しない場合はリンクを公開しない", async () => {
@@ -427,6 +437,38 @@ describe("管理者の本人確認審査API", () => {
     expect(mocks.actionCreate).not.toHaveBeenCalled();
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
     expect(mocks.appealUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("別のプロフィール案件が未完了ならプロフィールを公開しない", async () => {
+    mocks.caseCount.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+    mocks.requestFindUnique.mockResolvedValue({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
+      moderationCase: {
+        ...moderationCase,
+        targetType: "socialLink",
+        targetId: "link-1",
+        profile: { ...moderationCase.profile, status: "suspended" },
+      },
+    });
+    mocks.socialLinkFindFirst.mockResolvedValueOnce({ status: "hidden" });
+
+    const response = await PATCH(
+      reviewRequest("verified", "リンク本人を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      restored: true,
+      profileSurfaceRestoration: { restored: false },
+    });
+    expect(mocks.socialLinkUpdate).toHaveBeenCalled();
+    expect(mocks.profileUpdate).not.toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { status: "active" },
+    });
   });
 
   it("削除処理中のアカウントは停止状態を訂正しない", async () => {

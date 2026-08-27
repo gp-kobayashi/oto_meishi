@@ -298,6 +298,11 @@ export async function PATCH(
         previousStatus: moderationCase.profile.status,
         newStatus: moderationCase.profile.status,
       };
+      let profileSurfaceRestoration = {
+        restored: false,
+        previousStatus: moderationCase.profile.status,
+        newStatus: moderationCase.profile.status,
+      };
       if (decision === "verified") {
         await transaction.moderationCase.update({
           where: { id: moderationCase.id },
@@ -415,6 +420,31 @@ export async function PATCH(
           moderationCase.profile.accountModerationStatus === "active" ||
             accountCorrection.corrected,
         );
+        if (
+          accountCorrection.corrected &&
+          moderationCase.targetType !== "profile" &&
+          moderationCase.profile.status === "suspended"
+        ) {
+          const otherProfileCases = await transaction.moderationCase.count({
+            where: {
+              id: { not: moderationCase.id },
+              profileId: moderationCase.profileId,
+              targetType: "profile",
+              status: { in: [...openCaseStatuses] },
+            },
+          });
+          if (otherProfileCases === 0) {
+            await transaction.profile.update({
+              where: { id: moderationCase.profileId },
+              data: { status: "active" },
+            });
+            profileSurfaceRestoration = {
+              restored: true,
+              previousStatus: "suspended",
+              newStatus: "active",
+            };
+          }
+        }
       } else {
         await transaction.moderationCase.update({
           where: { id: moderationCase.id },
@@ -496,6 +526,29 @@ export async function PATCH(
           },
         });
       }
+      if (decision === "verified" && profileSurfaceRestoration.restored) {
+        const moderationAction = await transaction.moderationAction.create({
+          data: {
+            adminUserId: authorization.admin.id,
+            profileId: moderationCase.profileId,
+            targetType: "profile",
+            targetId: moderationCase.profileId,
+            action: "restore",
+            previousStatus: profileSurfaceRestoration.previousStatus,
+            newStatus: profileSurfaceRestoration.newStatus,
+            reason: note,
+          },
+          select: { id: true },
+        });
+        await transaction.userNotification.create({
+          data: {
+            profileId: moderationCase.profileId,
+            moderationActionId: moderationAction.id,
+            title: "プロフィールを公開しました",
+            message: note,
+          },
+        });
+      }
 
       return {
         success: true,
@@ -505,6 +558,7 @@ export async function PATCH(
         restored: targetRestoration.restored,
         accountCorrection,
         targetRestoration,
+        profileSurfaceRestoration,
         revocationId,
       } as const;
     });

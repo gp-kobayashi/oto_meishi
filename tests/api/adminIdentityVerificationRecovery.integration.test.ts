@@ -118,7 +118,7 @@ describe("本人確認による停止状態・対象コンテンツの復旧", (
         bio: "統合テスト用データ",
         audioUrl: "",
         audioTitle: "",
-        status: "hidden",
+        status: "suspended",
         accountModerationStatus: "suspended",
       },
       select: { id: true },
@@ -317,7 +317,13 @@ describe("本人確認による停止状態・対象コンテンツの復旧", (
       }),
     ).resolves.toEqual({ status: "confirmed" });
     await expect(
+      prisma.profile.findUnique({
+        where: { id: socialProfileId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "active" });
+    await expect(
       prisma.moderationAction.count({ where: { profileId: socialProfileId } }),
-    ).resolves.toBe(2);
+    ).resolves.toBe(3);
   });
 });
