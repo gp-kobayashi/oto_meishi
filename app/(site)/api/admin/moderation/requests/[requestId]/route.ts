@@ -121,10 +121,55 @@ export async function PATCH(
         } as const;
       }
 
-      if (moderationRequest.kind === "accountAppeal" && status === "resolved") {
+      await tx.$executeRawUnsafe(
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        `profile:${moderationRequest.profileId}`,
+      );
+      await tx.$executeRawUnsafe(
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        `moderation-request:${requestId}`,
+      );
+      const latestRequest = await tx.moderationRequest.findUnique({
+        where: { id: requestId },
+        select: { status: true, profileId: true, kind: true },
+      });
+      if (
+        !latestRequest ||
+        latestRequest.profileId !== moderationRequest.profileId
+      ) {
+        return { error: "申請が見つかりません。", httpStatus: 404 } as const;
+      }
+      if (latestRequest.kind !== moderationRequest.kind) {
+        return { error: "申請が見つかりません。", httpStatus: 404 } as const;
+      }
+      if (latestRequest.status !== "pending") {
+        return {
+          error: "この申請はすでに対応済みです。",
+          httpStatus: 409,
+        } as const;
+      }
+      const lockedProfile = await tx.profile.findUnique({
+        where: { id: moderationRequest.profileId },
+        select: { status: true, accountModerationStatus: true },
+      });
+      if (!lockedProfile) {
+        return {
+          error: "プロフィールが見つかりません。",
+          httpStatus: 404,
+        } as const;
+      }
+      const lockedModerationRequest = {
+        ...moderationRequest,
+        profile: lockedProfile,
+      };
+
+      if (
+        lockedModerationRequest.kind === "accountAppeal" &&
+        status === "resolved"
+      ) {
         const incompleteCaseCount = await tx.moderationCase.count({
           where: {
-            profileId: moderationRequest.profileId,
+            profileId: lockedModerationRequest.profileId,
             status: {
               in: [
                 "correctionRequired",
@@ -148,7 +193,10 @@ export async function PATCH(
         data: { status, responseMessage, resolvedAt },
       });
 
-      if (moderationRequest.kind === "accountAppeal" && status === "resolved") {
+      if (
+        lockedModerationRequest.kind === "accountAppeal" &&
+        status === "resolved"
+      ) {
         await tx.profile.update({
           where: { id: moderationRequest.profileId },
           data: {
@@ -164,7 +212,7 @@ export async function PATCH(
             targetType: "profile",
             targetId: moderationRequest.profileId,
             action: "restore",
-            previousStatus: moderationRequest.profile.status,
+            previousStatus: lockedModerationRequest.profile.status,
             newStatus: "active",
             reason: responseMessage,
           },
