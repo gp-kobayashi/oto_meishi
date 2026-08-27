@@ -4,10 +4,12 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     authorize: vi.fn(),
     transaction: vi.fn(),
+    executeRaw: vi.fn(),
     requestFindUnique: vi.fn(),
     requestUpdate: vi.fn(),
     caseCount: vi.fn(),
     profileUpdate: vi.fn(),
+    profileFindUnique: vi.fn(),
     actionCreate: vi.fn(),
     userRateLimit: vi.fn(),
     ipRateLimit: vi.fn(),
@@ -55,14 +57,19 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
       retryAfterSeconds: 60,
     });
     mocks.getClientIp.mockReturnValue(null);
+    mocks.executeRaw.mockResolvedValue(1);
     mocks.transaction.mockImplementation((callback) =>
       callback({
+        $executeRawUnsafe: mocks.executeRaw,
         moderationRequest: {
           findUnique: mocks.requestFindUnique,
           update: mocks.requestUpdate,
         },
         moderationCase: { count: mocks.caseCount },
-        profile: { update: mocks.profileUpdate },
+        profile: {
+          findUnique: mocks.profileFindUnique,
+          update: mocks.profileUpdate,
+        },
         moderationAction: { create: mocks.actionCreate },
       }),
     );
@@ -79,6 +86,10 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
     mocks.requestUpdate.mockResolvedValue({});
     mocks.caseCount.mockResolvedValue(0);
     mocks.profileUpdate.mockResolvedValue({});
+    mocks.profileFindUnique.mockResolvedValue({
+      status: "suspended",
+      accountModerationStatus: "suspended",
+    });
     mocks.actionCreate.mockResolvedValue({});
   });
 
@@ -116,6 +127,21 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
         newStatus: "active",
       }),
     });
+    expect(mocks.executeRaw.mock.calls).toEqual([
+      [
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        "profile:profile-1",
+      ],
+      [
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        "moderation-request:request-1",
+      ],
+    ]);
+    expect(mocks.requestFindUnique).toHaveBeenCalledTimes(2);
+    expect(mocks.profileFindUnique).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      select: { status: true, accountModerationStatus: true },
+    });
   });
 
   it("解除申請を却下した場合は利用停止を維持する", async () => {
@@ -151,11 +177,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
       where: {
         profileId: "profile-1",
         status: {
-          in: [
-            "correctionRequired",
-            "postReviewPending",
-            "preReviewPending",
-          ],
+          in: ["correctionRequired", "postReviewPending", "preReviewPending"],
         },
       },
     });

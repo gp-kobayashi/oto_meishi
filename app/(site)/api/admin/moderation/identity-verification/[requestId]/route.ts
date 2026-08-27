@@ -36,6 +36,32 @@ const noSuspensionCorrection = (
   reason: SuspensionCorrectionResult["reason"],
 ): SuspensionCorrectionResult => ({ corrected: false, reason });
 
+const identityVerificationRequestSelect = {
+  id: true,
+  status: true,
+  profileId: true,
+  postingDeadlineAt: true,
+  moderationCase: {
+    select: {
+      id: true,
+      profileId: true,
+      targetType: true,
+      targetId: true,
+      reasonCode: true,
+      status: true,
+      profile: {
+        select: {
+          status: true,
+          audioStatus: true,
+          accountModerationStatus: true,
+          suspensionAppealDueAt: true,
+          deletionProcessingStartedAt: true,
+        },
+      },
+    },
+  },
+} as const;
+
 type Transaction = Prisma.TransactionClient;
 
 async function restoreTargetIfAllowed(
@@ -186,51 +212,44 @@ export async function PATCH(
     }
 
     const result = await prisma.$transaction(async (transaction) => {
-      await transaction.$executeRawUnsafe(
-        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
-        requestId,
-      );
-      const verificationRequest =
+      const initialVerificationRequest =
         await transaction.identityVerificationRequest.findUnique({
           where: { id: requestId },
-          select: {
-            id: true,
-            status: true,
-            profileId: true,
-            postingDeadlineAt: true,
-            moderationCase: {
-              select: {
-                id: true,
-                profileId: true,
-                targetType: true,
-                targetId: true,
-                reasonCode: true,
-                status: true,
-                profile: {
-                  select: {
-                    status: true,
-                    audioStatus: true,
-                    accountModerationStatus: true,
-                    suspensionAppealDueAt: true,
-                    deletionProcessingStartedAt: true,
-                  },
-                },
-              },
-            },
-          },
+          select: identityVerificationRequestSelect,
         });
-      if (!verificationRequest) {
+      if (!initialVerificationRequest) {
         return {
           error: "本人確認申請が見つかりません。",
           httpStatus: 404,
         } as const;
       }
-      if (verificationRequest.status !== "pending") {
+      await transaction.$executeRawUnsafe(
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        `profile:${initialVerificationRequest.profileId}`,
+      );
+      await transaction.$executeRawUnsafe(
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        `identity-verification-request:${requestId}`,
+      );
+      const lockedVerificationRequest =
+        await transaction.identityVerificationRequest.findUnique({
+          where: { id: requestId },
+          select: identityVerificationRequestSelect,
+        });
+      if (!lockedVerificationRequest) {
+        return {
+          error: "本人確認申請が見つかりません。",
+          httpStatus: 404,
+        } as const;
+      }
+      if (lockedVerificationRequest.status !== "pending") {
         return {
           error: "この本人確認申請は審査済みです。",
           httpStatus: 409,
         } as const;
       }
+      const lockedModerationCase = lockedVerificationRequest.moderationCase;
+      const verificationRequest = lockedVerificationRequest;
       const reviewedAt = new Date();
       if (verificationRequest.postingDeadlineAt <= reviewedAt) {
         await transaction.identityVerificationRequest.update({
@@ -242,7 +261,7 @@ export async function PATCH(
           httpStatus: 409,
         } as const;
       }
-      const moderationCase = verificationRequest.moderationCase;
+      const moderationCase = lockedModerationCase;
       if (
         moderationCase.reasonCode !== "impersonation" ||
         !openCaseStatuses.includes(
@@ -364,6 +383,19 @@ export async function PATCH(
                 data: {
                   accountModerationStatus: "active",
                   suspensionAppealDueAt: null,
+                },
+              });
+              await transaction.moderationRequest.updateMany({
+                where: {
+                  profileId: moderationCase.profileId,
+                  kind: "accountAppeal",
+                  status: "pending",
+                },
+                data: {
+                  status: "resolved",
+                  responseMessage:
+                    "本人確認により利用停止理由が解消されたため、利用停止状態を訂正しました。",
+                  resolvedAt: reviewedAt,
                 },
               });
               accountCorrection = { corrected: true, reason: "corrected" };

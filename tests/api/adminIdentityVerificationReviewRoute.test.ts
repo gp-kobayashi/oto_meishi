@@ -10,6 +10,7 @@ const { mocks } = vi.hoisted(() => ({
     executeRaw: vi.fn(),
     requestFindUnique: vi.fn(),
     requestUpdate: vi.fn(),
+    appealUpdateMany: vi.fn(),
     caseCount: vi.fn(),
     caseUpdate: vi.fn(),
     caseEventCreate: vi.fn(),
@@ -94,6 +95,7 @@ describe("管理者の本人確認審査API", () => {
       moderationCase,
     });
     mocks.requestUpdate.mockResolvedValue({ id: requestId });
+    mocks.appealUpdateMany.mockResolvedValue({ count: 1 });
     mocks.caseCount.mockResolvedValue(0);
     mocks.caseUpdate.mockResolvedValue({ id: "case-1" });
     mocks.caseEventCreate.mockResolvedValue({ id: "event-1" });
@@ -128,6 +130,7 @@ describe("管理者の本人確認審査API", () => {
             findUnique: mocks.requestFindUnique,
             update: mocks.requestUpdate,
           },
+          moderationRequest: { updateMany: mocks.appealUpdateMany },
           moderationCase: {
             count: mocks.caseCount,
             update: mocks.caseUpdate,
@@ -173,6 +176,7 @@ describe("管理者の本人確認審査API", () => {
         reviewNote: "本人の投稿を確認しました。",
       }),
     });
+    expect(mocks.requestFindUnique).toHaveBeenCalledTimes(2);
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { id: "profile-1" },
       data: {
@@ -197,6 +201,29 @@ describe("管理者の本人確認審査API", () => {
     });
     expect(mocks.actionCreate).toHaveBeenCalledTimes(2);
     expect(mocks.notificationCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.appealUpdateMany).toHaveBeenCalledWith({
+      where: {
+        profileId: "profile-1",
+        kind: "accountAppeal",
+        status: "pending",
+      },
+      data: {
+        status: "resolved",
+        responseMessage:
+          "本人確認により利用停止理由が解消されたため、利用停止状態を訂正しました。",
+        resolvedAt: expect.any(Date),
+      },
+    });
+    expect(mocks.executeRaw.mock.calls.slice(0, 2)).toEqual([
+      [
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        "profile:profile-1",
+      ],
+      [
+        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        `identity-verification-request:${requestId}`,
+      ],
+    ]);
     expect(mocks.notificationCreate.mock.calls[1][0]).toEqual({
       data: expect.objectContaining({ title: "本人確認により公開しました" }),
     });
@@ -241,7 +268,7 @@ describe("管理者の本人確認審査API", () => {
   });
 
   it("同じプロフィールのソーシャルリンクだけを公開する", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "pending",
       profileId: "profile-1",
@@ -282,7 +309,7 @@ describe("管理者の本人確認審査API", () => {
   });
 
   it("対象リンクが存在しない場合はリンクを公開しない", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "pending",
       profileId: "profile-1",
@@ -307,7 +334,7 @@ describe("管理者の本人確認審査API", () => {
   });
 
   it("削除済み音声は公開しない", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "pending",
       profileId: "profile-1",
@@ -399,10 +426,15 @@ describe("管理者の本人確認審査API", () => {
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
     expect(mocks.actionCreate).not.toHaveBeenCalled();
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
+    expect(mocks.appealUpdateMany).not.toHaveBeenCalled();
   });
 
   it("削除処理中のアカウントは停止状態を訂正しない", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    const profile = {
+      ...moderationCase.profile,
+      deletionProcessingStartedAt: new Date("2025-01-01T00:00:00.000Z"),
+    };
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "pending",
       profileId: "profile-1",
@@ -410,8 +442,7 @@ describe("管理者の本人確認審査API", () => {
       moderationCase: {
         ...moderationCase,
         profile: {
-          ...moderationCase.profile,
-          deletionProcessingStartedAt: new Date("2025-01-01T00:00:00.000Z"),
+          ...profile,
         },
       },
     });
@@ -429,7 +460,11 @@ describe("管理者の本人確認審査API", () => {
   });
 
   it("削除保留中のアカウントは停止状態を訂正しない", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    const profile = {
+      ...moderationCase.profile,
+      accountModerationStatus: "deletionPending" as const,
+    };
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "pending",
       profileId: "profile-1",
@@ -437,8 +472,7 @@ describe("管理者の本人確認審査API", () => {
       moderationCase: {
         ...moderationCase,
         profile: {
-          ...moderationCase.profile,
-          accountModerationStatus: "deletionPending",
+          ...profile,
         },
       },
     });
@@ -503,7 +537,12 @@ describe("管理者の本人確認審査API", () => {
   });
 
   it("すでに有効なアカウントでは訂正記録を重複作成しない", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    const profile = {
+      ...moderationCase.profile,
+      status: "active" as const,
+      accountModerationStatus: "active" as const,
+    };
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "pending",
       profileId: "profile-1",
@@ -511,9 +550,7 @@ describe("管理者の本人確認審査API", () => {
       moderationCase: {
         ...moderationCase,
         profile: {
-          ...moderationCase.profile,
-          status: "active",
-          accountModerationStatus: "active",
+          ...profile,
         },
       },
     });
@@ -533,7 +570,7 @@ describe("管理者の本人確認審査API", () => {
   });
 
   it("審査済み申請の再操作を拒否する", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "verified",
       profileId: "profile-1",
@@ -553,7 +590,7 @@ describe("管理者の本人確認審査API", () => {
   });
 
   it("投稿期限を過ぎた申請を期限切れにして審査を拒否する", async () => {
-    mocks.requestFindUnique.mockResolvedValueOnce({
+    mocks.requestFindUnique.mockResolvedValue({
       id: requestId,
       status: "pending",
       profileId: "profile-1",
