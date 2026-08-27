@@ -120,44 +120,48 @@ describe("管理者の本人確認審査API", () => {
     mocks.violationCreate.mockResolvedValue({ id: "revocation-1" });
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
-    mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
-      callback({
-        $executeRawUnsafe: mocks.executeRaw,
-        identityVerificationRequest: {
-          findUnique: mocks.requestFindUnique,
-          update: mocks.requestUpdate,
-        },
-        moderationCase: {
-          count: mocks.caseCount,
-          update: mocks.caseUpdate,
-        },
-        moderationCaseEvent: { create: mocks.caseEventCreate },
-        profile: { update: mocks.profileUpdate },
-        socialLink: {
-          findFirst: mocks.socialLinkFindFirst,
-          update: mocks.socialLinkUpdate,
-        },
-        moderationViolationEvent: {
-          findFirst: mocks.violationFindFirst,
-          findMany: mocks.violationFindMany,
-          create: mocks.violationCreate,
-        },
-        moderationAction: { create: mocks.actionCreate },
-        userNotification: { create: mocks.notificationCreate },
-      }),
+    mocks.transaction.mockImplementation(
+      async (callback: (tx: unknown) => unknown) =>
+        callback({
+          $executeRawUnsafe: mocks.executeRaw,
+          identityVerificationRequest: {
+            findUnique: mocks.requestFindUnique,
+            update: mocks.requestUpdate,
+          },
+          moderationCase: {
+            count: mocks.caseCount,
+            update: mocks.caseUpdate,
+          },
+          moderationCaseEvent: { create: mocks.caseEventCreate },
+          profile: { update: mocks.profileUpdate },
+          socialLink: {
+            findFirst: mocks.socialLinkFindFirst,
+            update: mocks.socialLinkUpdate,
+          },
+          moderationViolationEvent: {
+            findFirst: mocks.violationFindFirst,
+            findMany: mocks.violationFindMany,
+            create: mocks.violationCreate,
+          },
+          moderationAction: { create: mocks.actionCreate },
+          userNotification: { create: mocks.notificationCreate },
+        }),
     );
   });
 
   it("本人確認成功時にケースを完了し停止状態を訂正する", async () => {
-    const response = await PATCH(reviewRequest("verified", "本人の投稿を確認しました。"), {
-      params: Promise.resolve({ requestId }),
-    });
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      {
+        params: Promise.resolve({ requestId }),
+      },
+    );
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({
       status: "verified",
       caseStatus: "confirmed",
-      restored: false,
+      restored: true,
       revocationId: "revocation-1",
       accountCorrection: { corrected: true, reason: "corrected" },
     });
@@ -176,6 +180,10 @@ describe("管理者の本人確認審査API", () => {
         suspensionAppealDueAt: null,
       },
     });
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { status: "active" },
+    });
     expect(mocks.violationCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -186,6 +194,11 @@ describe("管理者の本人確認審査API", () => {
     );
     expect(mocks.notificationCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ title: "利用停止状態を訂正しました" }),
+    });
+    expect(mocks.actionCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(2);
+    expect(mocks.notificationCreate.mock.calls[1][0]).toEqual({
+      data: expect.objectContaining({ title: "本人確認により公開しました" }),
     });
     expect(mocks.actionCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -202,9 +215,12 @@ describe("管理者の本人確認審査API", () => {
   it("別の未完了ケースがあっても停止状態の訂正は行う", async () => {
     mocks.caseCount.mockResolvedValueOnce(1);
 
-    const response = await PATCH(reviewRequest("verified", "本人の投稿を確認しました。"), {
-      params: Promise.resolve({ requestId }),
-    });
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      {
+        params: Promise.resolve({ requestId }),
+      },
+    );
 
     await expect(response.json()).resolves.toMatchObject({
       status: "verified",
@@ -212,12 +228,119 @@ describe("管理者の本人確認審査API", () => {
       accountCorrection: { corrected: true },
     });
     expect(mocks.profileUpdate).toHaveBeenCalled();
+    expect(mocks.caseCount).toHaveBeenCalledWith({
+      where: {
+        id: { not: "case-1" },
+        profileId: "profile-1",
+        status: {
+          in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+        },
+        targetType: "profile",
+      },
+    });
+  });
+
+  it("同じプロフィールのソーシャルリンクだけを公開する", async () => {
+    mocks.requestFindUnique.mockResolvedValueOnce({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
+      moderationCase: {
+        ...moderationCase,
+        targetType: "socialLink",
+        targetId: "link-1",
+      },
+    });
+    mocks.socialLinkFindFirst.mockResolvedValueOnce({ status: "hidden" });
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({ restored: true });
+    expect(mocks.socialLinkFindFirst).toHaveBeenCalledWith({
+      where: { id: "link-1", profileId: "profile-1" },
+      select: { status: true },
+    });
+    expect(mocks.caseCount).toHaveBeenCalledWith({
+      where: {
+        id: { not: "case-1" },
+        profileId: "profile-1",
+        status: {
+          in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+        },
+        targetType: "socialLink",
+        targetId: "link-1",
+      },
+    });
+    expect(mocks.socialLinkUpdate).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { status: "active" },
+    });
+  });
+
+  it("対象リンクが存在しない場合はリンクを公開しない", async () => {
+    mocks.requestFindUnique.mockResolvedValueOnce({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
+      moderationCase: {
+        ...moderationCase,
+        targetType: "socialLink",
+        targetId: "deleted-link",
+      },
+    });
+    mocks.socialLinkFindFirst.mockResolvedValueOnce(null);
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({ restored: false });
+    expect(mocks.socialLinkUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
+  });
+
+  it("削除済み音声は公開しない", async () => {
+    mocks.requestFindUnique.mockResolvedValueOnce({
+      id: requestId,
+      status: "pending",
+      profileId: "profile-1",
+      postingDeadlineAt: new Date("2999-01-01T00:00:00.000Z"),
+      moderationCase: {
+        ...moderationCase,
+        targetType: "audio",
+        targetId: "profile-1",
+        profile: { ...moderationCase.profile, audioStatus: "removed" },
+      },
+    });
+
+    const response = await PATCH(
+      reviewRequest("verified", "本人の投稿を確認しました。"),
+      { params: Promise.resolve({ requestId }) },
+    );
+
+    await expect(response.json()).resolves.toMatchObject({ restored: false });
+    expect(mocks.profileUpdate).toHaveBeenCalledTimes(1);
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { accountModerationStatus: "active", suspensionAppealDueAt: null },
+    });
+    expect(mocks.actionCreate).toHaveBeenCalledTimes(1);
   });
 
   it("確認できない場合はケースを修正待ちにして理由を通知する", async () => {
-    const response = await PATCH(reviewRequest("rejected", "申請内容と投稿が一致しません。"), {
-      params: Promise.resolve({ requestId }),
-    });
+    const response = await PATCH(
+      reviewRequest("rejected", "申請内容と投稿が一致しません。"),
+      {
+        params: Promise.resolve({ requestId }),
+      },
+    );
 
     expect(response.status).toBe(200);
     expect(mocks.caseUpdate).toHaveBeenCalledWith({
@@ -344,7 +467,10 @@ describe("管理者の本人確認審査API", () => {
 
     await expect(response.json()).resolves.toMatchObject({
       restored: false,
-      accountCorrection: { corrected: false, reason: "matchingViolationMissing" },
+      accountCorrection: {
+        corrected: false,
+        reason: "matchingViolationMissing",
+      },
     });
     expect(mocks.violationCreate).not.toHaveBeenCalled();
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
@@ -386,6 +512,7 @@ describe("管理者の本人確認審査API", () => {
         ...moderationCase,
         profile: {
           ...moderationCase.profile,
+          status: "active",
           accountModerationStatus: "active",
         },
       },
@@ -414,9 +541,12 @@ describe("管理者の本人確認審査API", () => {
       moderationCase,
     });
 
-    const response = await PATCH(reviewRequest("verified", "再確認しました。"), {
-      params: Promise.resolve({ requestId }),
-    });
+    const response = await PATCH(
+      reviewRequest("verified", "再確認しました。"),
+      {
+        params: Promise.resolve({ requestId }),
+      },
+    );
 
     expect(response.status).toBe(409);
     expect(mocks.requestUpdate).not.toHaveBeenCalled();

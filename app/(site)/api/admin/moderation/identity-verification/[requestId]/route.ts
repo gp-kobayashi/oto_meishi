@@ -12,6 +12,7 @@ import {
   decideActiveViolationSuspension,
   type ViolationHistoryEvent,
 } from "@/lib/moderationViolation";
+import type { Prisma } from "@/lib/generated/prisma/client";
 
 const MAX_REVIEW_BODY_BYTES = 4 * 1024;
 const openCaseStatuses = [
@@ -34,6 +35,92 @@ type SuspensionCorrectionResult = {
 const noSuspensionCorrection = (
   reason: SuspensionCorrectionResult["reason"],
 ): SuspensionCorrectionResult => ({ corrected: false, reason });
+
+type Transaction = Prisma.TransactionClient;
+
+async function restoreTargetIfAllowed(
+  transaction: Transaction,
+  moderationCase: {
+    id: string;
+    profileId: string;
+    targetType: "profile" | "audio" | "socialLink";
+    targetId: string;
+    profile: {
+      status: "active" | "hidden" | "suspended";
+      audioStatus: "active" | "hidden" | "removed";
+    };
+  },
+  accountActive: boolean,
+) {
+  const otherOpenCases = await transaction.moderationCase.count({
+    where: {
+      id: { not: moderationCase.id },
+      profileId: moderationCase.profileId,
+      status: { in: [...openCaseStatuses] },
+      ...(moderationCase.targetType === "profile"
+        ? { targetType: "profile" }
+        : {
+            targetType: moderationCase.targetType,
+            targetId: moderationCase.targetId,
+          }),
+    },
+  });
+  const canRestore = accountActive && otherOpenCases === 0;
+
+  if (moderationCase.targetType === "profile") {
+    const previousStatus = moderationCase.profile.status;
+    const restored = canRestore && previousStatus !== "active";
+    if (restored) {
+      await transaction.profile.update({
+        where: { id: moderationCase.profileId },
+        data: { status: "active" },
+      });
+    }
+    return {
+      restored,
+      previousStatus,
+      newStatus: restored ? "active" : previousStatus,
+    };
+  }
+
+  if (moderationCase.targetType === "audio") {
+    const previousStatus = moderationCase.profile.audioStatus;
+    const restored =
+      canRestore && previousStatus !== "active" && previousStatus !== "removed";
+    if (restored) {
+      await transaction.profile.update({
+        where: { id: moderationCase.profileId },
+        data: { audioStatus: "active" },
+      });
+    }
+    return {
+      restored,
+      previousStatus,
+      newStatus: restored ? "active" : previousStatus,
+    };
+  }
+
+  const socialLink = await transaction.socialLink.findFirst({
+    where: {
+      id: moderationCase.targetId,
+      profileId: moderationCase.profileId,
+    },
+    select: { status: true },
+  });
+  const previousStatus = socialLink?.status ?? "hidden";
+  const restored = canRestore && socialLink?.status === "hidden";
+  if (restored) {
+    await transaction.socialLink.update({
+      where: { id: moderationCase.targetId },
+      data: { status: "active" },
+    });
+  }
+  return {
+    restored,
+    previousStatus,
+    newStatus: restored ? "active" : previousStatus,
+  };
+}
 
 export async function PATCH(
   request: Request,
@@ -181,9 +268,17 @@ export async function PATCH(
       let previousStatus: string = moderationCase.profile.status;
       let newStatus: string = previousStatus;
       let revocationId: string | null = null;
-      let accountCorrection: SuspensionCorrectionResult = noSuspensionCorrection(
-        "alreadyActive",
-      );
+      let accountCorrection: SuspensionCorrectionResult =
+        noSuspensionCorrection("alreadyActive");
+      let targetRestoration: {
+        restored: boolean;
+        previousStatus: string;
+        newStatus: string;
+      } = {
+        restored: false,
+        previousStatus: moderationCase.profile.status,
+        newStatus: moderationCase.profile.status,
+      };
       if (decision === "verified") {
         await transaction.moderationCase.update({
           where: { id: moderationCase.id },
@@ -237,8 +332,7 @@ export async function PATCH(
             );
           } else if (
             moderationCase.profile.deletionProcessingStartedAt ||
-            moderationCase.profile.accountModerationStatus ===
-              "deletionPending"
+            moderationCase.profile.accountModerationStatus === "deletionPending"
           ) {
             accountCorrection = noSuspensionCorrection("deletionPending");
           } else if (
@@ -278,8 +372,17 @@ export async function PATCH(
             }
           }
         } else {
-          accountCorrection = noSuspensionCorrection("matchingViolationMissing");
+          accountCorrection = noSuspensionCorrection(
+            "matchingViolationMissing",
+          );
         }
+
+        targetRestoration = await restoreTargetIfAllowed(
+          transaction,
+          moderationCase,
+          moderationCase.profile.accountModerationStatus === "active" ||
+            accountCorrection.corrected,
+        );
       } else {
         await transaction.moderationCase.update({
           where: { id: moderationCase.id },
@@ -329,12 +432,34 @@ export async function PATCH(
           data: {
             profileId: moderationCase.profileId,
             moderationActionId: moderationAction.id,
-            title:
-              isAccountCorrection
-                ? "利用停止状態を訂正しました"
-                : decision === "verified"
-                  ? "本人確認が完了しました"
-                  : "本人確認を完了できませんでした",
+            title: isAccountCorrection
+              ? "利用停止状態を訂正しました"
+              : decision === "verified"
+                ? "本人確認が完了しました"
+                : "本人確認を完了できませんでした",
+            message: note,
+          },
+        });
+      }
+      if (decision === "verified" && targetRestoration.restored) {
+        const moderationAction = await transaction.moderationAction.create({
+          data: {
+            adminUserId: authorization.admin.id,
+            profileId: moderationCase.profileId,
+            targetType: moderationCase.targetType,
+            targetId: moderationCase.targetId,
+            action: "restore",
+            previousStatus: targetRestoration.previousStatus,
+            newStatus: targetRestoration.newStatus,
+            reason: note,
+          },
+          select: { id: true },
+        });
+        await transaction.userNotification.create({
+          data: {
+            profileId: moderationCase.profileId,
+            moderationActionId: moderationAction.id,
+            title: "本人確認により公開しました",
             message: note,
           },
         });
@@ -345,8 +470,9 @@ export async function PATCH(
         status: decision,
         caseStatus:
           decision === "verified" ? "confirmed" : "correctionRequired",
-        restored: false,
+        restored: targetRestoration.restored,
         accountCorrection,
+        targetRestoration,
         revocationId,
       } as const;
     });
