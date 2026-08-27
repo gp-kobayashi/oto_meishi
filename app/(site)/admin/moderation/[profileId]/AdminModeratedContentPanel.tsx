@@ -343,7 +343,7 @@ export default function AdminModeratedContentPanel({
         {profile.links.length ? (
           <div className={styles.links}>
             {profile.links.map((socialLink) => (
-              <article className={styles.linkItem} key={socialLink.id}>
+              <article className={styles.linkItem} id={`link-${socialLink.id}`} key={socialLink.id}>
                 <div className={styles.linkHeading}>
                   <div>
                     <p className={styles.service}>{socialLink.service}</p>

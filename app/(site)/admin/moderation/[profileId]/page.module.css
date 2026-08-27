@@ -38,6 +38,104 @@
   margin-bottom: 22px;
 }
 
+.attentionSummary {
+  margin: 16px 0 22px;
+  padding: 22px;
+  border: 2px solid #fca5a5;
+  border-radius: 16px;
+  background: #fff7f7;
+  box-shadow: 0 8px 24px rgba(127, 29, 29, 0.08);
+}
+
+.attentionSummaryHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.attentionSummary h2,
+.attentionTargets h3 {
+  margin: 0;
+}
+
+.attentionSummary h2 {
+  font-size: 20px;
+}
+
+.attentionEyebrow {
+  margin: 0 0 5px;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.attentionCount {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.attentionTaskList,
+.attentionTargets ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attentionTaskLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 190px;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff;
+  color: #991b1b;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.attentionTaskLink strong {
+  white-space: nowrap;
+}
+
+.noAttention {
+  margin: 16px 0 0;
+  color: #64748b;
+}
+
+.attentionTargets {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #fecaca;
+}
+
+.attentionTargets h3 {
+  color: #7f1d1d;
+  font-size: 14px;
+}
+
+.attentionTargets a {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .heading h1,
 .heading p,
 .panel h2,
@@ -848,6 +946,19 @@
 
   .heading {
     align-items: flex-start;
+  }
+
+  .attentionSummaryHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .attentionTaskList {
+    display: grid;
+  }
+
+  .attentionTaskLink {
+    min-width: 0;
   }
 
   .definitionList {

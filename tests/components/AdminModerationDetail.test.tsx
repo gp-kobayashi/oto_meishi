@@ -59,5 +59,22 @@ describe("AdminModerationDetail", () => {
       screen.getByRole("heading", { name: "問い合わせ・解除申請" }),
     ).toBeDefined();
     expect(screen.getByRole("heading", { name: "対応履歴" })).toBeDefined();
+
+    const orderedHeadings = [
+      screen.getByRole("heading", { name: "要対応サマリー" }),
+      screen.getByRole("heading", { name: "通報" }),
+      screen.getByRole("heading", { name: "修正内容と審査状況" }),
+      screen.getByRole("heading", { name: "本人確認申請" }),
+      screen.getByRole("heading", { name: "問い合わせ・解除申請" }),
+      screen.getByRole("heading", { name: "管理操作履歴" }),
+      screen.getByRole("heading", { name: "プロフィール" }),
+    ];
+    for (let index = 1; index < orderedHeadings.length; index += 1) {
+      expect(
+        orderedHeadings[index - 1].compareDocumentPosition(
+          orderedHeadings[index],
+        ) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    }
   });
 });

@@ -12,6 +12,7 @@ import AdminIdentityVerificationPanel from "./AdminIdentityVerificationPanel";
 import AdminModerationCasesPanel from "./AdminModerationCasesPanel";
 import AdminModeratedContentPanel from "./AdminModeratedContentPanel";
 import AdminModerationHistoryPanels from "./AdminModerationHistoryPanels";
+import AdminModerationAttentionSummary from "./AdminModerationAttentionSummary";
 import {
   profileStatusLabels,
 } from "./moderationPresentation";
@@ -103,8 +104,9 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                 {profileStatusLabels[data.profile.status]}
               </span>
             </header>
-            <AdminModeratedContentPanel
-              profile={data.profile}
+            <AdminModerationAttentionSummary profile={data.profile} />
+            <AdminReportsPanel
+              reports={data.profile.reports}
               onReload={loadDetail}
               onActionMessage={setActionMessage}
             />
@@ -127,15 +129,15 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
               onActionMessage={setActionMessage}
             />
 
-            <AdminReportsPanel
-              reports={data.profile.reports}
-              onReload={loadDetail}
-              onActionMessage={setActionMessage}
-            />
             <AdminModerationHistoryPanels
               violationSummary={data.profile.violationSummary}
               violationEvents={data.profile.violationEvents}
               history={data.profile.history}
+            />
+            <AdminModeratedContentPanel
+              profile={data.profile}
+              onReload={loadDetail}
+              onActionMessage={setActionMessage}
             />
           </article>
         ) : null}
