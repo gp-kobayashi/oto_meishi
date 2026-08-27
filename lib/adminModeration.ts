@@ -1,3 +1,5 @@
+import type { Prisma } from "@/lib/generated/prisma/client";
+
 export const moderationFilters = [
   "all",
   "attention",
@@ -7,6 +9,46 @@ export const moderationFilters = [
 ] as const;
 
 export type ModerationFilter = (typeof moderationFilters)[number];
+
+export function getModerationFilterWhere(
+  filter: ModerationFilter,
+): Prisma.ProfileWhereInput {
+  switch (filter) {
+    case "attention":
+      return {
+        OR: [
+          { status: { not: "active" } },
+          { audioStatus: { not: "active" } },
+          { sns: { some: { status: "hidden" } } },
+          { reports: { some: { status: "pending" } } },
+          {
+            moderationCases: {
+              some: {
+                status: { in: ["postReviewPending", "preReviewPending"] },
+              },
+            },
+          },
+        ],
+      };
+    case "active":
+      return {
+        status: "active",
+        audioStatus: "active",
+        sns: { none: { status: "hidden" } },
+        moderationCases: {
+          none: {
+            status: { in: ["postReviewPending", "preReviewPending"] },
+          },
+        },
+      };
+    case "hidden":
+      return { status: "hidden" };
+    case "suspended":
+      return { status: "suspended" };
+    default:
+      return {};
+  }
+}
 
 export type ModerationListItem = {
   id: string;
@@ -25,6 +67,7 @@ export type ModerationListItem = {
 
 export type ModerationListResponse = {
   items: ModerationListItem[];
+  attentionTotal: number;
   pagination: {
     page: number;
     pageSize: number;

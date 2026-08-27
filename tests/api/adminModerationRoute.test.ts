@@ -53,6 +53,7 @@ describe("GET /api/admin/moderation", () => {
         },
       ],
       1,
+      10,
     ]);
   });
 
@@ -72,6 +73,7 @@ describe("GET /api/admin/moderation", () => {
       updatedAt: "2026-07-17T00:00:00.000Z",
     });
     expect(result.items[0].audioUrl).toBeUndefined();
+    expect(result.attentionTotal).toBe(10);
     expect(result.pagination).toEqual({
       page: 2,
       pageSize: 20,
@@ -81,6 +83,23 @@ describe("GET /api/admin/moderation", () => {
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ skip: 20, take: 20 }),
     );
+    expect(mocks.count).toHaveBeenNthCalledWith(2, {
+      where: {
+        OR: [
+          { status: { not: "active" } },
+          { audioStatus: { not: "active" } },
+          { sns: { some: { status: "hidden" } } },
+          { reports: { some: { status: "pending" } } },
+          {
+            moderationCases: {
+              some: {
+                status: { in: ["postReviewPending", "preReviewPending"] },
+              },
+            },
+          },
+        ],
+      },
+    });
     expect(mocks.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({

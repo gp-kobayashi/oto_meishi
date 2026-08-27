@@ -1,7 +1,7 @@
 import { authorizeAdminRequest } from "@/lib/adminAuth";
 import {
+  getModerationFilterWhere,
   isModerationFilter,
-  type ModerationFilter,
 } from "@/lib/adminModeration";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -12,44 +12,6 @@ const PAGE_SIZE = 20;
 function parsePositiveInteger(value: string | null) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
-}
-
-function getFilterWhere(filter: ModerationFilter): Prisma.ProfileWhereInput {
-  switch (filter) {
-    case "attention":
-      return {
-        OR: [
-          { status: { not: "active" } },
-          { audioStatus: { not: "active" } },
-          { sns: { some: { status: "hidden" } } },
-          { reports: { some: { status: "pending" } } },
-          {
-            moderationCases: {
-              some: {
-                status: { in: ["postReviewPending", "preReviewPending"] },
-              },
-            },
-          },
-        ],
-      };
-    case "active":
-      return {
-        status: "active",
-        audioStatus: "active",
-        sns: { none: { status: "hidden" } },
-        moderationCases: {
-          none: {
-            status: { in: ["postReviewPending", "preReviewPending"] },
-          },
-        },
-      };
-    case "hidden":
-      return { status: "hidden" };
-    case "suspended":
-      return { status: "suspended" };
-    default:
-      return {};
-  }
 }
 
 export async function GET(request: Request) {
@@ -67,7 +29,7 @@ export async function GET(request: Request) {
     const query = (url.searchParams.get("q") ?? "").trim().slice(0, 100);
     const where: Prisma.ProfileWhereInput = {
       AND: [
-        getFilterWhere(requestedFilter),
+        getModerationFilterWhere(requestedFilter),
         query
           ? {
               OR: [
@@ -79,7 +41,7 @@ export async function GET(request: Request) {
       ],
     };
 
-    const [profiles, total] = await prisma.$transaction([
+    const [profiles, total, attentionTotal] = await prisma.$transaction([
       prisma.profile.findMany({
         where,
         orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
@@ -109,10 +71,12 @@ export async function GET(request: Request) {
         },
       }),
       prisma.profile.count({ where }),
+      prisma.profile.count({ where: getModerationFilterWhere("attention") }),
     ]);
 
     return Response.json(
       {
+        attentionTotal,
         items: profiles.map((profile) => ({
           id: profile.id,
           userId: profile.userId,

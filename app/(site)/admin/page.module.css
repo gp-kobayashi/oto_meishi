@@ -36,15 +36,6 @@
   letter-spacing: 0.18em;
 }
 
-.total {
-  flex: 0 0 auto;
-  padding: 8px 14px;
-  border-radius: 999px;
-  background: #e2e8f0;
-  color: #334155 !important;
-  font-weight: 700;
-}
-
 .controls {
   display: flex;
   align-items: flex-end;
@@ -75,9 +66,23 @@
 }
 
 .filters button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 9px 13px;
   background: #f1f5f9;
   color: #475569;
+}
+
+.attentionCount {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
 }
 
 .filters .activeFilter {

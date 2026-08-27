@@ -31,6 +31,11 @@ const audioStatusLabels = {
   removed: "削除済み",
 };
 
+function formatAttentionCount(count: number) {
+  if (count <= 0) return null;
+  return count >= 10 ? "9+" : String(count);
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [data, setData] = useState<ModerationListResponse | null>(null);
@@ -108,7 +113,6 @@ export default function AdminPage() {
             <h1>管理対象一覧</h1>
             <p>プロフィール、音声、リンクの公開状態を確認します。</p>
           </div>
-          {data ? <p className={styles.total}>{data.pagination.total}件</p> : null}
         </header>
 
         <div className={styles.controls}>
@@ -118,12 +122,22 @@ export default function AdminPage() {
                 key={option.value}
                 type="button"
                 className={filter === option.value ? styles.activeFilter : ""}
+                aria-label={
+                  option.value === "attention" && data?.attentionTotal
+                    ? `要対応 ${formatAttentionCount(data.attentionTotal)}件`
+                    : undefined
+                }
                 onClick={() => {
                   setFilter(option.value);
                   setPage(1);
                 }}
               >
-                {option.label}
+                <span>{option.label}</span>
+                {option.value === "attention" && data?.attentionTotal ? (
+                  <span className={styles.attentionCount} aria-hidden="true">
+                    {formatAttentionCount(data.attentionTotal)}
+                  </span>
+                ) : null}
               </button>
             ))}
           </div>

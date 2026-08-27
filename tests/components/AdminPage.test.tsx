@@ -45,6 +45,7 @@ describe("AdminPage", () => {
               updatedAt: "2026-07-17T00:00:00.000Z",
             },
           ],
+          attentionTotal: 1,
           pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
         }),
         { status: 200 },
@@ -59,6 +60,37 @@ describe("AdminPage", () => {
     expect(screen.getByText("未確認の通報")).toBeDefined();
     expect(screen.getByText("審査待ち")).toBeDefined();
     expect(screen.getByText("2件", { selector: "p" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { name: "管理対象一覧" }).parentElement
+        ?.textContent,
+    ).not.toContain("1件");
+    expect(screen.getByRole("button", { name: "要対応 1件" })).toBeDefined();
+  });
+
+  it.each([
+    [0, false, ""],
+    [1, true, "1"],
+    [10, true, "9+"],
+  ])("要対応件数 %s の表示を制御する", async (attentionTotal, visible, label) => {
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      Response.json({
+        items: [],
+        attentionTotal,
+        pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+      }),
+    );
+
+    render(<AdminPage />);
+
+    const button = await screen.findByRole("button", {
+      name: visible ? `要対応 ${label}件` : "要対応",
+    });
+    if (visible) {
+      expect(button.textContent).toContain(`要対応${label}`);
+    } else {
+      expect(button.textContent).toContain("要対応");
+      expect(button.textContent).not.toContain("0");
+    }
   });
 
   it("未ログインの場合は管理者ログインを求める", async () => {
