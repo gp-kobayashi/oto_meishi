@@ -1,6 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAdminModerationDetailResponse } from "@/tests/fixtures/adminModerationDetail";
+import {
+  createAdminModerationDetail,
+  createAdminModerationDetailResponse,
+} from "@/tests/fixtures/adminModerationDetail";
 
 const { mocks } = vi.hoisted(() => ({
   mocks: {
@@ -17,6 +20,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import AdminModerationDetail from "@/app/(site)/admin/moderation/[profileId]/AdminModerationDetail";
+import AdminModerationAttentionSummary from "@/app/(site)/admin/moderation/[profileId]/AdminModerationAttentionSummary";
 
 describe("AdminModerationDetail", () => {
   beforeEach(() => {
@@ -76,5 +80,31 @@ describe("AdminModerationDetail", () => {
         ) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
+  });
+
+  it("要対応項目がない場合は成功状態として表示する", () => {
+    const { profile } = createAdminModerationDetail();
+    render(
+      <AdminModerationAttentionSummary
+        profile={{
+          ...profile,
+          reports: [],
+          moderationCases: [],
+          moderationRequests: [],
+          identityVerificationRequests: [],
+        }}
+      />,
+    );
+    expect(screen.getByRole("region").getAttribute("data-status")).toBe(
+      "clear",
+    );
+  });
+
+  it("要対応項目がある場合は警告状態として表示する", () => {
+    const { profile } = createAdminModerationDetail();
+    render(<AdminModerationAttentionSummary profile={profile} />);
+    expect(screen.getByRole("region").getAttribute("data-status")).toBe(
+      "action-required",
+    );
   });
 });

@@ -18,8 +18,8 @@ export default function AdminModerationAttentionSummary({
   const pendingReports = profile.reports.filter(
     (report) => report.status === "pending",
   ).length;
-  const reviewWaitingCases = profile.moderationCases.filter(
-    (moderationCase) => reviewWaitingStatuses.has(moderationCase.status),
+  const reviewWaitingCases = profile.moderationCases.filter((moderationCase) =>
+    reviewWaitingStatuses.has(moderationCase.status),
   ).length;
   const pendingIdentityVerification = (
     profile.identityVerificationRequests ?? []
@@ -65,10 +65,14 @@ export default function AdminModerationAttentionSummary({
       href: "#requests-heading",
     },
   ].filter((task) => task.count > 0);
+  const hasActionableItems = tasks.length > 0 || attentionTargets.size > 0;
 
   return (
     <section
-      className={styles.attentionSummary}
+      className={`${styles.attentionSummary} ${
+        hasActionableItems ? "" : styles.attentionSummarySuccess
+      }`}
+      data-status={hasActionableItems ? "action-required" : "clear"}
       aria-labelledby="attention-summary-heading"
     >
       <div className={styles.attentionSummaryHeader}>
@@ -91,7 +95,8 @@ export default function AdminModerationAttentionSummary({
             {tasks.map((task) => (
               <li key={task.href}>
                 <Link href={task.href} className={styles.attentionTaskLink}>
-                  <span>{task.label}</span><strong>{task.count}件</strong>
+                  <span>{task.label}</span>
+                  <strong>{task.count}件</strong>
                 </Link>
               </li>
             ))}

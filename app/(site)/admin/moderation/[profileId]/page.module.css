@@ -47,6 +47,20 @@
   box-shadow: 0 8px 24px rgba(127, 29, 29, 0.08);
 }
 
+.attentionSummarySuccess {
+  border-color: #86efac;
+  background: #f0fdf4;
+  box-shadow: 0 8px 24px rgba(21, 128, 61, 0.08);
+}
+
+.attentionSummarySuccess .attentionEyebrow {
+  color: #15803d;
+}
+
+.attentionSummarySuccess .noAttention {
+  color: #166534;
+}
+
 .attentionSummaryHeader {
   display: flex;
   align-items: center;
