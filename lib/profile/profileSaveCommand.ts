@@ -9,6 +9,7 @@ import {
 } from "@/lib/profile/profileLinks";
 import { ownerModerationCasesQuery } from "@/lib/profile/queries";
 import type { ProfileSaveExistingProfile } from "@/lib/profile/profileSavePreparation";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 export async function executeProfileSave({
   existingProfile,
@@ -33,6 +34,7 @@ export async function executeProfileSave({
 }) {
   return prisma.$transaction(async (transaction) => {
     let profileId: string;
+    let currentProfile = existingProfile;
 
     if (!existingProfile) {
       const createdProfile = await transaction.profile.create({
@@ -51,10 +53,33 @@ export async function executeProfileSave({
       });
       profileId = createdProfile.id;
     } else {
+      await lockModerationProfile(transaction, existingProfile.id);
+      const lockedProfile = await transaction.profile.findUnique({
+        where: { id: existingProfile.id },
+        include: {
+          sns: true,
+          moderationCases: {
+            where: {
+              targetType: "socialLink",
+              retentionExpiresAt: { gt: new Date() },
+            },
+            select: {
+              snapshots: {
+                where: { kind: "reported" },
+                select: { content: true, contentHash: true },
+              },
+            },
+          },
+        },
+      });
+      if (!lockedProfile || lockedProfile.authId !== authId) {
+        throw new Error("Profile changed while saving.");
+      }
+      currentProfile = lockedProfile;
       const reportedProfileContent: ModeratedProfileContent = {
-        displayName: existingProfile.displayName,
-        bio: existingProfile.bio,
-        theme: existingProfile.theme,
+        displayName: currentProfile.displayName,
+        bio: currentProfile.bio,
+        theme: currentProfile.theme,
       };
       const correctedProfileContent: ModeratedProfileContent = {
         displayName: displayName || userId,
@@ -63,7 +88,7 @@ export async function executeProfileSave({
       };
       const profileCorrection = await recordModeratedProfileCorrection({
         transaction,
-        profileId: existingProfile.id,
+        profileId: currentProfile.id,
         reportedContent: reportedProfileContent,
         correctedContent: correctedProfileContent,
         actorId: authId,
@@ -85,9 +110,9 @@ export async function executeProfileSave({
     }
 
     if (!preserveExistingLinks) {
-      const existingLinks: ExistingSocialLink[] = (
-        existingProfile?.sns ?? []
-      ).map((link) => ({ ...link, status: link.status ?? "active" }));
+      const existingLinks: ExistingSocialLink[] = (currentProfile?.sns ?? []).map(
+        (link) => ({ ...link, status: link.status ?? "active" }),
+      );
       await syncSocialLinks({
         transaction,
         profileId,
@@ -97,9 +122,10 @@ export async function executeProfileSave({
       });
     }
 
-    return transaction.profile.findUnique({
+    const savedProfile = await transaction.profile.findUnique({
       where: { userId },
       include: { sns: true, moderationCases: ownerModerationCasesQuery },
     });
+    return savedProfile;
   });
 }

@@ -5,6 +5,7 @@ const { mocks } = vi.hoisted(() => ({
     getUser: vi.fn(),
     transaction: vi.fn(),
     findUnique: vi.fn(),
+    lockedFindUnique: vi.fn(),
     updateMany: vi.fn(),
     moderationCaseFindFirst: vi.fn(),
     moderationCaseCreate: vi.fn(),
@@ -19,6 +20,7 @@ const { mocks } = vi.hoisted(() => ({
     pendingDeleteMany: vi.fn(),
     pendingUpdate: vi.fn(),
     processPending: vi.fn(),
+    executeRaw: vi.fn(),
   },
 }));
 
@@ -72,7 +74,8 @@ describe("DELETE /api/audio", () => {
     });
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
-        profile: { updateMany: mocks.updateMany },
+        $executeRaw: mocks.executeRaw,
+        profile: { findUnique: mocks.lockedFindUnique, updateMany: mocks.updateMany },
         pendingR2ObjectDeletion: { upsert: mocks.pendingUpsert },
         moderationCase: {
           findFirst: mocks.moderationCaseFindFirst,
@@ -104,6 +107,12 @@ describe("DELETE /api/audio", () => {
     mocks.pendingDeleteMany.mockResolvedValue({ count: 1 });
     mocks.pendingUpdate.mockResolvedValue({ id: "pending-1" });
     mocks.processPending.mockResolvedValue("deleted");
+    mocks.executeRaw.mockResolvedValue(1);
+    mocks.lockedFindUnique.mockImplementation(async () =>
+      mocks.findUnique.mock.results.at(-1)?.value
+        ? await mocks.findUnique.mock.results.at(-1)!.value
+        : null,
+    );
   });
 
   it("本人のR2音源を削除してプロフィールを未登録にする", async () => {

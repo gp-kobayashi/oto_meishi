@@ -22,6 +22,7 @@ const { mocks } = vi.hoisted(() => ({
     uploadToR2: vi.fn(),
     generateAudioKey: vi.fn(),
     findUniqueProfile: vi.fn(),
+    lockedProfileFindUnique: vi.fn(),
     findFirstProfile: vi.fn(),
     findFirstSnapshot: vi.fn(),
     inspectAudioFile: vi.fn(),
@@ -38,6 +39,7 @@ const { mocks } = vi.hoisted(() => ({
     extractKeyFromUrl: vi.fn(),
     readMultipartFormData: vi.fn(),
     requestR2ObjectDeletion: vi.fn(),
+    executeRaw: vi.fn(),
   },
 }));
 
@@ -179,6 +181,11 @@ describe("/api/audio/upload route", () => {
     });
     mocks.findFirstProfile.mockResolvedValue(null);
     mocks.findFirstSnapshot.mockResolvedValue(null);
+    mocks.lockedProfileFindUnique.mockImplementation(async () =>
+      mocks.findUniqueProfile.mock.results.at(-1)?.value
+        ? await mocks.findUniqueProfile.mock.results.at(-1)!.value
+        : null,
+    );
     mocks.inspectAudioFile.mockImplementation(async (filePath: string) =>
       filePath.endsWith("output.m4a")
         ? validOutputMetadata()
@@ -196,7 +203,11 @@ describe("/api/audio/upload route", () => {
     mocks.updateProfile.mockResolvedValue(undefined);
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
-        profile: { update: mocks.updateProfile },
+        $executeRaw: mocks.executeRaw,
+        profile: {
+          findUnique: mocks.lockedProfileFindUnique,
+          update: mocks.updateProfile,
+        },
         moderationCase: {
           update: mocks.moderationCaseUpdate,
           create: mocks.moderationCaseCreate,

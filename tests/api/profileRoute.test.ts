@@ -7,6 +7,8 @@ const { mocks } = vi.hoisted(() => ({
     deleteUser: vi.fn(),
     isRegistrationBanned: vi.fn(),
     profileFindUnique: vi.fn(),
+    lockedProfileFindUnique: vi.fn(),
+    lockedReadCount: 0,
     profileCreate: vi.fn(),
     profileUpdate: vi.fn(),
     socialLinkDeleteMany: vi.fn(),
@@ -26,6 +28,7 @@ const { mocks } = vi.hoisted(() => ({
     consumePublicProfileReadIpRateLimit: vi.fn(),
     consumePrivateProfileReadUserRateLimit: vi.fn(),
     consumePrivateProfileReadIpRateLimit: vi.fn(),
+    executeRaw: vi.fn(),
   },
 }));
 
@@ -115,10 +118,22 @@ describe("/api/profile route", () => {
     mocks.moderationCaseUpdate.mockResolvedValue({ id: "case-1" });
     mocks.moderationSnapshotCreate.mockResolvedValue({});
     mocks.moderationCaseEventCreate.mockResolvedValue({});
+    mocks.executeRaw.mockResolvedValue(1);
+    mocks.lockedReadCount = 0;
+    mocks.lockedProfileFindUnique.mockImplementation(async () =>
+      mocks.profileCreate.mock.calls.length > 0
+        ? mocks.profileFindUnique()
+        : ++mocks.lockedReadCount === 1
+        ? mocks.profileFindUnique.mock.results.at(-1)?.value
+          ? await mocks.profileFindUnique.mock.results.at(-1)!.value
+          : null
+        : mocks.profileFindUnique(),
+    );
     mocks.transaction.mockImplementation(async (callback) =>
       callback({
+        $executeRaw: mocks.executeRaw,
         profile: {
-          findUnique: mocks.profileFindUnique,
+          findUnique: mocks.lockedProfileFindUnique,
           create: mocks.profileCreate,
           update: mocks.profileUpdate,
         },

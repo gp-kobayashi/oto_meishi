@@ -37,6 +37,7 @@ import {
   getModerationDeadline,
 } from "@/lib/moderationRemediation";
 import { requestR2ObjectDeletion } from "@/lib/pendingR2ObjectDeletion";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 const MAX_MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 const MAX_REQUEST_BODY_SIZE_BYTES =
@@ -339,7 +340,67 @@ export async function POST(request: NextRequest) {
       try {
         const deadline = getModerationDeadline();
         await prisma.$transaction(async (tx) => {
-          const existingCase = profile.moderationCases.find(
+          await lockModerationProfile(tx, profile.id);
+          const currentProfile = await tx.profile.findUnique({
+            where: { id: profile.id },
+            select: {
+              id: true,
+              authId: true,
+              audioStatus: true,
+              audioKey: true,
+              audioUrl: true,
+              audioContentHash: true,
+              moderationCases: {
+                where: {
+                  targetType: "audio",
+                  OR: [
+                    {
+                      status: {
+                        in: [
+                          "correctionRequired",
+                          "postReviewPending",
+                          "preReviewPending",
+                        ],
+                      },
+                    },
+                    { retentionExpiresAt: { gt: new Date() } },
+                  ],
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: {
+                  id: true,
+                  status: true,
+                  snapshots: {
+                    where: { kind: "reported" },
+                    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                    take: 1,
+                    select: { contentHash: true },
+                  },
+                },
+              },
+            },
+          });
+          if (
+            !currentProfile ||
+            currentProfile.authId !== authenticatedUserId
+          ) {
+            throw new Error("Profile changed while uploading audio.");
+          }
+          const matchingCurrentReportedAudio =
+            currentProfile.moderationCases.some((moderationCase) =>
+              moderationCase.snapshots.some(
+                (snapshot) =>
+                  snapshot.contentHash &&
+                  compareModeratedContentHashes(
+                    snapshot.contentHash,
+                    contentHash,
+                  ) === "same",
+              ),
+            );
+          if (matchingCurrentReportedAudio) {
+            throw new Error("REPORTED_AUDIO_UNCHANGED");
+          }
+          const existingCase = currentProfile.moderationCases.find(
             (moderationCase) =>
               moderationCase.status === "correctionRequired" ||
               moderationCase.status === "postReviewPending" ||
@@ -348,13 +409,13 @@ export async function POST(request: NextRequest) {
           const reviewMode = "preReview" as const;
           const pendingStatus = "preReviewPending" as const;
           const isModeratedReplacement =
-            Boolean(existingCase) || profile.audioStatus !== "active";
+            Boolean(existingCase) || currentProfile.audioStatus !== "active";
 
           await tx.profile.update({
             where: {
               userId,
               authId: authenticatedUserId,
-              audioStatus: profile.audioStatus,
+              audioStatus: currentProfile.audioStatus,
             },
             data: {
               audioKey,
@@ -364,7 +425,7 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          if (!isModeratedReplacement) return;
+          if (!isModeratedReplacement) return { unchanged: false };
 
           const moderationCase = existingCase
             ? await tx.moderationCase.update({
@@ -415,12 +476,22 @@ export async function POST(request: NextRequest) {
               details: { targetType: "audio" },
             },
           });
+          return { unchanged: false };
         });
       } catch (databaseError) {
         try {
           await requestR2ObjectDeletion(audioKey);
         } catch (cleanupError) {
           console.error("Failed to delete unlinked audio file:", cleanupError);
+        }
+        if (
+          databaseError instanceof Error &&
+          databaseError.message === "REPORTED_AUDIO_UNCHANGED"
+        ) {
+          return NextResponse.json(
+            { error: "非公開前と同じ音声です。別の音声へ変更してください。" },
+            { status: 409 },
+          );
         }
         throw databaseError;
       }

@@ -6,6 +6,7 @@ import { createServerSupabaseClient } from "@/lib/supabaseClient";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { getModerationDeadline } from "@/lib/moderationRemediation";
 import { processPendingR2ObjectDeletion } from "@/lib/pendingR2ObjectDeletion";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 export async function DELETE(request: Request) {
   const authHeader = request.headers.get("Authorization");
@@ -58,8 +59,26 @@ export async function DELETE(request: Request) {
     if (profile.audioStatus === "hidden") {
       const deadline = getModerationDeadline();
       let recoveryResult: { count: number };
+      let currentProfile = profile;
       try {
         recoveryResult = await prisma.$transaction(async (tx) => {
+          await lockModerationProfile(tx, profile.id);
+          const lockedProfile = await tx.profile.findUnique({
+            where: { id: profile.id },
+            select: {
+              id: true,
+              audioUrl: true,
+              audioKey: true,
+              audioContentHash: true,
+              audioTitle: true,
+              audioStatus: true,
+              accountModerationStatus: true,
+            },
+          });
+          if (!lockedProfile) {
+            throw new Error("Profile changed while deleting audio.");
+          }
+          currentProfile = lockedProfile;
           const updateResult = await tx.profile.updateMany({
             where: {
               authId: user.id,
@@ -74,7 +93,7 @@ export async function DELETE(request: Request) {
 
           await recordModeratedAudioDeletion({
             tx,
-            profile,
+            profile: currentProfile,
             actorId: user.id,
             deadline,
             audioKey: null,
@@ -110,7 +129,7 @@ export async function DELETE(request: Request) {
     );
   }
 
-  const audioKey = profile.audioKey || extractKeyFromUrl(profile.audioUrl);
+  let audioKey = profile.audioKey || extractKeyFromUrl(profile.audioUrl);
   if (!audioKey) {
     return NextResponse.json(
       { error: "音源情報が不正なため削除できませんでした。" },
@@ -119,22 +138,45 @@ export async function DELETE(request: Request) {
   }
 
   let updateResult: { count: number };
+  let currentProfile = profile;
   try {
     const deadline = getModerationDeadline();
     updateResult = await prisma.$transaction(async (tx) => {
+      await lockModerationProfile(tx, profile.id);
+      const lockedProfile = await tx.profile.findUnique({
+        where: { id: profile.id },
+        select: {
+          id: true,
+          audioUrl: true,
+          audioKey: true,
+          audioContentHash: true,
+          audioTitle: true,
+          audioStatus: true,
+          accountModerationStatus: true,
+        },
+      });
+      if (!lockedProfile) {
+        throw new Error("Profile changed while deleting audio.");
+      }
+      currentProfile = lockedProfile;
+      audioKey =
+        currentProfile.audioKey || extractKeyFromUrl(currentProfile.audioUrl);
+      if (!audioKey) return { count: 0 };
       const result = await tx.profile.updateMany({
         where: {
           authId: user.id,
-          audioUrl: profile.audioUrl,
-          audioKey: profile.audioKey,
-          audioStatus: profile.audioStatus,
+          audioUrl: currentProfile.audioUrl,
+          audioKey: currentProfile.audioKey,
+          audioStatus: currentProfile.audioStatus,
         },
         data: {
           audioUrl: "",
           audioKey: "",
           audioTitle: "",
           audioStatus:
-            profile.audioStatus === "hidden" ? "removed" : profile.audioStatus,
+            currentProfile.audioStatus === "hidden"
+              ? "removed"
+              : currentProfile.audioStatus,
         },
       });
 
@@ -142,7 +184,7 @@ export async function DELETE(request: Request) {
         return result;
       }
 
-      if (profile.audioStatus !== "hidden") {
+      if (currentProfile.audioStatus !== "hidden") {
         await tx.pendingR2ObjectDeletion.upsert({
           where: { objectKey: audioKey },
           create: { objectKey: audioKey, nextAttemptAt: new Date() },
@@ -158,7 +200,7 @@ export async function DELETE(request: Request) {
 
       await recordModeratedAudioDeletion({
         tx,
-        profile,
+        profile: currentProfile,
         actorId: user.id,
         deadline,
         audioKey,
@@ -181,7 +223,7 @@ export async function DELETE(request: Request) {
     );
   }
 
-  if (profile.audioStatus !== "hidden") {
+  if (currentProfile.audioStatus !== "hidden") {
     try {
       await processPendingR2ObjectDeletion(audioKey);
     } catch (error) {
@@ -195,7 +237,9 @@ export async function DELETE(request: Request) {
       audioUrl: "",
       audioTitle: "",
       audioStatus:
-        profile.audioStatus === "hidden" ? "removed" : profile.audioStatus,
+        currentProfile.audioStatus === "hidden"
+          ? "removed"
+          : currentProfile.audioStatus,
     },
     { headers: PRIVATE_NO_STORE_HEADERS },
   );
