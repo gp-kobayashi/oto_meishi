@@ -170,157 +170,161 @@ export default function AdminModerationCasesPanel({
                 : [];
             return (
               <li className={styles.caseItem} key={moderationCase.id}>
-                <div className={styles.caseHeading}>
-                  <div>
-                    <span className={styles.historyTarget}>
-                      {targetTypeLabels[moderationCase.targetType]}
-                    </span>
+                <details className={styles.collapsibleItem} open={isPending}>
+                  <summary className={styles.collapsibleSummary}>
                     <strong>
+                      {targetTypeLabels[moderationCase.targetType]} /{" "}
                       {moderationReasonLabels[moderationCase.reasonCode]}
                     </strong>
-                  </div>
-                  <span className={styles.reviewStatus}>
-                    {moderationCaseStatusLabels[moderationCase.status]}
-                  </span>
-                </div>
-                <p className={styles.caseMessage}>
-                  対応理由: {moderationCase.userMessage}
-                </p>
-                {latestContentChange && changedProfileFields.length ? (
-                  <div className={styles.changeSummary}>
-                    <strong>変更された項目</strong>
-                    <ul>
-                      {changedProfileFields.map((field) => (
-                        <li key={field}>{profileFieldLabels[field]}</li>
-                      ))}
-                    </ul>
-                    <time dateTime={latestContentChange.createdAt}>
-                      変更日時: {formatAdminDate(latestContentChange.createdAt)}
+                    <span className={styles.reviewStatus}>
+                      {moderationCaseStatusLabels[moderationCase.status]}
+                    </span>
+                    <time dateTime={moderationCase.updatedAt}>
+                      {formatAdminDate(moderationCase.updatedAt)}
                     </time>
-                  </div>
-                ) : null}
-                <div className={styles.snapshotComparison}>
-                  <div>
-                    <h3>非公開時</h3>
-                    <pre>
-                      {latestReported
-                        ? formatSnapshotContent(latestReported.content)
-                        : "記録なし"}
-                    </pre>
-                    {latestReported ? (
-                      <>
-                        <time dateTime={latestReported.createdAt}>
-                          {formatAdminDate(latestReported.createdAt)}
-                        </time>
-                        {moderationCase.targetType === "audio" &&
-                        latestReported.hasStoredAudio ? (
-                          <AdminAudioPlayer
-                            profileId={profileId}
-                            snapshotId={latestReported.id}
-                            label="非公開時の音声を確認"
-                          />
-                        ) : null}
-                      </>
-                    ) : null}
-                  </div>
-                  <div>
-                    <h3>修正後</h3>
-                    <pre>
-                      {latestCorrected
-                        ? formatSnapshotContent(latestCorrected.content)
-                        : "まだ修正されていません"}
-                    </pre>
-                    {latestCorrected ? (
-                      <>
-                        <time dateTime={latestCorrected.createdAt}>
-                          {formatAdminDate(latestCorrected.createdAt)}
-                        </time>
-                        {moderationCase.targetType === "audio" &&
-                        (latestCorrected.hasStoredAudio || hasAudio) ? (
-                          <AdminAudioPlayer
-                            profileId={profileId}
-                            snapshotId={
-                              latestCorrected.hasStoredAudio
-                                ? latestCorrected.id
-                                : undefined
-                            }
-                            label="修正後の音声を確認"
-                          />
-                        ) : null}
-                      </>
-                    ) : null}
-                  </div>
-                </div>
-                <h3 className={styles.timelineHeading}>操作履歴</h3>
-                {moderationCase.events.length ? (
-                  <ol className={styles.caseTimeline}>
-                    {moderationCase.events.map((caseEvent) => (
-                      <li key={caseEvent.id}>
-                        <strong>
-                          {moderationCaseEventLabels[caseEvent.eventType]}
-                        </strong>
-                        <time dateTime={caseEvent.createdAt}>
-                          {formatAdminDate(caseEvent.createdAt)}
-                        </time>
-                        <span>
-                          {caseEvent.actorType}
-                          {caseEvent.actorIdentifier
-                            ? ` / ${caseEvent.actorIdentifier}`
-                            : ""}
-                        </span>
-                      </li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className={styles.emptyHistory}>操作履歴はありません。</p>
-                )}
-                {isPending ? (
-                  <div className={styles.caseReview}>
-                    <label htmlFor={`case-response-${moderationCase.id}`}>
-                      ユーザーに通知する審査理由（必須）
-                    </label>
-                    <textarea
-                      id={`case-response-${moderationCase.id}`}
-                      maxLength={500}
-                      rows={4}
-                      value={caseResponses[moderationCase.id] ?? ""}
-                      onChange={(event) =>
-                        setCaseResponses((current) => ({
-                          ...current,
-                          [moderationCase.id]: event.target.value,
-                        }))
-                      }
-                    />
-                    <div className={styles.reportActions}>
-                      {(
-                        [
-                          ["approve", "修正を承認", !!latestCorrected],
-                          ["continueHidden", "非公開を継続", false],
-                          ["requestChanges", "追加修正を依頼", false],
-                        ] as const
-                      ).map(([decision, label, requiresCorrected]) => (
-                        <button
-                          key={decision}
-                          type="button"
-                          disabled={
-                            updatingCaseId === moderationCase.id ||
-                            (requiresCorrected && !latestCorrected) ||
-                            !caseResponses[moderationCase.id]?.trim()
-                          }
-                          onClick={() =>
-                            void reviewModerationCase(
-                              moderationCase.id,
-                              decision,
-                              latestCorrected?.id ?? null,
-                            )
-                          }
-                        >
-                          {label}
-                        </button>
-                      ))}
+                  </summary>
+                  <p className={styles.caseMessage}>
+                    対応理由: {moderationCase.userMessage}
+                  </p>
+                  {latestContentChange && changedProfileFields.length ? (
+                    <div className={styles.changeSummary}>
+                      <strong>変更された項目</strong>
+                      <ul>
+                        {changedProfileFields.map((field) => (
+                          <li key={field}>{profileFieldLabels[field]}</li>
+                        ))}
+                      </ul>
+                      <time dateTime={latestContentChange.createdAt}>
+                        変更日時:{" "}
+                        {formatAdminDate(latestContentChange.createdAt)}
+                      </time>
+                    </div>
+                  ) : null}
+                  <div className={styles.snapshotComparison}>
+                    <div>
+                      <h3>非公開時</h3>
+                      <pre>
+                        {latestReported
+                          ? formatSnapshotContent(latestReported.content)
+                          : "記録なし"}
+                      </pre>
+                      {latestReported ? (
+                        <>
+                          <time dateTime={latestReported.createdAt}>
+                            {formatAdminDate(latestReported.createdAt)}
+                          </time>
+                          {moderationCase.targetType === "audio" &&
+                          latestReported.hasStoredAudio ? (
+                            <AdminAudioPlayer
+                              profileId={profileId}
+                              snapshotId={latestReported.id}
+                              label="非公開時の音声を確認"
+                            />
+                          ) : null}
+                        </>
+                      ) : null}
+                    </div>
+                    <div>
+                      <h3>修正後</h3>
+                      <pre>
+                        {latestCorrected
+                          ? formatSnapshotContent(latestCorrected.content)
+                          : "まだ修正されていません"}
+                      </pre>
+                      {latestCorrected ? (
+                        <>
+                          <time dateTime={latestCorrected.createdAt}>
+                            {formatAdminDate(latestCorrected.createdAt)}
+                          </time>
+                          {moderationCase.targetType === "audio" &&
+                          (latestCorrected.hasStoredAudio || hasAudio) ? (
+                            <AdminAudioPlayer
+                              profileId={profileId}
+                              snapshotId={
+                                latestCorrected.hasStoredAudio
+                                  ? latestCorrected.id
+                                  : undefined
+                              }
+                              label="修正後の音声を確認"
+                            />
+                          ) : null}
+                        </>
+                      ) : null}
                     </div>
                   </div>
-                ) : null}
+                  <h3 className={styles.timelineHeading}>操作履歴</h3>
+                  {moderationCase.events.length ? (
+                    <ol className={styles.caseTimeline}>
+                      {moderationCase.events.map((caseEvent) => (
+                        <li key={caseEvent.id}>
+                          <strong>
+                            {moderationCaseEventLabels[caseEvent.eventType]}
+                          </strong>
+                          <time dateTime={caseEvent.createdAt}>
+                            {formatAdminDate(caseEvent.createdAt)}
+                          </time>
+                          <span>
+                            {caseEvent.actorType}
+                            {caseEvent.actorIdentifier
+                              ? ` / ${caseEvent.actorIdentifier}`
+                              : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className={styles.emptyHistory}>
+                      操作履歴はありません。
+                    </p>
+                  )}
+                  {isPending ? (
+                    <div className={styles.caseReview}>
+                      <label htmlFor={`case-response-${moderationCase.id}`}>
+                        ユーザーに通知する審査理由（必須）
+                      </label>
+                      <textarea
+                        id={`case-response-${moderationCase.id}`}
+                        maxLength={500}
+                        rows={4}
+                        value={caseResponses[moderationCase.id] ?? ""}
+                        onChange={(event) =>
+                          setCaseResponses((current) => ({
+                            ...current,
+                            [moderationCase.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      <div className={styles.reportActions}>
+                        {(
+                          [
+                            ["approve", "修正を承認", !!latestCorrected],
+                            ["continueHidden", "非公開を継続", false],
+                            ["requestChanges", "追加修正を依頼", false],
+                          ] as const
+                        ).map(([decision, label, requiresCorrected]) => (
+                          <button
+                            key={decision}
+                            type="button"
+                            disabled={
+                              updatingCaseId === moderationCase.id ||
+                              (requiresCorrected && !latestCorrected) ||
+                              !caseResponses[moderationCase.id]?.trim()
+                            }
+                            onClick={() =>
+                              void reviewModerationCase(
+                                moderationCase.id,
+                                decision,
+                                latestCorrected?.id ?? null,
+                              )
+                            }
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </details>
               </li>
             );
           })}

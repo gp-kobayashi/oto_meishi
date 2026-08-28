@@ -29,6 +29,12 @@ describe("AdminReportsPanel", () => {
         onActionMessage={onActionMessage}
       />,
     );
+    const pendingSummary = screen
+      .getByText("危険または不正なリンク")
+      .closest("summary");
+    expect((pendingSummary?.parentElement as HTMLDetailsElement).open).toBe(
+      true,
+    );
     expect(screen.getByText("危険または不正なリンク")).toBeDefined();
     expect(screen.getByText("最初の確認記録")).toBeDefined();
     fireEvent.click(screen.getByRole("button", { name: "確認済みにする" }));
@@ -50,5 +56,27 @@ describe("AdminReportsPanel", () => {
         "通報を「確認済み」に変更しました。",
       );
     });
+  });
+
+  it("対応済み通報は折りたたみ、展開すると詳細を表示する", () => {
+    const d = createAdminModerationDetail();
+    const report = { ...d.profile.reports[0], status: "resolved" as const };
+    render(
+      <AdminReportsPanel
+        reports={[report]}
+        onReload={vi.fn()}
+        onActionMessage={vi.fn()}
+      />,
+    );
+    const summary = screen
+      .getByText("危険または不正なリンク")
+      .closest("summary");
+    expect(summary).not.toBeNull();
+    const details = summary?.parentElement;
+    expect(details?.tagName).toBe("DETAILS");
+    expect((details as HTMLDetailsElement).open).toBe(false);
+    fireEvent.click(summary as HTMLElement);
+    expect((details as HTMLDetailsElement).open).toBe(true);
+    expect(screen.getByText("外部サイトへ誘導されます")).toBeDefined();
   });
 });

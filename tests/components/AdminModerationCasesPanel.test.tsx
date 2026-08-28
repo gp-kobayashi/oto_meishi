@@ -39,6 +39,20 @@ describe("AdminModerationCasesPanel", () => {
       screen.getAllByRole("button", { name: /非公開時の音声|修正後の音声/ })
         .length,
     ).toBeGreaterThan(0);
+    const completedSummary = screen
+      .getByText(/音声 \/ 不適切な内容/)
+      .closest("summary");
+    expect(completedSummary).not.toBeNull();
+    expect((completedSummary?.parentElement as HTMLDetailsElement).open).toBe(
+      false,
+    );
+    const pendingSummary = screen
+      .getByText(/リンク \/ 安全でないリンク/)
+      .closest("summary");
+    expect((pendingSummary?.parentElement as HTMLDetailsElement).open).toBe(
+      true,
+    );
+    expect(screen.getByRole("button", { name: "修正を承認" })).toBeDefined();
   });
   it("修正承認をPATCHし審査結果メッセージを通知する", async () => {
     const onReload = vi.fn().mockResolvedValue(undefined);

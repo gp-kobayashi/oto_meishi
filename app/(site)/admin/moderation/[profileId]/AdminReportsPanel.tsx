@@ -102,108 +102,119 @@ export default function AdminReportsPanel({
           <ol className={styles.reportList}>
             {reports.map((report) => (
               <li key={report.id}>
-                <div className={styles.reportHeader}>
-                  <strong>{reportReasonLabels[report.reason]}</strong>
-                  <span
-                    className={`${styles.reportStatus} ${styles[report.status]}`}
-                  >
-                    {reportStatusLabels[report.status]}
-                  </span>
-                </div>
-                <p className={styles.reportDetails}>
-                  {report.details || "詳細は入力されていません。"}
-                </p>
-                <time dateTime={report.createdAt}>
-                  受付日時: {formatAdminDate(report.createdAt)}
-                </time>
-                {report.reviewedAt && report.reviewerIdentifier ? (
-                  <p className={styles.reportReviewer}>
-                    最終変更: {formatAdminDate(report.reviewedAt)} /{" "}
-                    {report.reviewerRole} / {report.reviewerIdentifier}
+                <details
+                  className={styles.collapsibleItem}
+                  open={
+                    report.status === "pending" || report.status === "reviewed"
+                  }
+                >
+                  <summary className={styles.collapsibleSummary}>
+                    <strong>{reportReasonLabels[report.reason]}</strong>
+                    <span
+                      className={`${styles.reportStatus} ${styles[report.status]}`}
+                    >
+                      {reportStatusLabels[report.status]}
+                    </span>
+                    <time dateTime={report.createdAt}>
+                      受付日時: {formatAdminDate(report.createdAt)}
+                    </time>
+                  </summary>
+                  <p className={styles.reportDetails}>
+                    {report.details || "詳細は入力されていません。"}
                   </p>
-                ) : null}
-                {report.reviewNote ? (
-                  <p className={styles.reportReviewNote}>
-                    対応メモ: {report.reviewNote}
-                  </p>
-                ) : null}
-                {report.statusEvents.length ? (
-                  <section
-                    className={styles.reportStatusHistory}
-                    aria-label="通報対応履歴"
-                  >
-                    <h3>対応履歴</h3>
-                    <ol>
-                      {report.statusEvents.map((event) => (
-                        <li key={event.id}>
-                          <div className={styles.reportHistoryHeader}>
-                            <strong>
-                              {event.previousStatus
-                                ? reportStatusLabels[event.previousStatus]
-                                : "移行時点"}
-                              {" → "}
-                              {reportStatusLabels[event.newStatus]}
-                            </strong>
-                            <time dateTime={event.createdAt}>
-                              {formatAdminDate(event.createdAt)}
-                            </time>
-                          </div>
-                          <p>{event.note || "対応メモなし"}</p>
-                          <span>
-                            担当者: {event.adminRole ?? "不明"} /{" "}
-                            {event.adminIdentifier ?? "記録なし"}
-                            {event.isBackfilled ? "（既存記録）" : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ol>
-                  </section>
-                ) : null}
-                {report.status === "pending" || report.status === "reviewed" ? (
-                  <div className={styles.reportActions}>
-                    {report.status === "pending" ? (
+                  <time dateTime={report.createdAt}>
+                    受付日時: {formatAdminDate(report.createdAt)}
+                  </time>
+                  {report.reviewedAt && report.reviewerIdentifier ? (
+                    <p className={styles.reportReviewer}>
+                      最終変更: {formatAdminDate(report.reviewedAt)} /{" "}
+                      {report.reviewerRole} / {report.reviewerIdentifier}
+                    </p>
+                  ) : null}
+                  {report.reviewNote ? (
+                    <p className={styles.reportReviewNote}>
+                      対応メモ: {report.reviewNote}
+                    </p>
+                  ) : null}
+                  {report.statusEvents.length ? (
+                    <section
+                      className={styles.reportStatusHistory}
+                      aria-label="通報対応履歴"
+                    >
+                      <h3>対応履歴</h3>
+                      <ol>
+                        {report.statusEvents.map((event) => (
+                          <li key={event.id}>
+                            <div className={styles.reportHistoryHeader}>
+                              <strong>
+                                {event.previousStatus
+                                  ? reportStatusLabels[event.previousStatus]
+                                  : "移行時点"}
+                                {" → "}
+                                {reportStatusLabels[event.newStatus]}
+                              </strong>
+                              <time dateTime={event.createdAt}>
+                                {formatAdminDate(event.createdAt)}
+                              </time>
+                            </div>
+                            <p>{event.note || "対応メモなし"}</p>
+                            <span>
+                              担当者: {event.adminRole ?? "不明"} /{" "}
+                              {event.adminIdentifier ?? "記録なし"}
+                              {event.isBackfilled ? "（既存記録）" : ""}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    </section>
+                  ) : null}
+                  {report.status === "pending" ||
+                  report.status === "reviewed" ? (
+                    <div className={styles.reportActions}>
+                      {report.status === "pending" ? (
+                        <button
+                          type="button"
+                          disabled={Boolean(updatingReportId)}
+                          onClick={() =>
+                            setPendingReportAction({
+                              reportId: report.id,
+                              status: "reviewed",
+                              statusLabel: "確認済み",
+                            })
+                          }
+                        >
+                          確認済みにする
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         disabled={Boolean(updatingReportId)}
                         onClick={() =>
                           setPendingReportAction({
                             reportId: report.id,
-                            status: "reviewed",
-                            statusLabel: "確認済み",
+                            status: "resolved",
+                            statusLabel: "対応済み",
                           })
                         }
                       >
-                        確認済みにする
+                        対応済みにする
                       </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      disabled={Boolean(updatingReportId)}
-                      onClick={() =>
-                        setPendingReportAction({
-                          reportId: report.id,
-                          status: "resolved",
-                          statusLabel: "対応済み",
-                        })
-                      }
-                    >
-                      対応済みにする
-                    </button>
-                    <button
-                      type="button"
-                      disabled={Boolean(updatingReportId)}
-                      onClick={() =>
-                        setPendingReportAction({
-                          reportId: report.id,
-                          status: "dismissed",
-                          statusLabel: "対応不要",
-                        })
-                      }
-                    >
-                      対応不要にする
-                    </button>
-                  </div>
-                ) : null}
+                      <button
+                        type="button"
+                        disabled={Boolean(updatingReportId)}
+                        onClick={() =>
+                          setPendingReportAction({
+                            reportId: report.id,
+                            status: "dismissed",
+                            statusLabel: "対応不要",
+                          })
+                        }
+                      >
+                        対応不要にする
+                      </button>
+                    </div>
+                  ) : null}
+                </details>
               </li>
             ))}
           </ol>
