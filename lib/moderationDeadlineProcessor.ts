@@ -7,6 +7,7 @@ import {
   completePendingAccountAuthDeletions,
   deleteModeratedAccount,
 } from "@/lib/moderatedAccountDeletion";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 500;
@@ -146,6 +147,7 @@ export async function processModerationDeadlines(
 
     try {
       const changed = await prisma.$transaction(async (tx) => {
+        await lockModerationProfile(tx, profile.id);
         if (decision.action === "suspend") {
           const suspensionAppealDueAt = addModerationPeriod(now);
           const update = await tx.profile.updateMany({
@@ -157,6 +159,10 @@ export async function processModerationDeadlines(
                   status: "correctionRequired",
                   reviewDueAt: { lte: now },
                 },
+                none: { status: { in: [...PENDING_ADMIN_REVIEW_STATUSES] } },
+              },
+              moderationRequests: {
+                none: { kind: "accountAppeal", status: "pending" },
               },
             },
             data: {

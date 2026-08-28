@@ -10,6 +10,7 @@ const { mocks } = vi.hoisted(() => ({
     eventCreateMany: vi.fn(),
     deleteModeratedAccount: vi.fn(),
     completePendingAuthDeletions: vi.fn(),
+    executeRaw: vi.fn(),
   },
 }));
 
@@ -29,6 +30,7 @@ import { processModerationDeadlines } from "@/lib/moderationDeadlineProcessor";
 
 const now = new Date("2026-08-08T00:00:00.000Z");
 const transactionClient = {
+  $executeRaw: mocks.executeRaw,
   profile: { updateMany: mocks.updateMany },
   moderationAction: { create: mocks.actionCreate },
   userNotification: { create: mocks.notificationCreate },
@@ -43,6 +45,7 @@ describe("processModerationDeadlines", () => {
         callback(transactionClient),
     );
     mocks.updateMany.mockResolvedValue({ count: 1 });
+    mocks.executeRaw.mockResolvedValue(1);
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
     mocks.eventCreateMany.mockResolvedValue({ count: 1 });
@@ -109,12 +112,23 @@ describe("processModerationDeadlines", () => {
     });
     expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
+        where: expect.objectContaining({
+          moderationCases: expect.objectContaining({
+            none: { status: { in: ["postReviewPending", "preReviewPending"] } },
+          }),
+          moderationRequests: {
+            none: { kind: "accountAppeal", status: "pending" },
+          },
+        }),
         data: expect.objectContaining({
           status: "suspended",
           accountModerationStatus: "suspended",
           suspensionAppealDueAt: new Date("2026-10-07T00:00:00.000Z"),
         }),
       }),
+    );
+    expect(mocks.executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.updateMany.mock.invocationCallOrder[0],
     );
     expect(mocks.actionCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -151,6 +165,9 @@ describe("processModerationDeadlines", () => {
     const result = await processModerationDeadlines(now);
 
     expect(result.deletionScheduled).toBe(1);
+    expect(mocks.executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.updateMany.mock.invocationCallOrder[0],
+    );
     expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
@@ -166,6 +183,37 @@ describe("processModerationDeadlines", () => {
       }),
       select: { id: true },
     });
+  });
+
+  it("最終更新条件に合わない場合は監査副作用を作らずスキップする", async () => {
+    mocks.findMany.mockResolvedValue([
+      {
+        id: "profile-race",
+        status: "hidden",
+        accountModerationStatus: "active",
+        suspensionAppealDueAt: null,
+        deletionScheduledAt: null,
+        moderationCases: [
+          {
+            id: "case-race",
+            status: "correctionRequired",
+            reviewDueAt: new Date("2026-08-07T23:59:59.000Z"),
+          },
+        ],
+        moderationRequests: [],
+      },
+    ]);
+    mocks.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(processModerationDeadlines(now)).resolves.toMatchObject({
+      suspended: 0,
+      skipped: 1,
+      failed: 0,
+    });
+    expect(mocks.executeRaw).toHaveBeenCalledTimes(1);
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+    expect(mocks.eventCreateMany).not.toHaveBeenCalled();
   });
 
   it("管理者確認待ちまたは解除申請待ちは変更しない", async () => {
