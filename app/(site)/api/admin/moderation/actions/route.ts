@@ -19,6 +19,7 @@ import {
   resolveModerationReviewMode,
   type ModerationReasonCode,
 } from "@/lib/moderationRemediation";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 const MAX_MODERATION_ACTION_BODY_BYTES = 16 * 1024;
 
@@ -165,8 +166,27 @@ export async function PATCH(request: Request) {
       );
     }
 
+    let targetProfileId: string | null = null;
+    if (targetType === "socialLink") {
+      const target = await prisma.socialLink.findUnique({
+        where: { id: targetId },
+        select: { profileId: true },
+      });
+      targetProfileId = target?.profileId ?? null;
+    } else {
+      const target = await prisma.profile.findUnique({
+        where: { id: targetId },
+        select: { id: true },
+      });
+      targetProfileId = target?.id ?? null;
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-      let profileId: string;
+      if (!targetProfileId) {
+        return { error: "対象が見つかりません。", status: 404 } as const;
+      }
+      await lockModerationProfile(tx, targetProfileId);
+      let profileId: string = targetProfileId;
       let previousStatus: string;
       let reportedContent: Prisma.InputJsonObject = {};
       let reportedContentHash: string | null = null;
@@ -285,15 +305,29 @@ export async function PATCH(request: Request) {
             url: true,
             status: true,
             profile: {
-              select: { deletionProcessingStartedAt: true },
+              select: {
+                status: true,
+                accountModerationStatus: true,
+                deletionProcessingStartedAt: true,
+              },
             },
           },
         });
         if (!target)
           return { error: "対象が見つかりません。", status: 404 } as const;
+        if (target.profileId !== targetProfileId) {
+          return {
+            error:
+              "対象プロフィールが更新されています。最新の内容を読み込み直して再度お試しください。",
+            status: 409,
+          } as const;
+        }
         profileId = target.profileId;
         deletionProcessingStartedAt =
           target.profile?.deletionProcessingStartedAt ?? null;
+        profileStatus = target.profile?.status ?? null;
+        accountModerationStatus =
+          target.profile?.accountModerationStatus ?? null;
         previousStatus = target.status;
         reportedContent = {
           service: target.service,
@@ -356,10 +390,6 @@ export async function PATCH(request: Request) {
       let effectiveNextStatus = nextStatus;
       let profileStatusBeforeAutomaticSuspension: string | null = null;
       if (action === "hide") {
-        await tx.$executeRawUnsafe(
-          "select pg_advisory_xact_lock(hashtextextended($1, 0))",
-          profileId,
-        );
         const violationEvents = await tx.moderationViolationEvent.findMany({
           where: { profileId },
           select: {
@@ -370,17 +400,6 @@ export async function PATCH(request: Request) {
           },
         });
         const decision = decideViolationSuspension(violationEvents, reasonCode);
-        if (targetType === "socialLink") {
-          const profile = await tx.profile.findUnique({
-            where: { id: profileId },
-            select: { status: true, accountModerationStatus: true },
-          });
-          if (!profile) {
-            return { error: "対象が見つかりません。", status: 404 } as const;
-          }
-          profileStatus = profile.status;
-          accountModerationStatus = profile.accountModerationStatus;
-        }
         suspensionTriggered =
           decision.shouldSuspend && accountModerationStatus === "active";
 

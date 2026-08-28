@@ -5,8 +5,10 @@ const { mocks } = vi.hoisted(() => ({
     authorizeAdminRequest: vi.fn(),
     transaction: vi.fn(),
     profileFindUnique: vi.fn(),
+    preflightProfileFindUnique: vi.fn(),
     profileUpdate: vi.fn(),
     socialLinkFindUnique: vi.fn(),
+    preflightSocialLinkFindUnique: vi.fn(),
     socialLinkUpdate: vi.fn(),
     actionCreate: vi.fn(),
     notificationCreate: vi.fn(),
@@ -20,6 +22,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationViolationEventCreate: vi.fn(),
     moderationViolationEventFindMany: vi.fn(),
     executeRawUnsafe: vi.fn(),
+    executeRaw: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
     consumeAdminActionIpRateLimit: vi.fn(),
   },
@@ -30,7 +33,11 @@ vi.mock("@/lib/adminAuth", () => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { $transaction: mocks.transaction },
+  prisma: {
+    $transaction: mocks.transaction,
+    profile: { findUnique: mocks.preflightProfileFindUnique },
+    socialLink: { findUnique: mocks.preflightSocialLinkFindUnique },
+  },
 }));
 
 vi.mock("@/lib/adminActionRateLimit", () => ({
@@ -41,6 +48,7 @@ vi.mock("@/lib/adminActionRateLimit", () => ({
 import { PATCH } from "@/app/(site)/api/admin/moderation/actions/route";
 
 const tx = {
+  $executeRaw: mocks.executeRaw,
   $executeRawUnsafe: mocks.executeRawUnsafe,
   profile: { findUnique: mocks.profileFindUnique, update: mocks.profileUpdate },
   socialLink: {
@@ -107,6 +115,10 @@ describe("PATCH /api/admin/moderation/actions", () => {
         },
       ],
     });
+    mocks.preflightProfileFindUnique.mockResolvedValue({ id: "profile-1" });
+    mocks.preflightSocialLinkFindUnique.mockResolvedValue({
+      profileId: "profile-1",
+    });
     mocks.profileUpdate.mockResolvedValue({});
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
@@ -123,6 +135,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
     });
     mocks.moderationViolationEventFindMany.mockResolvedValue([]);
     mocks.executeRawUnsafe.mockResolvedValue(0);
+    mocks.executeRaw.mockResolvedValue(0);
     mocks.consumeAdminActionRateLimit.mockReturnValue({
       allowed: true,
       limit: 60,
@@ -259,9 +272,9 @@ describe("PATCH /api/admin/moderation/actions", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mocks.executeRawUnsafe).toHaveBeenCalledWith(
-      "select pg_advisory_xact_lock(hashtextextended($1, 0))",
-      "profile-1",
+    expect(mocks.executeRaw).toHaveBeenCalled();
+    expect(mocks.executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.profileFindUnique.mock.invocationCallOrder[0],
     );
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { id: "profile-1" },
@@ -330,6 +343,9 @@ describe("PATCH /api/admin/moderation/actions", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mocks.executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.profileFindUnique.mock.invocationCallOrder[0],
+    );
     expect(mocks.profileUpdate).toHaveBeenNthCalledWith(1, {
       where: { id: "profile-1" },
       data: { audioStatus: "hidden" },
@@ -407,6 +423,9 @@ describe("PATCH /api/admin/moderation/actions", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mocks.executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.socialLinkFindUnique.mock.invocationCallOrder[0],
+    );
     expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         moderationCaseId: "case-1",
@@ -414,6 +433,41 @@ describe("PATCH /api/admin/moderation/actions", () => {
         contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       }),
     });
+  });
+
+  it("リンクが別プロフィールへ移動していた場合は更新せず409を返す", async () => {
+    mocks.socialLinkFindUnique.mockResolvedValueOnce({
+      id: "link-1",
+      profileId: "profile-2",
+      service: "youtube",
+      label: "YouTube",
+      url: "https://example.com/moved",
+      status: "active",
+      profile: {
+        status: "active",
+        accountModerationStatus: "active",
+        deletionProcessingStartedAt: null,
+      },
+    });
+
+    const response = await PATCH(
+      request({
+        targetType: "socialLink",
+        targetId: "link-1",
+        action: "hide",
+        reason: "移動競合を確認しました",
+        reasonCode: "unsafeLink",
+      }),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "対象プロフィールが更新されています。最新の内容を読み込み直して再度お試しください。",
+    });
+    expect(mocks.socialLinkUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
   it("音声を非公開にすると現在の音声ハッシュを保存する", async () => {
