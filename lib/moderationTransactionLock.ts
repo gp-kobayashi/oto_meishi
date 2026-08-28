@@ -10,7 +10,8 @@ export async function lockModerationProfile(
   transaction: Transaction,
   profileId: string,
 ) {
-  await transaction.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${profileId}, 0))`;
+  const profileLockKey = `profile:${profileId}`;
+  await transaction.$executeRaw`select pg_advisory_xact_lock(hashtextextended(${profileLockKey}, 0))`;
 }
 
 /** Must be called after lockModerationProfile for the same profile. */

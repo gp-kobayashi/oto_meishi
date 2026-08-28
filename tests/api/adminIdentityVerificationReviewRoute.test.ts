@@ -126,6 +126,7 @@ describe("管理者の本人確認審査API", () => {
       async (callback: (tx: unknown) => unknown) =>
         callback({
           $executeRawUnsafe: mocks.executeRaw,
+          $executeRaw: mocks.executeRaw,
           identityVerificationRequest: {
             findUnique: mocks.requestFindUnique,
             update: mocks.requestUpdate,
@@ -216,7 +217,10 @@ describe("管理者の本人確認審査API", () => {
     });
     expect(mocks.executeRaw.mock.calls.slice(0, 2)).toEqual([
       [
-        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
+        [
+          "select pg_advisory_xact_lock(hashtextextended(",
+          ", 0))",
+        ],
         "profile:profile-1",
       ],
       [

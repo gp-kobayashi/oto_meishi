@@ -13,6 +13,7 @@ import {
   type ViolationHistoryEvent,
 } from "@/lib/moderationViolation";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 const MAX_REVIEW_BODY_BYTES = 4 * 1024;
 const openCaseStatuses = [
@@ -223,9 +224,9 @@ export async function PATCH(
           httpStatus: 404,
         } as const;
       }
-      await transaction.$executeRawUnsafe(
-        "select pg_advisory_xact_lock(hashtextextended($1, 0))",
-        `profile:${initialVerificationRequest.profileId}`,
+      await lockModerationProfile(
+        transaction,
+        initialVerificationRequest.profileId,
       );
       await transaction.$executeRawUnsafe(
         "select pg_advisory_xact_lock(hashtextextended($1, 0))",
