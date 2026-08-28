@@ -5,6 +5,8 @@ const { mocks } = vi.hoisted(() => ({
     authorize: vi.fn(),
     transaction: vi.fn(),
     caseFindUnique: vi.fn(),
+    preflightCaseFindUnique: vi.fn(),
+    executeRaw: vi.fn(),
     caseUpdate: vi.fn(),
     evidenceLifecycleUpdateMany: vi.fn(),
     eventCreate: vi.fn(),
@@ -28,7 +30,10 @@ vi.mock("@/lib/adminActionRateLimit", () => ({
 }));
 vi.mock("@/lib/clientIp", () => ({ getClientIp: mocks.getClientIp }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { $transaction: mocks.transaction },
+  prisma: {
+    $transaction: mocks.transaction,
+    moderationCase: { findUnique: mocks.preflightCaseFindUnique },
+  },
 }));
 
 import { PATCH } from "@/app/(site)/api/admin/moderation/cases/[caseId]/route";
@@ -93,9 +98,12 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     });
     mocks.getClientIp.mockReturnValue(null);
     mocks.caseFindUnique.mockResolvedValue(pendingCase);
+    mocks.preflightCaseFindUnique.mockResolvedValue({ profileId: "profile-1" });
+    mocks.executeRaw.mockResolvedValue(1);
     mocks.actionCreate.mockResolvedValue({ id: "action-1" });
     mocks.transaction.mockImplementation((callback) =>
       callback({
+        $executeRaw: mocks.executeRaw,
         moderationCase: {
           findUnique: mocks.caseFindUnique,
           update: mocks.caseUpdate,
@@ -131,6 +139,17 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mocks.preflightCaseFindUnique).toHaveBeenCalledWith({
+      where: { id: "case-1" },
+      select: { profileId: true },
+    });
+    expect(mocks.executeRaw).toHaveBeenCalledTimes(2);
+    expect(mocks.executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.executeRaw.mock.invocationCallOrder[1],
+    );
+    expect(mocks.caseFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "case-1" } }),
+    );
     expect(mocks.linkUpdateMany).toHaveBeenCalledWith({
       where: { id: "link-1" },
       data: { status: "active" },

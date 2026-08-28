@@ -15,6 +15,10 @@ import {
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
+import {
+  lockModerationCase,
+  lockModerationProfile,
+} from "@/lib/moderationTransactionLock";
 
 const MAX_BODY_BYTES = 8 * 1024;
 const AUDIO_EVIDENCE_RETENTION_MS = 60 * 24 * 60 * 60 * 1000;
@@ -98,7 +102,19 @@ export async function PATCH(
     }
 
     const { caseId } = await params;
+    const caseTarget = await prisma.moderationCase.findUnique({
+      where: { id: caseId },
+      select: { profileId: true },
+    });
+    if (!caseTarget) {
+      return Response.json(
+        { error: "審査対象が見つかりません。" },
+        { status: 404, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
     const result = await prisma.$transaction(async (tx) => {
+      await lockModerationProfile(tx, caseTarget.profileId);
+      await lockModerationCase(tx, caseId);
       const moderationCase = await tx.moderationCase.findUnique({
         where: { id: caseId },
         select: {
