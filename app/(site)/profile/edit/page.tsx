@@ -90,14 +90,18 @@ const moderationStatusLabels: Record<ModerationCase["status"], string> = {
   confirmed: "確認済み",
 };
 
-function ModerationNotice({ moderationCase }: { moderationCase: ModerationCase }) {
+function ModerationNotice({
+  moderationCase,
+}: {
+  moderationCase: ModerationCase;
+}) {
   const guidance =
     moderationCase.status === "confirmed"
       ? "管理者による確認は完了しています。"
       : moderationCase.reasonCode === "impersonation" &&
           moderationCase.targetType === "profile"
         ? "なりすましへの対応では、表示名・自己紹介・テーマと、登録済みの音声・リンクをすべて変更または削除してください。すべての修正を管理者が確認するまで公開されません。"
-      : "問題の箇所を変更しても、管理者の確認が完了するまで公開されません。";
+        : "問題の箇所を変更しても、管理者の確認が完了するまで公開されません。";
 
   return (
     <aside className={styles.moderationNotice} role="status">
@@ -424,7 +428,9 @@ export default function ProfileEditPage() {
 
   const handleDeleteAudio = async () => {
     if (!profile || deletingAudio) return;
-    if (!window.confirm("登録中の音源を削除しますか？この操作は取り消せません。")) {
+    if (
+      !window.confirm("登録中の音源を削除しますか？この操作は取り消せません。")
+    ) {
       return;
     }
 
@@ -479,10 +485,7 @@ export default function ProfileEditPage() {
       if (!current || current.sns.length >= 4) return current;
       return {
         ...current,
-        sns: [
-          ...current.sns,
-          { service: "other", url: "", label: "" },
-        ],
+        sns: [...current.sns, { service: "other", url: "", label: "" }],
       };
     });
   };
@@ -564,10 +567,9 @@ export default function ProfileEditPage() {
         const uploadResult = await uploadResponse.json().catch(() => ({}));
 
         if (!uploadResponse.ok) {
-          throw new Error(getAudioUploadErrorMessage(
-            uploadResponse.status,
-            uploadResult,
-          ));
+          throw new Error(
+            getAudioUploadErrorMessage(uploadResponse.status, uploadResult),
+          );
         }
 
         finalAudioUrl = "";
@@ -618,11 +620,12 @@ export default function ProfileEditPage() {
   const audioModerationCase = profile?.moderationCases?.find(
     (moderationCase) => moderationCase.targetType === "audio",
   );
-  const identityVerificationCase = profile?.moderationCases?.find(
-    (moderationCase) =>
-      moderationCase.reasonCode === "impersonation" &&
-      moderationCase.status !== "confirmed",
-  );
+  const identityVerificationCases =
+    profile?.moderationCases?.filter(
+      (moderationCase) =>
+        moderationCase.reasonCode === "impersonation" &&
+        moderationCase.status !== "confirmed",
+    ) ?? [];
   const previewProfile: ProfileData | null = profile
     ? {
         ...profile,
@@ -657,7 +660,9 @@ export default function ProfileEditPage() {
               onSave={handleSave}
               className={styles.stickySaveControls}
             />
-            <article className={`${styles.cardEditor} ${styles[profile.theme]}`}>
+            <article
+              className={`${styles.cardEditor} ${styles[profile.theme]}`}
+            >
               <div className={styles.cardTopBar}>
                 <div>
                   <p className={styles.cardBadge}>編集モード</p>
@@ -688,322 +693,328 @@ export default function ProfileEditPage() {
               </div>
 
               <div className={styles.cardBody}>
-              {profileModerationCase ? (
-                <ModerationNotice moderationCase={profileModerationCase} />
-              ) : null}
-              {identityVerificationCase ? (
-                <IdentityVerificationRequestPanel
-                  moderationCaseId={identityVerificationCase.id}
-                  socialLinks={socialLinks}
-                />
-              ) : null}
-
-              <div className={styles.fieldRow}>
-                <ValidatedFieldLabel
-                  htmlFor="displayName"
-                  label="表示名"
-                  error={validationErrors.displayName}
-                />
-                <input
-                  id="displayName"
-                  className={styles.titleInput}
-                  type="text"
-                  value={profile.displayName}
-                  onChange={(event) =>
-                    updateField("displayName", event.target.value)
-                  }
-                />
-              </div>
-
-              <div className={styles.fieldRow}>
-                <ValidatedFieldLabel
-                  htmlFor="bio"
-                  label="自己紹介"
-                  error={validationErrors.bio}
-                />
-                <textarea
-                  id="bio"
-                  className={styles.bioInput}
-                  value={profile.bio}
-                  onChange={(event) => updateField("bio", event.target.value)}
-                />
-              </div>
-
-              <div className={styles.audioGroup}>
-                {audioModerationCase ? (
-                  <ModerationNotice moderationCase={audioModerationCase} />
+                {profileModerationCase ? (
+                  <ModerationNotice moderationCase={profileModerationCase} />
                 ) : null}
-                <div className={styles.audioField}>
+                {identityVerificationCases.length ? (
+                  <IdentityVerificationRequestPanel
+                    moderationCases={identityVerificationCases}
+                    socialLinks={socialLinks}
+                  />
+                ) : null}
+
+                <div className={styles.fieldRow}>
                   <ValidatedFieldLabel
-                    htmlFor="audioTitle"
-                    label="音声タイトル"
-                    error={validationErrors.audioTitle}
+                    htmlFor="displayName"
+                    label="表示名"
+                    error={validationErrors.displayName}
                   />
                   <input
-                    id="audioTitle"
-                    className={styles.input}
+                    id="displayName"
+                    className={styles.titleInput}
                     type="text"
-                    value={profile.audioTitle}
+                    value={profile.displayName}
                     onChange={(event) =>
-                      updateField("audioTitle", event.target.value)
+                      updateField("displayName", event.target.value)
                     }
                   />
                 </div>
-                <div className={styles.audioField}>
-                  <label className={styles.label} htmlFor="audioFile">
-                    音声ファイル
-                  </label>
-                  <div
-                    className={`${styles.uploadZone} ${
-                      dragActive ? styles.uploadZoneActive : ""
-                    }`}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                  >
-                    <input
-                      id="audioFile"
-                      type="file"
-                      accept={AUDIO_FILE_ACCEPT}
-                      className={styles.hiddenFileInput}
-                      onChange={handleAudioInput}
-                    />
-                    <label
-                      htmlFor="audioFile"
-                      className={styles.uploadZoneLabel}
-                    >
-                      <p className={styles.uploadLabel}>
-                        ここに音声ファイルをドロップ、またはクリックして選択
-                      </p>
-                      <p className={styles.uploadHint}>
-                        {(audioUploadMessages.length > 0
-                          ? audioUploadMessages
-                          : [
-                              audioFile?.name ||
-                                (profile.audioKey || profile.audioUrl
-                                  ? "音源を登録済み"
-                                  : "未選択"),
-                            ]
-                        ).map((line, index, lines) => (
-                          <span key={`${line}-${index}`}>
-                            {line}
-                            {index < lines.length - 1 ? <br /> : null}
-                          </span>
-                        ))}
-                      </p>
-                    </label>
-                  </div>
-                  <p className={styles.uploadRequirements}>
-                    {AUDIO_UPLOAD_REQUIREMENTS}
-                  </p>
-                  {audioFileError ? (
-                    <p className={styles.audioFileError} role="alert">
-                      {audioFileError}
-                    </p>
-                  ) : null}
-                  {(audioPreviewUrl || profile.audioKey || profile.audioUrl) && (
-                    <div className={styles.audioPreview}>
-                      {audioPreviewUrl ? (
-                        <audio
-                          controls
-                          className={styles.audioPlayer}
-                          src={audioPreviewUrl}
-                        />
-                      ) : (
-                        <AudioPlayer
-                          userId={profile.userId}
-                          audioTitle={profile.audioTitle}
-                        />
-                      )}
-                      {profile.audioKey || profile.audioUrl ? (
-                        <button
-                          type="button"
-                          className={styles.deleteAudioButton}
-                          onClick={handleDeleteAudio}
-                          disabled={deletingAudio}
-                        >
-                          {deletingAudio ? "削除中..." : "音源を削除"}
-                        </button>
-                      ) : null}
-                    </div>
-                  )}
+
+                <div className={styles.fieldRow}>
+                  <ValidatedFieldLabel
+                    htmlFor="bio"
+                    label="自己紹介"
+                    error={validationErrors.bio}
+                  />
+                  <textarea
+                    id="bio"
+                    className={styles.bioInput}
+                    value={profile.bio}
+                    onChange={(event) => updateField("bio", event.target.value)}
+                  />
                 </div>
-              </div>
 
-              <div className={styles.sectionHeader}>
-                <h3 className={styles.sectionTitle}>サービスリンク</h3>
-              </div>
-
-              <div className={styles.socialList}>
-                {socialLinks.map((link, index) => (
-                  <div
-                    key={link.id ?? `${link.service}-${index}`}
-                    className={styles.socialRow}
-                  >
-                    {profile.moderationCases
-                      ?.filter(
-                        (moderationCase) =>
-                          moderationCase.targetType === "socialLink" &&
-                          moderationCase.targetId === link.id,
-                      )
-                      .map((moderationCase) => (
-                        <ModerationNotice
-                          key={moderationCase.id}
-                          moderationCase={moderationCase}
-                        />
-                      ))}
-                    <div className={styles.serviceRow}>
-                      <label
-                        className={styles.smallLabel}
-                        htmlFor={`service-${index}`}
-                      >
-                        サービス
-                      </label>
-                      <select
-                        id={`service-${index}`}
-                        className={`${styles.select} ${styles.smallInput}`}
-                        value={link.service}
-                        onChange={(event) =>
-                          updateSocialLink(index, "service", event.target.value)
-                        }
-                      >
-                        {serviceOptions.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className={styles.serviceRow}>
-                      <ValidatedFieldLabel
-                        htmlFor={`label-${index}`}
-                        label="ラベル"
-                        error={validationErrors.socialLinks?.[index]?.label}
-                        className={styles.smallLabel}
-                      />
-                      <input
-                        id={`label-${index}`}
-                        className={`${styles.input} ${styles.smallInput}`}
-                        type="text"
-                        placeholder="リンクを追加"
-                        value={link.label}
-                        onChange={(event) =>
-                          updateSocialLink(index, "label", event.target.value)
-                        }
-                      />
-                    </div>
-
-                    <div className={styles.serviceRow}>
-                      <ValidatedFieldLabel
-                        htmlFor={`url-${index}`}
-                        label="URL"
-                        error={validationErrors.socialLinks?.[index]?.url}
-                        className={styles.smallLabel}
-                      />
-                      <input
-                        id={`url-${index}`}
-                        className={`${styles.input} ${styles.smallInput}`}
-                        type="url"
-                        placeholder={serviceUrlPlaceholders[link.service]}
-                        value={link.url}
-                        onChange={(event) =>
-                          updateSocialLink(index, "url", event.target.value)
-                        }
-                      />
-                    </div>
-
-                    <button
-                      type="button"
-                      className={styles.removeButton}
-                      onClick={() => removeSocialLink(index)}
-                    >
-                      削除
-                    </button>
+                <div className={styles.audioGroup}>
+                  {audioModerationCase ? (
+                    <ModerationNotice moderationCase={audioModerationCase} />
+                  ) : null}
+                  <div className={styles.audioField}>
+                    <ValidatedFieldLabel
+                      htmlFor="audioTitle"
+                      label="音声タイトル"
+                      error={validationErrors.audioTitle}
+                    />
+                    <input
+                      id="audioTitle"
+                      className={styles.input}
+                      type="text"
+                      value={profile.audioTitle}
+                      onChange={(event) =>
+                        updateField("audioTitle", event.target.value)
+                      }
+                    />
                   </div>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                className={styles.addButton}
-                onClick={addSocialLink}
-                disabled={socialLinks.length >= 4}
-              >
-                + リンクを追加
-              </button>
-            </div>
-            {previewOpen && previewProfile ? (
-              <div
-                className={styles.previewBackdrop}
-                onMouseDown={(event) => {
-                  if (event.target === event.currentTarget) {
-                    setPreviewOpen(false);
-                  }
-                }}
-              >
-                <section
-                  className={styles.previewDialog}
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="profile-preview-title"
-                >
-                  <header className={styles.previewHeader}>
-                    <div>
-                      <p className={styles.previewEyebrow}>保存前プレビュー</p>
-                      <h2 id="profile-preview-title">公開プロフィール表示</h2>
-                      <p>
-                        この操作では変更内容は保存されません。
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className={styles.previewCloseButton}
-                      onClick={() => setPreviewOpen(false)}
-                      autoFocus
-                    >
-                      閉じる
-                    </button>
-                  </header>
-                  <div
-                    className={styles.previewModeSelector}
-                    aria-label="プレビュー表示幅"
-                  >
-                    <button
-                      type="button"
-                      aria-pressed={previewMode === "desktop"}
-                      onClick={() => setPreviewMode("desktop")}
-                    >
-                      PC表示
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={previewMode === "mobile"}
-                      onClick={() => setPreviewMode("mobile")}
-                    >
-                      スマートフォン表示
-                    </button>
-                  </div>
-                  <div className={styles.previewViewport}>
+                  <div className={styles.audioField}>
+                    <label className={styles.label} htmlFor="audioFile">
+                      音声ファイル
+                    </label>
                     <div
-                      className={`${styles.previewCanvas} ${
-                        previewMode === "mobile"
-                          ? styles.previewCanvasMobile
-                          : styles.previewCanvasDesktop
+                      className={`${styles.uploadZone} ${
+                        dragActive ? styles.uploadZoneActive : ""
                       }`}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                     >
-                      <Card
-                        link={previewProfile}
-                        previewAudioUrl={audioPreviewUrl}
-                        displayMode={
-                          previewMode === "mobile" ? "mobile" : "responsive"
-                        }
+                      <input
+                        id="audioFile"
+                        type="file"
+                        accept={AUDIO_FILE_ACCEPT}
+                        className={styles.hiddenFileInput}
+                        onChange={handleAudioInput}
                       />
+                      <label
+                        htmlFor="audioFile"
+                        className={styles.uploadZoneLabel}
+                      >
+                        <p className={styles.uploadLabel}>
+                          ここに音声ファイルをドロップ、またはクリックして選択
+                        </p>
+                        <p className={styles.uploadHint}>
+                          {(audioUploadMessages.length > 0
+                            ? audioUploadMessages
+                            : [
+                                audioFile?.name ||
+                                  (profile.audioKey || profile.audioUrl
+                                    ? "音源を登録済み"
+                                    : "未選択"),
+                              ]
+                          ).map((line, index, lines) => (
+                            <span key={`${line}-${index}`}>
+                              {line}
+                              {index < lines.length - 1 ? <br /> : null}
+                            </span>
+                          ))}
+                        </p>
+                      </label>
                     </div>
+                    <p className={styles.uploadRequirements}>
+                      {AUDIO_UPLOAD_REQUIREMENTS}
+                    </p>
+                    {audioFileError ? (
+                      <p className={styles.audioFileError} role="alert">
+                        {audioFileError}
+                      </p>
+                    ) : null}
+                    {(audioPreviewUrl ||
+                      profile.audioKey ||
+                      profile.audioUrl) && (
+                      <div className={styles.audioPreview}>
+                        {audioPreviewUrl ? (
+                          <audio
+                            controls
+                            className={styles.audioPlayer}
+                            src={audioPreviewUrl}
+                          />
+                        ) : (
+                          <AudioPlayer
+                            userId={profile.userId}
+                            audioTitle={profile.audioTitle}
+                          />
+                        )}
+                        {profile.audioKey || profile.audioUrl ? (
+                          <button
+                            type="button"
+                            className={styles.deleteAudioButton}
+                            onClick={handleDeleteAudio}
+                            disabled={deletingAudio}
+                          >
+                            {deletingAudio ? "削除中..." : "音源を削除"}
+                          </button>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
-                </section>
+                </div>
+
+                <div className={styles.sectionHeader}>
+                  <h3 className={styles.sectionTitle}>サービスリンク</h3>
+                </div>
+
+                <div className={styles.socialList}>
+                  {socialLinks.map((link, index) => (
+                    <div
+                      key={link.id ?? `${link.service}-${index}`}
+                      className={styles.socialRow}
+                    >
+                      {profile.moderationCases
+                        ?.filter(
+                          (moderationCase) =>
+                            moderationCase.targetType === "socialLink" &&
+                            moderationCase.targetId === link.id,
+                        )
+                        .map((moderationCase) => (
+                          <ModerationNotice
+                            key={moderationCase.id}
+                            moderationCase={moderationCase}
+                          />
+                        ))}
+                      <div className={styles.serviceRow}>
+                        <label
+                          className={styles.smallLabel}
+                          htmlFor={`service-${index}`}
+                        >
+                          サービス
+                        </label>
+                        <select
+                          id={`service-${index}`}
+                          className={`${styles.select} ${styles.smallInput}`}
+                          value={link.service}
+                          onChange={(event) =>
+                            updateSocialLink(
+                              index,
+                              "service",
+                              event.target.value,
+                            )
+                          }
+                        >
+                          {serviceOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className={styles.serviceRow}>
+                        <ValidatedFieldLabel
+                          htmlFor={`label-${index}`}
+                          label="ラベル"
+                          error={validationErrors.socialLinks?.[index]?.label}
+                          className={styles.smallLabel}
+                        />
+                        <input
+                          id={`label-${index}`}
+                          className={`${styles.input} ${styles.smallInput}`}
+                          type="text"
+                          placeholder="リンクを追加"
+                          value={link.label}
+                          onChange={(event) =>
+                            updateSocialLink(index, "label", event.target.value)
+                          }
+                        />
+                      </div>
+
+                      <div className={styles.serviceRow}>
+                        <ValidatedFieldLabel
+                          htmlFor={`url-${index}`}
+                          label="URL"
+                          error={validationErrors.socialLinks?.[index]?.url}
+                          className={styles.smallLabel}
+                        />
+                        <input
+                          id={`url-${index}`}
+                          className={`${styles.input} ${styles.smallInput}`}
+                          type="url"
+                          placeholder={serviceUrlPlaceholders[link.service]}
+                          value={link.url}
+                          onChange={(event) =>
+                            updateSocialLink(index, "url", event.target.value)
+                          }
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        className={styles.removeButton}
+                        onClick={() => removeSocialLink(index)}
+                      >
+                        削除
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  className={styles.addButton}
+                  onClick={addSocialLink}
+                  disabled={socialLinks.length >= 4}
+                >
+                  + リンクを追加
+                </button>
               </div>
-            ) : null}
+              {previewOpen && previewProfile ? (
+                <div
+                  className={styles.previewBackdrop}
+                  onMouseDown={(event) => {
+                    if (event.target === event.currentTarget) {
+                      setPreviewOpen(false);
+                    }
+                  }}
+                >
+                  <section
+                    className={styles.previewDialog}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="profile-preview-title"
+                  >
+                    <header className={styles.previewHeader}>
+                      <div>
+                        <p className={styles.previewEyebrow}>
+                          保存前プレビュー
+                        </p>
+                        <h2 id="profile-preview-title">公開プロフィール表示</h2>
+                        <p>この操作では変更内容は保存されません。</p>
+                      </div>
+                      <button
+                        type="button"
+                        className={styles.previewCloseButton}
+                        onClick={() => setPreviewOpen(false)}
+                        autoFocus
+                      >
+                        閉じる
+                      </button>
+                    </header>
+                    <div
+                      className={styles.previewModeSelector}
+                      aria-label="プレビュー表示幅"
+                    >
+                      <button
+                        type="button"
+                        aria-pressed={previewMode === "desktop"}
+                        onClick={() => setPreviewMode("desktop")}
+                      >
+                        PC表示
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={previewMode === "mobile"}
+                        onClick={() => setPreviewMode("mobile")}
+                      >
+                        スマートフォン表示
+                      </button>
+                    </div>
+                    <div className={styles.previewViewport}>
+                      <div
+                        className={`${styles.previewCanvas} ${
+                          previewMode === "mobile"
+                            ? styles.previewCanvasMobile
+                            : styles.previewCanvasDesktop
+                        }`}
+                      >
+                        <Card
+                          link={previewProfile}
+                          previewAudioUrl={audioPreviewUrl}
+                          displayMode={
+                            previewMode === "mobile" ? "mobile" : "responsive"
+                          }
+                        />
+                      </div>
+                    </div>
+                  </section>
+                </div>
+              ) : null}
             </article>
           </>
         )}
