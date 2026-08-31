@@ -119,6 +119,7 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
             />
             <AdminIdentityVerificationPanel
               requests={data.profile.identityVerificationRequests ?? []}
+              profileLinks={data.profile.links}
               onReload={loadDetail}
               onActionMessage={setActionMessage}
             />

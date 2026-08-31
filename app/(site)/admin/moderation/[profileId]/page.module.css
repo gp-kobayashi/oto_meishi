@@ -25,6 +25,40 @@
   font-weight: 700;
 }
 
+.verificationDetails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.verificationTarget,
+.verificationEvidence {
+  padding: 12px;
+  border: 1px solid #ddd6fe;
+  border-radius: 8px;
+  background: #faf5ff;
+}
+
+.verificationTarget h3,
+.verificationEvidence h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.verificationTarget p,
+.verificationEvidence p {
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.verificationTarget code {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .heading,
 .sectionHeading,
 .linkHeading {
@@ -109,6 +143,10 @@
 }
 
 @media (max-width: 560px) {
+  .verificationDetails {
+    grid-template-columns: 1fr;
+  }
+
   .collapsibleSummary time {
     width: 100%;
     margin-left: 24px;
@@ -703,9 +741,24 @@
   color: #991b1b;
 }
 
-.requestResolution { display: grid; gap: 8px; margin-top: 14px; }
-.requestResolution label { font-size: 13px; font-weight: 700; }
-.requestResolution textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #cbd5e1; border-radius: 9px; font: inherit; resize: vertical; }
+.requestResolution {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.requestResolution label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.requestResolution textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  font: inherit;
+  resize: vertical;
+}
 
 .caseList {
   display: grid;

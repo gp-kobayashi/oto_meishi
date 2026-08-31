@@ -25,6 +25,7 @@ describe("AdminIdentityVerificationPanel", () => {
     render(
       <AdminIdentityVerificationPanel
         requests={d.profile.identityVerificationRequests}
+        profileLinks={d.profile.links}
         onReload={onReload}
         onActionMessage={onActionMessage}
       />,
@@ -34,6 +35,13 @@ describe("AdminIdentityVerificationPanel", () => {
         .getByRole("link", { name: "申請時のSNSを確認する" })
         .getAttribute("href"),
     ).toBe("https://x.com/sample");
+    expect(screen.getByText("審査・違反取消の対象")).toBeDefined();
+    expect(screen.getByText("case-identity")).toBeDefined();
+    expect(screen.getByText("プロフィール全体")).toBeDefined();
+    expect(screen.getByText("本人確認の証拠SNS")).toBeDefined();
+    expect(
+      screen.getByText(/申請時URL：https:\/\/x.com\/sample/),
+    ).toBeDefined();
     fireEvent.change(
       screen.getByLabelText("審査メモ・ユーザーへの説明（必須）"),
       { target: { value: "確認" } },
@@ -56,5 +64,104 @@ describe("AdminIdentityVerificationPanel", () => {
         "本人確認を完了し、なりすまし違反の取り消しを記録しました。",
       );
     });
+  });
+
+  it("対象リンクが消えていても申請時URLを証拠として表示する", () => {
+    const d = createAdminModerationDetail();
+    const request = d.profile.identityVerificationRequests[0];
+    request.moderationCase = {
+      ...request.moderationCase,
+      targetType: "socialLink",
+      targetId: "deleted-link",
+    };
+    request.socialLink = null;
+
+    render(
+      <AdminIdentityVerificationPanel
+        requests={[request]}
+        profileLinks={d.profile.links}
+        onReload={vi.fn().mockResolvedValue(undefined)}
+        onActionMessage={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText("リンク（現在は削除または存在しません：deleted-link）"),
+    ).toBeDefined();
+    expect(
+      screen.getByText("現在の登録SNSは確認できません（申請時URLを使用）。"),
+    ).toBeDefined();
+  });
+
+  it("取消対象リンクと証拠SNSが異なる場合も別々に表示する", () => {
+    const d = createAdminModerationDetail();
+    const request = {
+      ...d.profile.identityVerificationRequests[0],
+      moderationCase: {
+        ...d.profile.identityVerificationRequests[0].moderationCase,
+        targetType: "socialLink" as const,
+        targetId: "link-a",
+      },
+      socialLink: {
+        id: "link-b",
+        service: "x",
+        label: "証拠用X",
+        url: "https://x.com/evidence",
+        sortOrder: 1,
+        status: "active" as const,
+      },
+      socialUrl: "https://x.com/evidence",
+    };
+
+    render(
+      <AdminIdentityVerificationPanel
+        requests={[request]}
+        profileLinks={[
+          {
+            id: "link-a",
+            service: "youtube",
+            label: "取消対象YouTube",
+            url: "https://youtube.com/target",
+            sortOrder: 0,
+            status: "hidden",
+          },
+          request.socialLink,
+        ]}
+        onReload={vi.fn().mockResolvedValue(undefined)}
+        onActionMessage={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("リンク：取消対象YouTube")).toBeDefined();
+    expect(
+      screen.getByText("youtube：https://youtube.com/target"),
+    ).toBeDefined();
+    expect(
+      screen.getByText("現在の登録内容：証拠用X（https://x.com/evidence）"),
+    ).toBeDefined();
+  });
+
+  it("音声対象ケースをリンクと混同せず表示する", () => {
+    const d = createAdminModerationDetail();
+    const request = {
+      ...d.profile.identityVerificationRequests[0],
+      moderationCase: {
+        ...d.profile.identityVerificationRequests[0].moderationCase,
+        targetType: "audio" as const,
+        targetId: "audio-1",
+      },
+      socialLink: null,
+    };
+
+    render(
+      <AdminIdentityVerificationPanel
+        requests={[request]}
+        profileLinks={d.profile.links}
+        onReload={vi.fn().mockResolvedValue(undefined)}
+        onActionMessage={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("音声")).toBeDefined();
   });
 });
