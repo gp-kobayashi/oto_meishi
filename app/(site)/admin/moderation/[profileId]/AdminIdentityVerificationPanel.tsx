@@ -4,31 +4,18 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import styles from "./page.module.css";
-import { formatAdminDate } from "./moderationPresentation";
+import {
+  formatAdminDate,
+  moderationCaseStatusLabels,
+  moderationReasonLabels,
+  targetTypeLabels,
+} from "./moderationPresentation";
 
 const identityVerificationStatusLabels = {
   pending: "確認待ち",
   verified: "本人と確認済み",
   rejected: "確認できず",
   expired: "投稿期限切れ",
-};
-const moderationCaseStatusLabels = {
-  correctionRequired: "非公開・修正が必要",
-  postReviewPending: "管理者確認待ち（非公開）",
-  preReviewPending: "管理者確認待ち（非公開）",
-  confirmed: "確認済み",
-};
-const moderationReasonLabels = {
-  inappropriateContent: "不適切な内容",
-  copyrightConcern: "著作権に関する問題",
-  harassment: "誹謗中傷",
-  unsafeLink: "安全でないリンク",
-  serviceMismatch: "選択したサービスとURLの不一致",
-  impersonation: "なりすまし",
-  threatOrPersonalData: "脅迫・第三者の個人情報",
-  unofficialThirdPartyProfile: "他人を主体としたプロフィール",
-  politicalReligiousPromotion: "政治・宗教への勧誘・宣伝",
-  other: "その他の問題",
 };
 
 type IdentityVerificationRequests =
@@ -37,6 +24,7 @@ type ProfileLinks = ModerationDetailResponse["profile"]["links"];
 
 type AdminIdentityVerificationPanelProps = {
   requests: IdentityVerificationRequests;
+  moderationCases: ModerationDetailResponse["profile"]["moderationCases"];
   profileLinks: ProfileLinks;
   onReload: () => Promise<void>;
   onActionMessage: (message: string) => void;
@@ -44,6 +32,7 @@ type AdminIdentityVerificationPanelProps = {
 
 export default function AdminIdentityVerificationPanel({
   requests,
+  moderationCases,
   profileLinks,
   onReload,
   onActionMessage,
@@ -129,6 +118,12 @@ export default function AdminIdentityVerificationPanel({
       {requests.length ? (
         <ol className={styles.reportList}>
           {requests.map((verificationRequest) => {
+            const moderationCase = moderationCases.find(
+              (item) => item.id === verificationRequest.moderationCaseId,
+            );
+            const reportedSnapshot = moderationCase?.snapshots.find(
+              (snapshot) => snapshot.kind === "reported",
+            );
             const targetLink =
               verificationRequest.moderationCase.targetType === "socialLink"
                 ? profileLinks.find(
@@ -182,6 +177,14 @@ export default function AdminIdentityVerificationPanel({
                       </p>
                     ) : null}
                     <p>
+                      対象種別：
+                      {
+                        targetTypeLabels[
+                          verificationRequest.moderationCase.targetType
+                        ]
+                      }
+                    </p>
+                    <p>
                       理由：
                       {
                         moderationReasonLabels[
@@ -196,6 +199,12 @@ export default function AdminIdentityVerificationPanel({
                       }
                     </p>
                     <p>{verificationRequest.moderationCase.userMessage}</p>
+                    {reportedSnapshot ? (
+                      <pre className={styles.verificationSnapshot}>
+                        報告時の保存内容：
+                        {JSON.stringify(reportedSnapshot.content, null, 2)}
+                      </pre>
+                    ) : null}
                   </section>
                   <section className={styles.verificationEvidence}>
                     <h3>本人確認の証拠SNS</h3>

@@ -58,7 +58,7 @@ describe("本人確認申請のケース・証拠SNS選択", () => {
         theme: "normal",
         audioUrl: "",
         audioTitle: "",
-        status: "active",
+        status: "hidden",
         accountModerationStatus: "active",
       },
       select: { id: true },
@@ -218,11 +218,15 @@ describe("本人確認申請のケース・証拠SNS選択", () => {
     });
 
     expect((await approve(linkARequestId)).status).toBe(200);
-    const [midCases, midLinks, midRequests, midRevocations] = await Promise.all(
-      [
+    const [midCases, midProfile, midLinks, midRequests, midRevocations] =
+      await Promise.all([
         prisma.moderationCase.findMany({
           where: { id: { in: [profileCaseId, linkCaseAId, linkCaseBId] } },
           select: { id: true, status: true },
+        }),
+        prisma.profile.findUnique({
+          where: { id: profileId },
+          select: { status: true },
         }),
         prisma.socialLink.findMany({
           where: { id: { in: [linkAId, linkBId] } },
@@ -245,8 +249,7 @@ describe("本人確認申請のケース・証拠SNS選択", () => {
         prisma.moderationViolationEvent.count({
           where: { profileId, eventType: "revoked" },
         }),
-      ],
-    );
+      ]);
     expect(midCases.find((item) => item.id === linkCaseAId)).toEqual({
       id: linkCaseAId,
       status: "confirmed",
@@ -261,6 +264,7 @@ describe("本人確認申請のケース・証拠SNS選択", () => {
     });
     expect(midLinks.find((item) => item.id === linkAId)?.status).toBe("active");
     expect(midLinks.find((item) => item.id === linkBId)?.status).toBe("hidden");
+    expect(midProfile).toEqual({ status: "hidden" });
     expect(
       midRequests.find((item) => item.id === linkARequestId),
     ).toMatchObject({
@@ -280,12 +284,22 @@ describe("本人確認申請のケース・証拠SNS選択", () => {
     expect(midRevocations).toBe(1);
     const linkBResponse = await approve(linkBRequestId);
     expect(linkBResponse.status).toBe(200);
+    await expect(
+      prisma.profile.findUnique({
+        where: { id: profileId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "hidden" });
     expect((await approve(profileRequestId)).status).toBe(200);
 
-    const [cases, links, requests, violations] = await Promise.all([
+    const [cases, profile, links, requests, violations] = await Promise.all([
       prisma.moderationCase.findMany({
         where: { id: { in: [profileCaseId, linkCaseAId, linkCaseBId] } },
         select: { id: true, status: true, targetType: true, targetId: true },
+      }),
+      prisma.profile.findUnique({
+        where: { id: profileId },
+        select: { status: true },
       }),
       prisma.socialLink.findMany({
         where: { id: { in: [linkAId, linkBId, evidenceLinkId] } },
@@ -307,6 +321,7 @@ describe("本人確認申請のケース・証拠SNS選択", () => {
       }),
     ]);
     expect(cases).toHaveLength(3);
+    expect(profile).toEqual({ status: "active" });
     expect(cases.every((item) => item.status === "confirmed")).toBe(true);
     expect(cases.find((item) => item.id === linkCaseAId)).toMatchObject({
       targetType: "socialLink",

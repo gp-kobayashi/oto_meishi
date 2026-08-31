@@ -25,6 +25,21 @@ describe("AdminIdentityVerificationPanel", () => {
     render(
       <AdminIdentityVerificationPanel
         requests={d.profile.identityVerificationRequests}
+        moderationCases={[
+          ...d.profile.moderationCases,
+          {
+            ...d.profile.moderationCases[0],
+            id: "case-identity",
+            targetType: "profile",
+            targetId: "profile-1",
+            snapshots: [
+              {
+                ...d.profile.moderationCases[0].snapshots[0],
+                content: { displayName: "報告時の表示名" },
+              },
+            ],
+          },
+        ]}
         profileLinks={d.profile.links}
         onReload={onReload}
         onActionMessage={onActionMessage}
@@ -42,6 +57,8 @@ describe("AdminIdentityVerificationPanel", () => {
     expect(
       screen.getByText(/申請時URL：https:\/\/x.com\/sample/),
     ).toBeDefined();
+    expect(screen.getByText(/報告時の保存内容/)).toBeDefined();
+    expect(screen.getByText(/報告時の表示名/)).toBeDefined();
     fireEvent.change(
       screen.getByLabelText("審査メモ・ユーザーへの説明（必須）"),
       { target: { value: "確認" } },
@@ -79,6 +96,7 @@ describe("AdminIdentityVerificationPanel", () => {
     render(
       <AdminIdentityVerificationPanel
         requests={[request]}
+        moderationCases={d.profile.moderationCases}
         profileLinks={d.profile.links}
         onReload={vi.fn().mockResolvedValue(undefined)}
         onActionMessage={vi.fn()}
@@ -116,6 +134,7 @@ describe("AdminIdentityVerificationPanel", () => {
     render(
       <AdminIdentityVerificationPanel
         requests={[request]}
+        moderationCases={d.profile.moderationCases}
         profileLinks={[
           {
             id: "link-a",
@@ -156,6 +175,7 @@ describe("AdminIdentityVerificationPanel", () => {
     render(
       <AdminIdentityVerificationPanel
         requests={[request]}
+        moderationCases={d.profile.moderationCases}
         profileLinks={d.profile.links}
         onReload={vi.fn().mockResolvedValue(undefined)}
         onActionMessage={vi.fn()}

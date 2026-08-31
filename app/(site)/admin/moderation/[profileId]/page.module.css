@@ -59,6 +59,18 @@
   overflow-wrap: anywhere;
 }
 
+.verificationSnapshot {
+  max-height: 180px;
+  margin: 10px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border-radius: 6px;
+  background: #f5f3ff;
+  font-size: 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .heading,
 .sectionHeading,
 .linkHeading {
