@@ -131,11 +131,7 @@ export type ModerationDetailResponse = {
       statusEvents: {
         id: string;
         previousStatus:
-          | "pending"
-          | "reviewed"
-          | "resolved"
-          | "dismissed"
-          | null;
+          "pending" | "reviewed" | "resolved" | "dismissed" | null;
         newStatus: "pending" | "reviewed" | "resolved" | "dismissed";
         note: string;
         isBackfilled: boolean;
@@ -158,6 +154,37 @@ export type ModerationDetailResponse = {
       id: string;
       moderationCaseId: string;
       socialLinkId: string | null;
+      moderationCase: {
+        id: string;
+        targetType: "profile" | "audio" | "socialLink";
+        targetId: string;
+        reasonCode:
+          | "inappropriateContent"
+          | "copyrightConcern"
+          | "harassment"
+          | "unsafeLink"
+          | "serviceMismatch"
+          | "impersonation"
+          | "threatOrPersonalData"
+          | "unofficialThirdPartyProfile"
+          | "politicalReligiousPromotion"
+          | "other";
+        status:
+          | "correctionRequired"
+          | "postReviewPending"
+          | "preReviewPending"
+          | "confirmed";
+        reviewMode: "postReview" | "preReview";
+        userMessage: string;
+        resolvedAt: string | null;
+      };
+      socialLink: {
+        id: string;
+        service: string;
+        label: string;
+        url: string;
+        status: "active" | "hidden";
+      } | null;
       socialUrl: string;
       plannedContent: string;
       status: "pending" | "verified" | "rejected" | "expired";

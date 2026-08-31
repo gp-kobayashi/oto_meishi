@@ -13,7 +13,10 @@ export async function GET(
 
     const { profileId } = await params;
     if (!profileId) {
-      return Response.json({ error: "プロフィールIDが不正です。" }, { status: 400 });
+      return Response.json(
+        { error: "プロフィールIDが不正です。" },
+        { status: 400 },
+      );
     }
 
     const profile = await prisma.profile.findUnique({
@@ -94,6 +97,27 @@ export async function GET(
             id: true,
             moderationCaseId: true,
             socialLinkId: true,
+            moderationCase: {
+              select: {
+                id: true,
+                targetType: true,
+                targetId: true,
+                reasonCode: true,
+                status: true,
+                reviewMode: true,
+                userMessage: true,
+                resolvedAt: true,
+              },
+            },
+            socialLink: {
+              select: {
+                id: true,
+                service: true,
+                label: true,
+                url: true,
+                status: true,
+              },
+            },
             socialUrl: true,
             plannedContent: true,
             status: true,
@@ -238,10 +262,7 @@ export async function GET(
                   status: deletedAudioCase.status,
                   reviewMode: deletedAudioCase.reviewMode,
                   reviewDueAt: deletedAudioCase.reviewDueAt.toISOString(),
-                  previousTitle: getSnapshotString(
-                    reportedAudio,
-                    "audioTitle",
-                  ),
+                  previousTitle: getSnapshotString(reportedAudio, "audioTitle"),
                   previousStatus: getSnapshotString(
                     reportedAudio,
                     "audioStatus",
@@ -281,35 +302,38 @@ export async function GET(
           moderationRequests: profile.moderationRequests.map(
             (moderationRequest) => ({
               ...moderationRequest,
-              resolvedAt:
-                moderationRequest.resolvedAt?.toISOString() ?? null,
+              resolvedAt: moderationRequest.resolvedAt?.toISOString() ?? null,
               createdAt: moderationRequest.createdAt.toISOString(),
               updatedAt: moderationRequest.updatedAt.toISOString(),
             }),
           ),
           identityVerificationRequests:
-            profile.identityVerificationRequests.map(
-              (verificationRequest) => ({
-                id: verificationRequest.id,
-                moderationCaseId: verificationRequest.moderationCaseId,
-                socialLinkId: verificationRequest.socialLinkId,
-                socialUrl: verificationRequest.socialUrl,
-                plannedContent: verificationRequest.plannedContent,
-                status: verificationRequest.status,
-                postingDeadlineAt:
-                  verificationRequest.postingDeadlineAt.toISOString(),
-                reviewNote: verificationRequest.reviewNote,
-                reviewerIdentifier:
-                  verificationRequest.reviewedByAdminUser?.authId.slice(0, 8) ??
+            profile.identityVerificationRequests.map((verificationRequest) => ({
+              id: verificationRequest.id,
+              moderationCaseId: verificationRequest.moderationCaseId,
+              socialLinkId: verificationRequest.socialLinkId,
+              moderationCase: {
+                ...verificationRequest.moderationCase,
+                resolvedAt:
+                  verificationRequest.moderationCase.resolvedAt?.toISOString() ??
                   null,
-                reviewerRole:
-                  verificationRequest.reviewedByAdminUser?.role ?? null,
-                reviewedAt:
-                  verificationRequest.reviewedAt?.toISOString() ?? null,
-                createdAt: verificationRequest.createdAt.toISOString(),
-                updatedAt: verificationRequest.updatedAt.toISOString(),
-              }),
-            ),
+              },
+              socialLink: verificationRequest.socialLink,
+              socialUrl: verificationRequest.socialUrl,
+              plannedContent: verificationRequest.plannedContent,
+              status: verificationRequest.status,
+              postingDeadlineAt:
+                verificationRequest.postingDeadlineAt.toISOString(),
+              reviewNote: verificationRequest.reviewNote,
+              reviewerIdentifier:
+                verificationRequest.reviewedByAdminUser?.authId.slice(0, 8) ??
+                null,
+              reviewerRole:
+                verificationRequest.reviewedByAdminUser?.role ?? null,
+              reviewedAt: verificationRequest.reviewedAt?.toISOString() ?? null,
+              createdAt: verificationRequest.createdAt.toISOString(),
+              updatedAt: verificationRequest.updatedAt.toISOString(),
+            })),
           moderationCases: profile.moderationCases.map((moderationCase) => ({
             id: moderationCase.id,
             targetType: moderationCase.targetType,
@@ -319,8 +343,7 @@ export async function GET(
             reviewMode: moderationCase.reviewMode,
             userMessage: moderationCase.userMessage,
             reviewDueAt: moderationCase.reviewDueAt.toISOString(),
-            retentionExpiresAt:
-              moderationCase.retentionExpiresAt.toISOString(),
+            retentionExpiresAt: moderationCase.retentionExpiresAt.toISOString(),
             resolvedAt: moderationCase.resolvedAt?.toISOString() ?? null,
             createdAt: moderationCase.createdAt.toISOString(),
             updatedAt: moderationCase.updatedAt.toISOString(),
@@ -383,10 +406,7 @@ export async function GET(
   }
 }
 
-function getSnapshotString(
-  content: unknown,
-  key: string,
-): string | null {
+function getSnapshotString(content: unknown, key: string): string | null {
   if (
     typeof content !== "object" ||
     content === null ||
