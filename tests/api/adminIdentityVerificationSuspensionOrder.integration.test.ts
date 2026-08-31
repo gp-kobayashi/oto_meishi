@@ -18,11 +18,16 @@ vi.mock("@/lib/clientIp", () => ({ getClientIp: () => null }));
 import { PATCH } from "@/app/(site)/api/admin/moderation/identity-verification/[requestId]/route";
 import { prisma } from "@/lib/prisma";
 
+type CaseFixture = {
+  caseId: string;
+  requestId: string;
+  violationId: string;
+  suspensionTriggered: boolean;
+};
+
 type Fixture = {
   profileId: string;
-  caseIds: [string, string];
-  requestIds: [string, string];
-  violationIds: [string, string];
+  cases: [CaseFixture, CaseFixture];
 };
 
 describe("本人確認の違反取消順序と停止状態の再評価", () => {
@@ -61,16 +66,16 @@ describe("本人確認の違反取消順序と停止状態の再評価", () => {
   }, 15_000);
 
   async function createFixture(
-    order: "trigger-first" | "non-trigger-first",
+    scenarioLabel: "trigger-first" | "non-trigger-first",
   ): Promise<Fixture> {
     const profile = await prisma.profile.create({
       data: {
-        userId: `suspension-order-${order}-${runId}`,
+        userId: `suspension-order-${scenarioLabel}-${runId}`,
         displayName: "停止再評価テスト",
         bio: "統合テスト用",
         theme: "normal",
         audioUrl: "",
-        audioKey: `audio/suspension-order-${order}-${runId}.m4a`,
+        audioKey: `audio/suspension-order-${scenarioLabel}-${runId}.m4a`,
         audioTitle: "テスト音声",
         audioStatus: "hidden",
         status: "suspended",
@@ -127,7 +132,7 @@ describe("本人確認の違反取消順序と停止状態の再評価", () => {
           suspensionTriggered: index === 0,
           note: "停止再評価テスト",
         })),
-        select: { id: true },
+        select: { id: true, suspensionTriggered: true },
       });
     const requests = await Promise.all(
       cases.map((item) =>
@@ -144,12 +149,21 @@ describe("本人確認の違反取消順序と停止状態の再評価", () => {
         }),
       ),
     );
-    return {
-      profileId: profile.id,
-      caseIds: [cases[0].id, cases[1].id],
-      requestIds: [requests[0].id, requests[1].id],
-      violationIds: [violations[0].id, violations[1].id],
-    };
+    const fixtureCases: [CaseFixture, CaseFixture] = [
+      {
+        caseId: cases[0].id,
+        requestId: requests[0].id,
+        violationId: violations[0].id,
+        suspensionTriggered: violations[0].suspensionTriggered,
+      },
+      {
+        caseId: cases[1].id,
+        requestId: requests[1].id,
+        violationId: violations[1].id,
+        suspensionTriggered: violations[1].suspensionTriggered,
+      },
+    ];
+    return { profileId: profile.id, cases: fixtureCases };
   }
 
   async function approve(requestId: string) {
@@ -170,152 +184,141 @@ describe("本人確認の違反取消順序と停止状態の再評価", () => {
   }
 
   it.each([
-    ["停止契機の違反を先に取り消す", "trigger-first" as const, [0, 1] as const],
-    [
-      "停止契機でない違反を先に取り消す",
-      "non-trigger-first" as const,
-      [1, 0] as const,
-    ],
-  ])(
-    "%s場合も最後の取消後だけ停止を解除する",
-    async (_label, fixtureLabel, order) => {
-      const fixture = await createFixture(fixtureLabel);
-      const [firstIndex, secondIndex] = order;
-      expect((await approve(fixture.requestIds[firstIndex])).status).toBe(200);
-      await expect(
-        prisma.profile.findUnique({
-          where: { id: fixture.profileId },
-          select: { status: true, accountModerationStatus: true },
-        }),
-      ).resolves.toEqual({
-        status: "suspended",
-        accountModerationStatus: "suspended",
-      });
-      await expect(
-        prisma.moderationViolationEvent.count({
-          where: { profileId: fixture.profileId, eventType: "revoked" },
-        }),
-      ).resolves.toBe(1);
-      await expect(
-        prisma.identityVerificationRequest.findUnique({
-          where: { id: fixture.requestIds[firstIndex] },
-          select: { status: true },
-        }),
-      ).resolves.toEqual({ status: "verified" });
-      await expect(
-        prisma.identityVerificationRequest.findUnique({
-          where: { id: fixture.requestIds[secondIndex] },
-          select: { status: true },
-        }),
-      ).resolves.toEqual({ status: "pending" });
-      await expect(
-        prisma.moderationCase.findUnique({
-          where: { id: fixture.caseIds[firstIndex] },
-          select: { status: true },
-        }),
-      ).resolves.toEqual({ status: "confirmed" });
-      await expect(
-        prisma.moderationCase.findUnique({
-          where: { id: fixture.caseIds[secondIndex] },
-          select: { status: true },
-        }),
-      ).resolves.toEqual({ status: "preReviewPending" });
-      await expect(
-        prisma.moderationViolationEvent.findFirst({
-          where: { profileId: fixture.profileId, eventType: "revoked" },
-          select: { originalViolationEventId: true },
-        }),
-      ).resolves.toEqual({
-        originalViolationEventId: fixture.violationIds[firstIndex],
-      });
-      await expect(
-        prisma.moderationAction.count({
-          where: { profileId: fixture.profileId },
-        }),
-      ).resolves.toBe(0);
-      expect((await approve(fixture.requestIds[secondIndex])).status).toBe(200);
-      await expect(
-        prisma.profile.findUnique({
-          where: { id: fixture.profileId },
-          select: {
-            status: true,
-            accountModerationStatus: true,
-            suspensionAppealDueAt: true,
-          },
-        }),
-      ).resolves.toMatchObject({
-        status: "active",
-        accountModerationStatus: "active",
-        suspensionAppealDueAt: null,
-      });
-      await expect(
-        prisma.moderationCase.findMany({
-          where: { id: { in: fixture.caseIds } },
-          select: { status: true },
-        }),
-      ).resolves.toEqual(
-        expect.arrayContaining([
-          { status: "confirmed" },
-          { status: "confirmed" },
-        ]),
-      );
-      await expect(
-        prisma.identityVerificationRequest.findMany({
-          where: { id: { in: fixture.requestIds } },
-          select: { status: true },
-        }),
-      ).resolves.toEqual(
-        expect.arrayContaining([
-          { status: "verified" },
-          { status: "verified" },
-        ]),
-      );
-      await expect(
-        prisma.moderationViolationEvent.count({
-          where: { profileId: fixture.profileId, eventType: "revoked" },
-        }),
-      ).resolves.toBe(2);
-      await expect(
-        prisma.moderationViolationEvent.findMany({
-          where: { profileId: fixture.profileId, eventType: "revoked" },
-          select: { originalViolationEventId: true },
-        }),
-      ).resolves.toEqual(
-        expect.arrayContaining([
-          { originalViolationEventId: fixture.violationIds[0] },
-          { originalViolationEventId: fixture.violationIds[1] },
-        ]),
-      );
-      await expect(
-        prisma.userNotification.count({
-          where: {
-            profileId: fixture.profileId,
-            title: "利用停止状態を訂正しました",
-          },
-        }),
-      ).resolves.toBe(1);
-      await expect(
-        prisma.moderationAction.count({
-          where: { profileId: fixture.profileId },
-        }),
-      ).resolves.toBe(3);
-      await expect(
-        prisma.moderationAction.findFirst({
-          where: {
-            profileId: fixture.profileId,
-            targetType: "profile",
-            action: "restore",
-            previousStatus: "suspended",
-            newStatus: "active",
-          },
-          select: { id: true },
-        }),
-      ).resolves.toEqual(expect.objectContaining({ id: expect.any(String) }));
-      await expect(
-        prisma.moderationAction.count({
-          where: { profileId: fixture.profileId },
-        }),
-      ).resolves.toBeGreaterThan(2);
-    },
-  );
+    ["停止契機の違反を先に取り消す", "trigger-first" as const],
+    ["停止契機でない違反を先に取り消す", "non-trigger-first" as const],
+  ])("%s場合も最後の取消後だけ停止を解除する", async (_label, fixtureLabel) => {
+    const fixture = await createFixture(fixtureLabel);
+    const approvalOrder =
+      fixtureLabel === "trigger-first"
+        ? [fixture.cases[0], fixture.cases[1]]
+        : [fixture.cases[1], fixture.cases[0]];
+    const [firstCase, secondCase] = approvalOrder;
+    expect((await approve(firstCase.requestId)).status).toBe(200);
+    await expect(
+      prisma.profile.findUnique({
+        where: { id: fixture.profileId },
+        select: { status: true, accountModerationStatus: true },
+      }),
+    ).resolves.toEqual({
+      status: "suspended",
+      accountModerationStatus: "suspended",
+    });
+    await expect(
+      prisma.moderationViolationEvent.count({
+        where: { profileId: fixture.profileId, eventType: "revoked" },
+      }),
+    ).resolves.toBe(1);
+    await expect(
+      prisma.identityVerificationRequest.findUnique({
+        where: { id: firstCase.requestId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "verified" });
+    await expect(
+      prisma.identityVerificationRequest.findUnique({
+        where: { id: secondCase.requestId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "pending" });
+    await expect(
+      prisma.moderationCase.findUnique({
+        where: { id: firstCase.caseId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "confirmed" });
+    await expect(
+      prisma.moderationCase.findUnique({
+        where: { id: secondCase.caseId },
+        select: { status: true },
+      }),
+    ).resolves.toEqual({ status: "preReviewPending" });
+    await expect(
+      prisma.moderationViolationEvent.findFirst({
+        where: { profileId: fixture.profileId, eventType: "revoked" },
+        select: { originalViolationEventId: true },
+      }),
+    ).resolves.toEqual({
+      originalViolationEventId: firstCase.violationId,
+    });
+    await expect(
+      prisma.moderationAction.count({
+        where: { profileId: fixture.profileId },
+      }),
+    ).resolves.toBe(0);
+    expect((await approve(secondCase.requestId)).status).toBe(200);
+    await expect(
+      prisma.profile.findUnique({
+        where: { id: fixture.profileId },
+        select: {
+          status: true,
+          accountModerationStatus: true,
+          suspensionAppealDueAt: true,
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "active",
+      accountModerationStatus: "active",
+      suspensionAppealDueAt: null,
+    });
+    await expect(
+      prisma.moderationCase.findMany({
+        where: { id: { in: fixture.cases.map(({ caseId }) => caseId) } },
+        select: { status: true },
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        { status: "confirmed" },
+        { status: "confirmed" },
+      ]),
+    );
+    await expect(
+      prisma.identityVerificationRequest.findMany({
+        where: { id: { in: fixture.cases.map(({ requestId }) => requestId) } },
+        select: { status: true },
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([{ status: "verified" }, { status: "verified" }]),
+    );
+    await expect(
+      prisma.moderationViolationEvent.count({
+        where: { profileId: fixture.profileId, eventType: "revoked" },
+      }),
+    ).resolves.toBe(2);
+    await expect(
+      prisma.moderationViolationEvent.findMany({
+        where: { profileId: fixture.profileId, eventType: "revoked" },
+        select: { originalViolationEventId: true },
+      }),
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        { originalViolationEventId: fixture.cases[0].violationId },
+        { originalViolationEventId: fixture.cases[1].violationId },
+      ]),
+    );
+    await expect(
+      prisma.userNotification.count({
+        where: {
+          profileId: fixture.profileId,
+          title: "利用停止状態を訂正しました",
+        },
+      }),
+    ).resolves.toBe(1);
+    await expect(
+      prisma.moderationAction.count({
+        where: { profileId: fixture.profileId },
+      }),
+    ).resolves.toBe(3);
+    await expect(
+      prisma.moderationAction.findFirst({
+        where: {
+          profileId: fixture.profileId,
+          targetType: "profile",
+          action: "restore",
+          previousStatus: "suspended",
+          newStatus: "active",
+        },
+        select: { id: true },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ id: expect.any(String) }));
+  });
 });
