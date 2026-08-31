@@ -27,7 +27,6 @@ type SuspensionCorrectionResult = {
   reason:
     | "corrected"
     | "matchingViolationMissing"
-    | "matchingViolationNotSuspensionTrigger"
     | "otherActiveViolations"
     | "deletionPending"
     | "alreadyActive";
@@ -351,11 +350,7 @@ export async function PATCH(
           });
           revocationId = revocation.id;
 
-          if (!violation.suspensionTriggered) {
-            accountCorrection = noSuspensionCorrection(
-              "matchingViolationNotSuspensionTrigger",
-            );
-          } else if (
+          if (
             moderationCase.profile.deletionProcessingStartedAt ||
             moderationCase.profile.accountModerationStatus === "deletionPending"
           ) {

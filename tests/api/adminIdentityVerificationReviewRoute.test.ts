@@ -558,7 +558,7 @@ describe("管理者の本人確認審査API", () => {
     expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
-  it("停止を発生させていない本人確認違反は停止状態を訂正しない", async () => {
+  it("停止契機でない本人確認違反でも残存違反を再評価して停止状態を訂正する", async () => {
     mocks.violationFindFirst.mockResolvedValueOnce({
       id: "violation-1",
       reasonCode: "impersonation",
@@ -571,15 +571,16 @@ describe("管理者の本人確認審査API", () => {
     );
 
     await expect(response.json()).resolves.toMatchObject({
-      restored: false,
-      accountCorrection: {
-        corrected: false,
-        reason: "matchingViolationNotSuspensionTrigger",
+      restored: true,
+      accountCorrection: { corrected: true, reason: "corrected" },
+    });
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: {
+        accountModerationStatus: "active",
+        suspensionAppealDueAt: null,
       },
     });
-    expect(mocks.profileUpdate).not.toHaveBeenCalled();
-    expect(mocks.actionCreate).not.toHaveBeenCalled();
-    expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
   it("すでに有効なアカウントでは訂正記録を重複作成しない", async () => {
