@@ -532,6 +532,20 @@ export async function PATCH(request: Request) {
           },
           select: { id: true },
         });
+        await tx.contentReport.updateMany({
+          where: {
+            profileId,
+            targetType,
+            targetId,
+            status: { in: ["pending", "reviewed"] },
+            moderationCaseId: null,
+            moderationActionId: null,
+          },
+          data: {
+            moderationCaseId: moderationCase.id,
+            moderationActionId: moderationAction.id,
+          },
+        });
       }
       const notification = getModerationNotification(
         targetType,

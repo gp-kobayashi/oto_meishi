@@ -343,7 +343,11 @@ export default function AdminModeratedContentPanel({
         {profile.links.length ? (
           <div className={styles.links}>
             {profile.links.map((socialLink) => (
-              <article className={styles.linkItem} id={`link-${socialLink.id}`} key={socialLink.id}>
+              <article
+                className={styles.linkItem}
+                id={`link-${socialLink.id}`}
+                key={socialLink.id}
+              >
                 <div className={styles.linkHeading}>
                   <div>
                     <p className={styles.service}>{socialLink.service}</p>
@@ -426,6 +430,11 @@ export default function AdminModeratedContentPanel({
             <p>
               実行すると管理操作履歴に管理者・理由・変更内容が保存されます。
             </p>
+            {pendingAction.action !== "restore" ? (
+              <p className={styles.reviewModeHelp}>
+                この対象の未対応通報がある場合、ケースと操作履歴へ関連付けます。
+              </p>
+            ) : null}
             <form onSubmit={submitAction}>
               {pendingAction.action === "hide" ? (
                 <>

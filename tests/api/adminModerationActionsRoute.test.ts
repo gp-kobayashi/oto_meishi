@@ -21,6 +21,7 @@ const { mocks } = vi.hoisted(() => ({
     moderationCaseEventCreate: vi.fn(),
     moderationViolationEventCreate: vi.fn(),
     moderationViolationEventFindMany: vi.fn(),
+    contentReportUpdateMany: vi.fn(),
     executeRawUnsafe: vi.fn(),
     executeRaw: vi.fn(),
     consumeAdminActionRateLimit: vi.fn(),
@@ -71,6 +72,7 @@ const tx = {
     create: mocks.moderationViolationEventCreate,
     findMany: mocks.moderationViolationEventFindMany,
   },
+  contentReport: { updateMany: mocks.contentReportUpdateMany },
   userNotification: { create: mocks.notificationCreate },
 };
 
@@ -134,6 +136,7 @@ describe("PATCH /api/admin/moderation/actions", () => {
       id: "violation-event-1",
     });
     mocks.moderationViolationEventFindMany.mockResolvedValue([]);
+    mocks.contentReportUpdateMany.mockResolvedValue({ count: 0 });
     mocks.executeRawUnsafe.mockResolvedValue(0);
     mocks.executeRaw.mockResolvedValue(0);
     mocks.consumeAdminActionRateLimit.mockReturnValue({
@@ -211,6 +214,17 @@ describe("PATCH /api/admin/moderation/actions", () => {
         note: "不適切な内容のため",
       },
       select: { id: true },
+    });
+    expect(mocks.contentReportUpdateMany).toHaveBeenCalledWith({
+      where: {
+        profileId: "profile-1",
+        targetType: "profile",
+        targetId: "profile-1",
+        status: { in: ["pending", "reviewed"] },
+        moderationCaseId: null,
+        moderationActionId: null,
+      },
+      data: { moderationCaseId: "case-1", moderationActionId: "action-1" },
     });
     expect(mocks.moderationSnapshotCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({

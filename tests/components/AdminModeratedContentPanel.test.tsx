@@ -62,6 +62,9 @@ describe("AdminModeratedContentPanel", () => {
         new Response(JSON.stringify({ success: true }), { status: 200 }),
       );
     const p = await profile();
+    p.reports = [
+      { ...p.reports[0], targetType: "profile", targetId: "profile-1" },
+    ];
     render(
       <AdminModeratedContentPanel
         profile={p}
@@ -75,6 +78,11 @@ describe("AdminModeratedContentPanel", () => {
     fireEvent.change(screen.getByLabelText("違反分類（必須）"), {
       target: { value: "harassment" },
     });
+    expect(
+      screen.getByText(
+        "この対象の未対応通報がある場合、ケースと操作履歴へ関連付けます。",
+      ),
+    ).toBeDefined();
     fireEvent.change(
       screen.getByLabelText("ユーザーに表示する対応理由（必須）"),
       { target: { value: "不適切な内容を確認" } },
