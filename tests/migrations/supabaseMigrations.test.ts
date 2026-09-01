@@ -375,4 +375,36 @@ describe("Supabase migrations", () => {
       "revoke all on function public.prevent_invalid_content_report_status_transition()",
     );
   });
+  it("通報対象と過去時点の内容、審査関連を安全に保持する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_add_content_report_target_linkage.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+    expect(sql).toContain('add column "targetType" "ModerationTargetType"');
+    expect(sql).toContain('add column "targetId" text');
+    expect(sql).toContain('add column "targetSnapshot" jsonb');
+    expect(sql).toContain('"targetType" = \'profile\'::"ModerationTargetType"');
+    expect(sql).toContain("'source', 'legacy'");
+    expect(sql).toContain("'available', false");
+    expect(sql).toContain('alter column "targetType" set not null');
+    expect(sql).toContain('alter column "targetId" set not null');
+    expect(sql).toContain('alter column "targetSnapshot" set not null');
+    expect(sql).toMatch(
+      /ContentReport_moderationCaseId_fkey[\s\S]*on delete set null/i,
+    );
+    expect(sql).toMatch(
+      /ContentReport_moderationActionId_fkey[\s\S]*on delete set null/i,
+    );
+    expect(sql).toContain(
+      'create index "ContentReport_profile_target_createdAt_idx"',
+    );
+    expect(sql).toContain('create index "ContentReport_moderationCaseId_idx"');
+    expect(sql).toContain(
+      'create index "ContentReport_moderationActionId_idx"',
+    );
+  });
 });

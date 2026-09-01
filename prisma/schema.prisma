@@ -201,6 +201,7 @@ model ModerationAction {
   reason         String               @db.VarChar(500)
   createdAt      DateTime             @default(now())
   notification   UserNotification?
+  contentReports ContentReport[]
 
   @@index([profileId, createdAt])
   @@index([targetType, targetId, createdAt])
@@ -226,6 +227,7 @@ model ModerationCase {
   events                       ModerationCaseEvent[]
   violationEvents              ModerationViolationEvent[]
   identityVerificationRequests IdentityVerificationRequest[]
+  contentReports                ContentReport[]
 
   @@index([profileId, status, createdAt])
   @@index([status, reviewDueAt])
@@ -318,6 +320,9 @@ model ContentReport {
   id                    String                     @id @default(uuid()) @db.Uuid
   profile               Profile                    @relation(fields: [profileId], references: [id], onDelete: Cascade)
   profileId             String
+  targetType            ModerationTargetType
+  targetId              String
+  targetSnapshot        Json
   reason                ReportReason
   details               String                     @default("") @db.VarChar(500)
   status                ReportStatus               @default(pending)
@@ -325,12 +330,19 @@ model ContentReport {
   reviewedByAdminUserId String?                    @db.Uuid
   reviewedAt            DateTime?
   reviewNote            String                     @default("") @db.VarChar(500)
+  moderationCase        ModerationCase?            @relation(fields: [moderationCaseId], references: [id], onDelete: SetNull)
+  moderationCaseId      String?                    @db.Uuid
+  moderationAction      ModerationAction?          @relation(fields: [moderationActionId], references: [id], onDelete: SetNull)
+  moderationActionId    String?                    @db.Uuid
   statusEvents          ContentReportStatusEvent[]
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
 
   @@index([status, createdAt])
   @@index([profileId, createdAt])
+  @@index([profileId, targetType, targetId, createdAt], map: "ContentReport_profile_target_createdAt_idx")
+  @@index([moderationCaseId])
+  @@index([moderationActionId])
   @@index([reviewedByAdminUserId])
 }
 
