@@ -8,6 +8,7 @@ import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { prisma } from "@/lib/prisma";
 import { hasJsonContentType } from "@/lib/requestContentType";
 import { readJsonBody } from "@/lib/requestJson";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 const MAX_REPORT_STATUS_BODY_BYTES = 4 * 1024;
 const reportStatuses = ["reviewed", "resolved", "dismissed"] as const;
@@ -114,9 +115,22 @@ export async function PATCH(
 
     const nextStatus = body.status;
     const result = await prisma.$transaction(async (transaction) => {
+      const initialReport = await transaction.contentReport.findUnique({
+        where: { id: reportId },
+        select: { id: true, profileId: true },
+      });
+      if (!initialReport) {
+        return { error: "通報が見つかりません。", httpStatus: 404 } as const;
+      }
+      await lockModerationProfile(transaction, initialReport.profileId);
       const report = await transaction.contentReport.findUnique({
         where: { id: reportId },
-        select: { id: true, status: true },
+        select: {
+          id: true,
+          status: true,
+          moderationCaseId: true,
+          moderationActionId: true,
+        },
       });
       if (!report) {
         return { error: "通報が見つかりません。", httpStatus: 404 } as const;
@@ -130,6 +144,16 @@ export async function PATCH(
       if (!allowedReportStatusTransitions[report.status].includes(nextStatus)) {
         return {
           error: "完了した通報の状態は変更できません。",
+          httpStatus: 409,
+        } as const;
+      }
+      if (
+        nextStatus === "resolved" &&
+        (!report.moderationCaseId || !report.moderationActionId)
+      ) {
+        return {
+          error:
+            "先に通報対象への対応を行い、ケースと管理操作履歴を関連付けてください。",
           httpStatus: 409,
         } as const;
       }

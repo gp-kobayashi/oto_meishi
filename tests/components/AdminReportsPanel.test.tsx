@@ -79,4 +79,36 @@ describe("AdminReportsPanel", () => {
     expect((details as HTMLDetailsElement).open).toBe(true);
     expect(screen.getByText("外部サイトへ誘導されます")).toBeDefined();
   });
+
+  it("未関連の通報は対応済みにできないことを案内する", () => {
+    const d = createAdminModerationDetail();
+    d.profile.reports = [
+      {
+        ...d.profile.reports[0],
+        moderationCase: {
+          id: "case-1",
+          status: "correctionRequired",
+          reasonCode: "unsafeLink",
+        },
+        moderationAction: null,
+      },
+    ];
+    render(
+      <AdminReportsPanel
+        reports={d.profile.reports}
+        onReload={vi.fn()}
+        onActionMessage={vi.fn()}
+      />,
+    );
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "対応済みにする",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("通報対象への対応後に対応済みにできます。"),
+    ).toBeDefined();
+  });
 });

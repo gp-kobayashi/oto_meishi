@@ -10,6 +10,7 @@ const { mocks } = vi.hoisted(() => ({
     findUnique: vi.fn(),
     updateMany: vi.fn(),
     eventCreate: vi.fn(),
+    lockModerationProfile: vi.fn(),
   },
 }));
 
@@ -25,6 +26,9 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     $transaction: mocks.transaction,
   },
+}));
+vi.mock("@/lib/moderationTransactionLock", () => ({
+  lockModerationProfile: mocks.lockModerationProfile,
 }));
 
 import { PATCH } from "@/app/(site)/api/admin/reports/[reportId]/route";
@@ -52,7 +56,14 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     mocks.consumeAdminActionRateLimit.mockReturnValue({ allowed: true });
     mocks.consumeAdminActionIpRateLimit.mockReturnValue({ allowed: true });
     mocks.getClientIp.mockReturnValue("127.0.0.1");
-    mocks.findUnique.mockResolvedValue({ id: "report-1", status: "pending" });
+    mocks.findUnique.mockResolvedValue({
+      id: "report-1",
+      profileId: "profile-1",
+      status: "pending",
+      moderationCaseId: "case-1",
+      moderationActionId: "action-1",
+    });
+    mocks.lockModerationProfile.mockResolvedValue(undefined);
     mocks.updateMany.mockResolvedValue({ count: 1 });
     mocks.eventCreate.mockResolvedValue({ id: "event-1" });
     mocks.transaction.mockImplementation(async (callback) =>
@@ -104,7 +115,14 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
   it("確認済みの通報を対応完了へ進められる", async () => {
     mocks.findUnique.mockResolvedValueOnce({
       id: "report-1",
+      profileId: "profile-1",
+    });
+    mocks.findUnique.mockResolvedValueOnce({
+      id: "report-1",
+      profileId: "profile-1",
       status: "reviewed",
+      moderationCaseId: "case-1",
+      moderationActionId: "action-1",
     });
 
     const response = await PATCH(
@@ -120,12 +138,46 @@ describe("PATCH /api/admin/reports/[reportId]", () => {
     );
   });
 
+  it("ケースと操作履歴に未関連の通報は対応完了にできない", async () => {
+    mocks.findUnique.mockResolvedValueOnce({
+      id: "report-1",
+      profileId: "profile-1",
+    });
+    mocks.findUnique.mockResolvedValueOnce({
+      id: "report-1",
+      profileId: "profile-1",
+      status: "reviewed",
+      moderationCaseId: null,
+      moderationActionId: null,
+    });
+
+    const response = await PATCH(
+      request({ status: "resolved", note: "対応完了" }),
+      context(),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "先に通報対象への対応を行い、ケースと管理操作履歴を関連付けてください。",
+    });
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+  });
+
   it.each(["resolved", "dismissed"] as const)(
     "終了済み状態%sからの再変更を拒否する",
     async (currentStatus) => {
       mocks.findUnique.mockResolvedValueOnce({
         id: "report-1",
+        profileId: "profile-1",
+      });
+      mocks.findUnique.mockResolvedValueOnce({
+        id: "report-1",
+        profileId: "profile-1",
         status: currentStatus,
+        moderationCaseId: "case-1",
+        moderationActionId: "action-1",
       });
 
       const response = await PATCH(

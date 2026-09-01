@@ -266,7 +266,11 @@ export default function AdminReportsPanel({
                       ) : null}
                       <button
                         type="button"
-                        disabled={Boolean(updatingReportId)}
+                        disabled={
+                          Boolean(updatingReportId) ||
+                          !report.moderationCase ||
+                          !report.moderationAction
+                        }
                         onClick={() =>
                           setPendingReportAction({
                             reportId: report.id,
@@ -277,6 +281,11 @@ export default function AdminReportsPanel({
                       >
                         対応済みにする
                       </button>
+                      {!report.moderationCase || !report.moderationAction ? (
+                        <p className={styles.restoreBlocked}>
+                          通報対象への対応後に対応済みにできます。
+                        </p>
+                      ) : null}
                       <button
                         type="button"
                         disabled={Boolean(updatingReportId)}
