@@ -94,4 +94,39 @@ describe("AdminModerationCasesPanel", () => {
       );
     });
   });
+
+  it("なりすまし案件では承認操作を表示せず本人確認申請へ誘導する", () => {
+    const d = createAdminModerationDetail();
+    const impersonationCase = {
+      ...d.profile.moderationCases[0],
+      id: "case-impersonation",
+      reasonCode: "impersonation" as const,
+    };
+
+    render(
+      <AdminModerationCasesPanel
+        cases={[impersonationCase]}
+        profileId="profile-1"
+        hasAudio={true}
+        onReload={vi.fn()}
+        onActionMessage={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "修正を承認" })).toBeNull();
+    expect(
+      screen.getByText(
+        "なりすまし案件の完了は本人確認申請の審査から行います。",
+      ),
+    ).toBeDefined();
+    expect(
+      screen
+        .getByRole("link", { name: "本人確認申請を確認する" })
+        .getAttribute("href"),
+    ).toBe("#identity-verification-heading");
+    expect(screen.getByRole("button", { name: "非公開を継続" })).toBeDefined();
+    expect(
+      screen.getByRole("button", { name: "追加修正を依頼" }),
+    ).toBeDefined();
+  });
 });

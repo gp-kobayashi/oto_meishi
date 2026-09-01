@@ -279,6 +279,14 @@ export default function AdminModerationCasesPanel({
                   )}
                   {isPending ? (
                     <div className={styles.caseReview}>
+                      {moderationCase.reasonCode === "impersonation" ? (
+                        <p className={styles.caseMessage}>
+                          なりすまし案件の完了は本人確認申請の審査から行います。
+                          <a href="#identity-verification-heading">
+                            本人確認申請を確認する
+                          </a>
+                        </p>
+                      ) : null}
                       <label htmlFor={`case-response-${moderationCase.id}`}>
                         ユーザーに通知する審査理由（必須）
                       </label>
@@ -295,12 +303,16 @@ export default function AdminModerationCasesPanel({
                         }
                       />
                       <div className={styles.reportActions}>
-                        {(
-                          [
-                            ["approve", "修正を承認", !!latestCorrected],
-                            ["continueHidden", "非公開を継続", false],
-                            ["requestChanges", "追加修正を依頼", false],
-                          ] as const
+                        {(moderationCase.reasonCode === "impersonation"
+                          ? ([
+                              ["continueHidden", "非公開を継続", false],
+                              ["requestChanges", "追加修正を依頼", false],
+                            ] as const)
+                          : ([
+                              ["approve", "修正を承認", !!latestCorrected],
+                              ["continueHidden", "非公開を継続", false],
+                              ["requestChanges", "追加修正を依頼", false],
+                            ] as const)
                         ).map(([decision, label, requiresCorrected]) => (
                           <button
                             key={decision}
