@@ -307,7 +307,20 @@ describe("本人確認の違反取消順序と停止状態の再評価", () => {
       prisma.moderationAction.count({
         where: { profileId: fixture.profileId },
       }),
-    ).resolves.toBe(3);
+    ).resolves.toBe(4);
+    await expect(
+      prisma.moderationAction.findFirst({
+        where: {
+          profileId: fixture.profileId,
+          targetType: "audio",
+          targetId: fixture.profileId,
+          action: "restore",
+          previousStatus: "hidden",
+          newStatus: "active",
+        },
+        select: { id: true },
+      }),
+    ).resolves.toEqual(expect.objectContaining({ id: expect.any(String) }));
     await expect(
       prisma.moderationAction.findFirst({
         where: {
