@@ -5,6 +5,7 @@ const { mocks } = vi.hoisted(() => ({
     authorizeAdminRequest: vi.fn(),
     findUnique: vi.fn(),
     historyFindMany: vi.fn(),
+    reportGroupBy: vi.fn(),
   },
 }));
 
@@ -16,6 +17,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     profile: { findUnique: mocks.findUnique },
     moderationAction: { findMany: mocks.historyFindMany },
+    contentReport: { groupBy: mocks.reportGroupBy },
   },
 }));
 
@@ -63,6 +65,16 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       reports: [
         {
           id: "report-1",
+          targetType: "socialLink",
+          targetId: "link-1",
+          targetSnapshot: {
+            service: "youtube",
+            label: "YouTube",
+            url: "https://youtube.com/example",
+            status: "active",
+          },
+          moderationCase: null,
+          moderationAction: null,
           reason: "unsafe_link",
           details: "外部サイトへ誘導される",
           status: "pending",
@@ -236,6 +248,9 @@ describe("GET /api/admin/moderation/[profileId]", () => {
         createdAt: new Date("2026-07-18T01:00:00.000Z"),
         adminUser: null,
       },
+    ]);
+    mocks.reportGroupBy.mockResolvedValue([
+      { targetType: "socialLink", targetId: "link-1", _count: { _all: 51 } },
     ]);
   });
 

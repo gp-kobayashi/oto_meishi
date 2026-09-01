@@ -50,6 +50,15 @@ export async function GET(
           take: 50,
           select: {
             id: true,
+            targetType: true,
+            targetId: true,
+            targetSnapshot: true,
+            moderationCase: {
+              select: { id: true, status: true, reasonCode: true },
+            },
+            moderationAction: {
+              select: { id: true, action: true, createdAt: true },
+            },
             reason: true,
             details: true,
             status: true,
@@ -216,6 +225,11 @@ export async function GET(
         adminUser: { select: { authId: true, role: true } },
       },
     });
+    const reportTargetCounts = await prisma.contentReport.groupBy({
+      by: ["targetType", "targetId"],
+      where: { profileId },
+      _count: { _all: true },
+    });
     const deletedAudioCase = profile.moderationCases.find(
       (moderationCase) =>
         moderationCase.targetType === "audio" &&
@@ -241,6 +255,12 @@ export async function GET(
         return counts;
       },
       {},
+    );
+    const reportTargetCountMap = new Map(
+      reportTargetCounts.map((entry) => [
+        `${entry.targetType}:${entry.targetId}`,
+        entry._count._all,
+      ]),
     );
 
     return Response.json(
@@ -278,6 +298,32 @@ export async function GET(
           links: profile.sns,
           reports: profile.reports.map((report) => ({
             id: report.id,
+            targetType: report.targetType,
+            targetId: report.targetId,
+            target: getReportTarget(
+              report.targetType,
+              report.targetId,
+              report.targetSnapshot,
+              profile,
+            ),
+            sameTargetReportCount:
+              reportTargetCountMap.get(
+                `${report.targetType}:${report.targetId}`,
+              ) ?? 1,
+            moderationCase: report.moderationCase
+              ? {
+                  id: report.moderationCase.id,
+                  status: report.moderationCase.status,
+                  reasonCode: report.moderationCase.reasonCode,
+                }
+              : null,
+            moderationAction: report.moderationAction
+              ? {
+                  id: report.moderationAction.id,
+                  action: report.moderationAction.action,
+                  createdAt: report.moderationAction.createdAt.toISOString(),
+                }
+              : null,
             reason: report.reason,
             details: report.details,
             status: report.status,
@@ -417,4 +463,157 @@ function getSnapshotString(content: unknown, key: string): string | null {
 
   const value = (content as Record<string, unknown>)[key];
   return typeof value === "string" ? value : null;
+}
+
+function getReportTarget(
+  targetType: "profile" | "audio" | "socialLink",
+  targetId: string,
+  snapshot: unknown,
+  profile: {
+    id: string;
+    displayName: string;
+    bio: string;
+    theme: string;
+    status: string;
+    audioTitle: string;
+    audioStatus: string;
+    audioKey: string;
+    audioUrl: string;
+    sns: Array<{
+      id: string;
+      service: string;
+      label: string;
+      url: string;
+      status: string;
+    }>;
+  },
+) {
+  const snapshotValues = getReportSnapshotValues(snapshot, targetType);
+  if (targetType === "profile") {
+    return {
+      targetLabel: `プロフィール（${profile.displayName}）`,
+      targetUrl: null,
+      snapshot: snapshotValues,
+      current: getLabeledValues(
+        {
+          displayName: profile.displayName,
+          bio: profile.bio,
+          theme: profile.theme,
+          status: profile.status,
+        },
+        targetType,
+      ),
+      snapshotAvailable: snapshotValues !== null,
+    };
+  }
+  if (targetType === "audio") {
+    const hasAudio = Boolean(profile.audioKey || profile.audioUrl);
+    return {
+      targetLabel: `音声（${profile.audioTitle || "タイトルなし"}）`,
+      targetUrl: null,
+      snapshot: snapshotValues,
+      current: getLabeledValues(
+        {
+          audioTitle: profile.audioTitle,
+          audioStatus: profile.audioStatus,
+          hasAudio: String(hasAudio),
+        },
+        targetType,
+      ),
+      snapshotAvailable: snapshotValues !== null,
+    };
+  }
+  const link = profile.sns.find((item) => item.id === targetId);
+  return {
+    targetLabel: link
+      ? `${link.label}（${link.service}）`
+      : "リンク（削除済み）",
+    targetUrl: link && isSafeExternalUrl(link.url) ? link.url : null,
+    snapshot: snapshotValues,
+    current: link
+      ? getLabeledValues(
+          {
+            service: link.service,
+            label: link.label,
+            url: link.url,
+            status: link.status,
+          },
+          targetType,
+        )
+      : null,
+    snapshotAvailable: snapshotValues !== null,
+  };
+}
+
+function getLabeledValues(
+  values: Record<string, string>,
+  targetType: "profile" | "audio" | "socialLink",
+): Record<string, string> {
+  const labels: Record<string, string> = {
+    displayName: "表示名",
+    bio: "自己紹介",
+    theme: "テーマ",
+    status: "状態",
+    audioTitle: "音声タイトル",
+    audioStatus: "音声状態",
+    hasAudio: "音声有無",
+    service: "サービス",
+    label: "ラベル",
+    url: "URL",
+  };
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [
+      labels[key] ?? `${targetType}の${key}`,
+      value,
+    ]),
+  );
+}
+
+function getReportSnapshotValues(
+  content: unknown,
+  targetType: "profile" | "audio" | "socialLink",
+): Record<string, string> | null {
+  if (
+    typeof content !== "object" ||
+    content === null ||
+    Array.isArray(content)
+  ) {
+    return null;
+  }
+  const raw = content as Record<string, unknown>;
+  if (raw.source === "legacy" && raw.available === false) return null;
+  const labels: Record<string, string> = {
+    displayName: "表示名",
+    bio: "自己紹介",
+    theme: "テーマ",
+    status: "状態",
+    audioTitle: "音声タイトル",
+    audioStatus: "音声状態",
+    hasAudio: "音声有無",
+    service: "サービス",
+    label: "ラベル",
+    url: "URL",
+  };
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === "source" || key === "available" || key === "reason") {
+      continue;
+    }
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      values[labels[key] ?? `${targetType}の${key}`] = String(value);
+    }
+  }
+  return Object.keys(values).length ? values : null;
+}
+
+function isSafeExternalUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
 }

@@ -9,6 +9,25 @@ export const moderationFilters = [
 ] as const;
 
 export type ModerationFilter = (typeof moderationFilters)[number];
+export type ModerationTargetType = "profile" | "audio" | "socialLink";
+
+export type AdminReportTargetValues = Record<string, string>;
+
+export type AdminReportTarget = {
+  targetLabel: string;
+  targetUrl: string | null;
+  snapshot: AdminReportTargetValues | null;
+  current: AdminReportTargetValues | null;
+  snapshotAvailable: boolean;
+};
+
+export type AdminReportRelation = {
+  id: string;
+  status?: string;
+  reasonCode?: string;
+  action?: string;
+  createdAt?: string;
+} | null;
 
 export function getModerationFilterWhere(
   filter: ModerationFilter,
@@ -114,6 +133,12 @@ export type ModerationDetailResponse = {
     }[];
     reports: {
       id: string;
+      targetType: ModerationTargetType;
+      targetId: string;
+      target: AdminReportTarget;
+      sameTargetReportCount: number;
+      moderationCase: AdminReportRelation;
+      moderationAction: AdminReportRelation;
       reason:
         | "inappropriate_audio"
         | "harassment"

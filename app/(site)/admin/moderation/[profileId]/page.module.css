@@ -668,6 +668,77 @@
   white-space: pre-wrap;
 }
 
+.reportTarget {
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.reportTarget h3,
+.reportTarget h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.reportTarget p {
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.reportTarget code {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.reportTarget a {
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.reportTargetColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.reportTargetColumns > div {
+  padding: 10px;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.reportTargetColumns dl {
+  margin: 0;
+}
+
+.reportTargetColumns dl > div {
+  display: grid;
+  grid-template-columns: minmax(70px, auto) 1fr;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.reportTargetColumns dt {
+  color: #64748b;
+}
+
+.reportTargetColumns dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 560px) {
+  .reportTargetColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
 .reportList time {
   display: block;
   margin-top: 10px;

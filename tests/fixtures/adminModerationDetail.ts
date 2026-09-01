@@ -37,6 +37,28 @@ export const createAdminModerationDetail = (): ModerationDetailResponse => ({
     reports: [
       {
         id: "report-1",
+        targetType: "socialLink",
+        targetId: "link-1",
+        target: {
+          targetLabel: "YouTube（youtube）",
+          targetUrl: "https://youtube.com/example",
+          snapshot: {
+            service: "youtube",
+            label: "変更前",
+            url: "https://unsafe.example",
+            status: "active",
+          },
+          current: {
+            service: "youtube",
+            label: "YouTube",
+            url: "https://youtube.com/example",
+            status: "hidden",
+          },
+          snapshotAvailable: true,
+        },
+        sameTargetReportCount: 1,
+        moderationCase: null,
+        moderationAction: null,
         reason: "unsafe_link",
         details: "外部サイトへ誘導されます",
         status: "pending",

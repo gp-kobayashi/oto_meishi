@@ -19,6 +19,11 @@ const reportStatusLabels = {
   resolved: "対応済み",
   dismissed: "対応不要",
 };
+const targetTypeLabels = {
+  profile: "プロフィール",
+  audio: "音声",
+  socialLink: "リンク",
+};
 type PendingReportAction = {
   reportId: string;
   status: "reviewed" | "resolved" | "dismissed";
@@ -122,6 +127,79 @@ export default function AdminReportsPanel({
                   <p className={styles.reportDetails}>
                     {report.details || "詳細は入力されていません。"}
                   </p>
+                  <section
+                    className={styles.reportTarget}
+                    aria-label="通報対象"
+                  >
+                    <h3>通報対象</h3>
+                    <p>
+                      {targetTypeLabels[report.targetType]} /{" "}
+                      {report.target.targetLabel}
+                      <code>（ID: {report.targetId}）</code>
+                    </p>
+                    <p>同じ対象への通報{report.sameTargetReportCount}件</p>
+                    {report.target.targetUrl ? (
+                      <a
+                        href={report.target.targetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        現在のリンクを開く
+                      </a>
+                    ) : null}
+                    <div className={styles.reportTargetColumns}>
+                      <div>
+                        <h4>通報時点の内容</h4>
+                        {report.target.snapshot ? (
+                          <dl>
+                            {Object.entries(report.target.snapshot).map(
+                              ([key, value]) => (
+                                <div key={key}>
+                                  <dt>{key}</dt>
+                                  <dd>{value}</dd>
+                                </div>
+                              ),
+                            )}
+                          </dl>
+                        ) : (
+                          <p>過去の内容は保存されていません。</p>
+                        )}
+                      </div>
+                      <div>
+                        <h4>現在の内容</h4>
+                        {report.target.current ? (
+                          <dl>
+                            {Object.entries(report.target.current).map(
+                              ([key, value]) => (
+                                <div key={key}>
+                                  <dt>{key}</dt>
+                                  <dd>{value}</dd>
+                                </div>
+                              ),
+                            )}
+                          </dl>
+                        ) : (
+                          <p>現在は削除済みです。</p>
+                        )}
+                      </div>
+                    </div>
+                    {report.moderationCase ? (
+                      <p>
+                        関連ケース: <code>{report.moderationCase.id}</code> /
+                        状態: {report.moderationCase.status} / 理由:{" "}
+                        {report.moderationCase.reasonCode}
+                      </p>
+                    ) : null}
+                    {report.moderationAction ? (
+                      <p>
+                        管理操作: <code>{report.moderationAction.id}</code> /{" "}
+                        {report.moderationAction.action} /{" "}
+                        {formatAdminDate(
+                          report.moderationAction.createdAt ?? "",
+                        )}
+                      </p>
+                    ) : null}
+                  </section>
                   <time dateTime={report.createdAt}>
                     受付日時: {formatAdminDate(report.createdAt)}
                   </time>
