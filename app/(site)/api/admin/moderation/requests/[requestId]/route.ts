@@ -8,6 +8,7 @@ import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { prisma } from "@/lib/prisma";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
+import { decideActiveViolationSuspension } from "@/lib/moderationViolation";
 
 const MAX_BODY_BYTES = 8 * 1024;
 
@@ -182,6 +183,21 @@ export async function PATCH(
         if (incompleteCaseCount > 0) {
           return {
             error: "未完了のモデレーションケースがあるため解除できません。",
+            httpStatus: 409,
+          } as const;
+        }
+        const violationEvents = await tx.moderationViolationEvent.findMany({
+          where: { profileId: lockedModerationRequest.profileId },
+          select: {
+            id: true,
+            eventType: true,
+            reasonCode: true,
+            originalViolationEventId: true,
+          },
+        });
+        if (decideActiveViolationSuspension(violationEvents).shouldSuspend) {
+          return {
+            error: "有効な違反が残っているため解除できません。",
             httpStatus: 409,
           } as const;
         }

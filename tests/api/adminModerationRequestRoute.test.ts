@@ -8,6 +8,7 @@ const { mocks } = vi.hoisted(() => ({
     requestFindUnique: vi.fn(),
     requestUpdate: vi.fn(),
     caseCount: vi.fn(),
+    violationFindMany: vi.fn(),
     profileUpdate: vi.fn(),
     profileFindUnique: vi.fn(),
     actionCreate: vi.fn(),
@@ -66,6 +67,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
           update: mocks.requestUpdate,
         },
         moderationCase: { count: mocks.caseCount },
+        moderationViolationEvent: { findMany: mocks.violationFindMany },
         profile: {
           findUnique: mocks.profileFindUnique,
           update: mocks.profileUpdate,
@@ -85,6 +87,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
     });
     mocks.requestUpdate.mockResolvedValue({});
     mocks.caseCount.mockResolvedValue(0);
+    mocks.violationFindMany.mockResolvedValue([]);
     mocks.profileUpdate.mockResolvedValue({});
     mocks.profileFindUnique.mockResolvedValue({
       status: "suspended",
@@ -179,6 +182,42 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
         status: {
           in: ["correctionRequired", "postReviewPending", "preReviewPending"],
         },
+      },
+    });
+    expect(mocks.requestUpdate).not.toHaveBeenCalled();
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+  });
+
+  it("有効ななりすまし違反が残る解除申請の承認を拒否する", async () => {
+    mocks.violationFindMany.mockResolvedValueOnce([
+      {
+        id: "violation-impersonation",
+        eventType: "confirmed",
+        reasonCode: "impersonation",
+        originalViolationEventId: null,
+      },
+    ]);
+
+    const response = await PATCH(
+      request({
+        status: "resolved",
+        responseMessage: "修正内容を確認したため解除しました。",
+      }),
+      { params: Promise.resolve({ requestId: "request-1" }) },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "有効な違反が残っているため解除できません。",
+    });
+    expect(mocks.violationFindMany).toHaveBeenCalledWith({
+      where: { profileId: "profile-1" },
+      select: {
+        id: true,
+        eventType: true,
+        reasonCode: true,
+        originalViolationEventId: true,
       },
     });
     expect(mocks.requestUpdate).not.toHaveBeenCalled();
