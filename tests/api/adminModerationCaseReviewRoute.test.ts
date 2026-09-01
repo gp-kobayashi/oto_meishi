@@ -349,13 +349,15 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toEqual({
-      error: "なりすましへの対応に必要な項目が未修正です: 音声、リンク（以前のYouTube）",
+      error: "なりすまし案件は本人確認申請の審査から処理してください。",
     });
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
     expect(mocks.caseUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
-  it("なりすまし案件で登録内容をすべて修正した場合は承認できる", async () => {
+  it("なりすまし案件は登録内容をすべて修正済みでも通常審査では承認しない", async () => {
     mocks.caseFindUnique.mockResolvedValueOnce({
       ...pendingCase,
       targetType: "profile",
@@ -425,10 +427,44 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
       context,
     );
 
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "なりすまし案件は本人確認申請の審査から処理してください。",
+    });
+    expect(mocks.profileUpdate).not.toHaveBeenCalled();
+    expect(mocks.caseUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it("なりすまし案件への追加修正依頼は通常審査から行える", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      reasonCode: "impersonation",
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "requestChanges",
+        reason: "本人確認に必要な内容を修正してください。",
+      }),
+      context,
+    );
+
     expect(response.status).toBe(200);
     expect(mocks.caseUpdate).toHaveBeenCalledWith({
       where: { id: "case-1" },
-      data: expect.objectContaining({ status: "confirmed" }),
+      data: {
+        status: "correctionRequired",
+        resolvedAt: null,
+        userMessage: "本人確認に必要な内容を修正してください。",
+      },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        title: "追加の修正が必要です",
+        message: "本人確認に必要な内容を修正してください。",
+      }),
     });
   });
 

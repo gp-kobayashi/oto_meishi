@@ -168,6 +168,15 @@ export async function PATCH(
           httpStatus: 409,
         } as const;
       }
+      if (
+        decision === "approve" &&
+        moderationCase.reasonCode === "impersonation"
+      ) {
+        return {
+          error: "なりすまし案件は本人確認申請の審査から処理してください。",
+          httpStatus: 409,
+        } as const;
+      }
 
       const now = new Date();
       const latestCorrectedSnapshot =
