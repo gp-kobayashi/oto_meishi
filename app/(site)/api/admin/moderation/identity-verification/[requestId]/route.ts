@@ -303,6 +303,12 @@ export async function PATCH(
         previousStatus: moderationCase.profile.status,
         newStatus: moderationCase.profile.status,
       };
+      const restoredPriorTargets: {
+        targetType: "audio" | "socialLink";
+        targetId: string;
+        previousStatus: string;
+        newStatus: string;
+      }[] = [];
       if (decision === "verified") {
         await transaction.moderationCase.update({
           where: { id: moderationCase.id },
@@ -439,6 +445,65 @@ export async function PATCH(
               previousStatus: "suspended",
               newStatus: "active",
             };
+          }
+        }
+        if (accountCorrection.corrected) {
+          const verifiedPriorCases = await transaction.moderationCase.findMany({
+            where: {
+              id: { not: moderationCase.id },
+              profileId: moderationCase.profileId,
+              reasonCode: "impersonation",
+              status: "confirmed",
+              identityVerificationRequests: { some: { status: "verified" } },
+            },
+            select: {
+              id: true,
+              profileId: true,
+              targetType: true,
+              targetId: true,
+              profile: {
+                select: { status: true, audioStatus: true },
+              },
+            },
+          });
+          for (const priorCase of verifiedPriorCases) {
+            if (priorCase.targetType === "profile") continue;
+            const priorRestoration = await restoreTargetIfAllowed(
+              transaction,
+              priorCase,
+              true,
+            );
+            if (priorRestoration.restored) {
+              restoredPriorTargets.push({
+                targetType: priorCase.targetType,
+                targetId: priorCase.targetId,
+                previousStatus: priorRestoration.previousStatus,
+                newStatus: priorRestoration.newStatus,
+              });
+            }
+          }
+          for (const priorTarget of restoredPriorTargets) {
+            const priorAction = await transaction.moderationAction.create({
+              data: {
+                adminUserId: authorization.admin.id,
+                profileId: moderationCase.profileId,
+                targetType: priorTarget.targetType,
+                targetId: priorTarget.targetId,
+                action: "restore",
+                previousStatus: priorTarget.previousStatus,
+                newStatus: priorTarget.newStatus,
+                reason: note,
+              },
+              select: { id: true },
+            });
+            await transaction.userNotification.create({
+              data: {
+                profileId: moderationCase.profileId,
+                moderationActionId: priorAction.id,
+                title: "本人確認が完了しました",
+                message: note,
+              },
+            });
           }
         }
       } else {

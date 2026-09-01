@@ -12,6 +12,7 @@ const { mocks } = vi.hoisted(() => ({
     requestUpdate: vi.fn(),
     appealUpdateMany: vi.fn(),
     caseCount: vi.fn(),
+    caseFindMany: vi.fn(),
     caseUpdate: vi.fn(),
     caseEventCreate: vi.fn(),
     profileUpdate: vi.fn(),
@@ -97,6 +98,7 @@ describe("管理者の本人確認審査API", () => {
     mocks.requestUpdate.mockResolvedValue({ id: requestId });
     mocks.appealUpdateMany.mockResolvedValue({ count: 1 });
     mocks.caseCount.mockResolvedValue(0);
+    mocks.caseFindMany.mockResolvedValue([]);
     mocks.caseUpdate.mockResolvedValue({ id: "case-1" });
     mocks.caseEventCreate.mockResolvedValue({ id: "event-1" });
     mocks.profileUpdate.mockResolvedValue({ id: "profile-1" });
@@ -134,6 +136,7 @@ describe("管理者の本人確認審査API", () => {
           moderationRequest: { updateMany: mocks.appealUpdateMany },
           moderationCase: {
             count: mocks.caseCount,
+            findMany: mocks.caseFindMany,
             update: mocks.caseUpdate,
           },
           moderationCaseEvent: { create: mocks.caseEventCreate },
