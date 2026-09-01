@@ -73,6 +73,9 @@ describe("通報状態と対応履歴のトランザクション統合テスト"
         prisma.contentReport.create({
           data: {
             profileId,
+            targetType: "profile",
+            targetId: profileId,
+            targetSnapshot: { legacy: false, status: "active" },
             reason: "other",
             details: `統合テスト: ${label}`,
           },

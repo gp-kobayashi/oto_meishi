@@ -27,12 +27,13 @@ type ReportRequestBody = {
   profileId?: unknown;
   reason?: unknown;
   details?: unknown;
+  targetType?: unknown;
+  targetId?: unknown;
 };
 
 function isReportReason(value: unknown): value is ReportReason {
   return (
-    typeof value === "string" &&
-    reportReasons.includes(value as ReportReason)
+    typeof value === "string" && reportReasons.includes(value as ReportReason)
   );
 }
 
@@ -90,8 +91,15 @@ export async function POST(request: Request) {
         : {};
     const profileId =
       typeof body.profileId === "string" ? body.profileId.trim() : "";
-    const details =
-      typeof body.details === "string" ? body.details.trim() : "";
+    const details = typeof body.details === "string" ? body.details.trim() : "";
+    const targetType =
+      body.targetType === "profile" ||
+      body.targetType === "audio" ||
+      body.targetType === "socialLink"
+        ? body.targetType
+        : "";
+    const targetId =
+      typeof body.targetId === "string" ? body.targetId.trim() : "";
 
     if (!profileId || profileId.length > MAX_PROFILE_ID_LENGTH) {
       return NextResponse.json(
@@ -105,6 +113,28 @@ export async function POST(request: Request) {
         { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
       );
     }
+    if (!targetType || !targetId || targetId.length > MAX_PROFILE_ID_LENGTH) {
+      return NextResponse.json(
+        { error: "通報対象が不正です。" },
+        { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
+    const reason = body.reason;
+    const expectedTargetType =
+      reason === "inappropriate_audio"
+        ? "audio"
+        : reason === "unsafe_link"
+          ? "socialLink"
+          : "profile";
+    if (
+      targetType !== expectedTargetType ||
+      (targetType === "profile" && targetId !== profileId)
+    ) {
+      return NextResponse.json(
+        { error: "通報理由と対象の組み合わせが不正です。" },
+        { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
     if (details.length > MAX_REPORT_DETAILS_LENGTH) {
       return NextResponse.json(
         { error: "通報の詳細は500文字までです。" },
@@ -115,13 +145,14 @@ export async function POST(request: Request) {
     if (clientIp) {
       const targetRateLimit = await consumeReportTargetRateLimit(
         clientIp,
-        profileId,
+        targetType,
+        targetId,
       );
       if (!targetRateLimit.allowed) {
         return NextResponse.json(
           {
             error:
-              "同じプロフィールへの通報が続いています。しばらく待ってから再度お試しください。",
+              "同じ対象への通報が続いています。しばらく待ってから再度お試しください。",
           },
           {
             status: 429,
@@ -141,7 +172,27 @@ export async function POST(request: Request) {
 
     const profile = await prisma.profile.findUnique({
       where: { id: profileId },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        displayName: true,
+        bio: true,
+        theme: true,
+        audioUrl: true,
+        audioKey: true,
+        audioTitle: true,
+        audioStatus: true,
+        audioContentHash: true,
+        sns: {
+          select: {
+            id: true,
+            service: true,
+            label: true,
+            url: true,
+            status: true,
+          },
+        },
+      },
     });
     if (!profile || profile.status !== "active") {
       return NextResponse.json(
@@ -150,10 +201,57 @@ export async function POST(request: Request) {
       );
     }
 
+    const targetLink =
+      targetType === "socialLink"
+        ? profile.sns.find((link) => link.id === targetId)
+        : null;
+    const target =
+      targetType === "socialLink"
+        ? targetLink
+        : targetType === "audio"
+          ? profile.audioStatus === "active" &&
+            Boolean(profile.audioKey || profile.audioUrl)
+            ? profile
+            : null
+          : profile;
+    if (
+      !target ||
+      (targetType === "socialLink" && target.status !== "active") ||
+      (targetType === "audio" && profile.audioStatus !== "active")
+    ) {
+      return NextResponse.json(
+        { error: "通報対象が見つかりません。" },
+        { status: 404, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
+    const targetSnapshot =
+      targetType === "profile"
+        ? {
+            displayName: profile.displayName,
+            bio: profile.bio,
+            theme: profile.theme,
+            status: profile.status,
+          }
+        : targetType === "audio"
+          ? {
+              audioTitle: profile.audioTitle,
+              audioStatus: profile.audioStatus,
+              hasAudio: true,
+              audioContentHash: profile.audioContentHash,
+            }
+          : {
+              service: targetLink!.service,
+              label: targetLink!.label,
+              url: targetLink!.url,
+              status: targetLink!.status,
+            };
     await prisma.contentReport.create({
       data: {
         profileId: profile.id,
-        reason: body.reason,
+        targetType,
+        targetId,
+        targetSnapshot,
+        reason,
         details,
       },
       select: { id: true },

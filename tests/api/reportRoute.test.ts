@@ -24,10 +24,22 @@ vi.mock("@/lib/reportRateLimit", () => ({
 import { POST } from "@/app/(site)/api/reports/route";
 
 function reportRequest(body: unknown, contentType = "application/json") {
+  const payload =
+    typeof body === "object" && body !== null
+      ? (body as Record<string, unknown>)
+      : {};
+  const reason = payload.reason;
   return new Request("http://localhost/api/reports", {
     method: "POST",
     headers: { "Content-Type": contentType },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      ...payload,
+      targetType:
+        payload.targetType ??
+        (reason === "unsafe_link" ? "socialLink" : "profile"),
+      targetId:
+        payload.targetId ?? (reason === "unsafe_link" ? "link-1" : "profile-1"),
+    }),
   });
 }
 
@@ -37,6 +49,23 @@ describe("POST /api/reports", () => {
     mocks.profileFindUnique.mockResolvedValue({
       id: "profile-1",
       status: "active",
+      displayName: "表示名",
+      bio: "自己紹介",
+      theme: "normal",
+      audioUrl: "",
+      audioKey: "",
+      audioTitle: "音声",
+      audioStatus: "active",
+      audioContentHash: null,
+      sns: [
+        {
+          id: "link-1",
+          service: "x",
+          label: "X",
+          url: "https://x.com/example",
+          status: "active",
+        },
+      ],
     });
     mocks.contentReportCreate.mockResolvedValue({ id: "report-1" });
     mocks.consumeReportIpRateLimit.mockReturnValue({
@@ -69,11 +98,19 @@ describe("POST /api/reports", () => {
     await expect(response.json()).resolves.toEqual({ success: true });
     expect(mocks.profileFindUnique).toHaveBeenCalledWith({
       where: { id: "profile-1" },
-      select: { id: true, status: true },
+      select: expect.objectContaining({ id: true, status: true }),
     });
     expect(mocks.contentReportCreate).toHaveBeenCalledWith({
       data: {
         profileId: "profile-1",
+        targetType: "socialLink",
+        targetId: "link-1",
+        targetSnapshot: {
+          service: "x",
+          label: "X",
+          url: "https://x.com/example",
+          status: "active",
+        },
         reason: "unsafe_link",
         details: "不審なリンクです。",
       },
@@ -83,10 +120,7 @@ describe("POST /api/reports", () => {
 
   it("JSON以外のContent-Typeを415で拒否する", async () => {
     const response = await POST(
-      reportRequest(
-        { profileId: "profile-1", reason: "other" },
-        "text/plain",
-      ),
+      reportRequest({ profileId: "profile-1", reason: "other" }, "text/plain"),
     );
 
     expect(response.status).toBe(415);
@@ -120,9 +154,7 @@ describe("POST /api/reports", () => {
       error:
         "通報の送信回数が上限に達しました。しばらく待ってから再度お試しください。",
     });
-    expect(mocks.consumeReportIpRateLimit).toHaveBeenCalledWith(
-      "203.0.113.10",
-    );
+    expect(mocks.consumeReportIpRateLimit).toHaveBeenCalledWith("203.0.113.10");
     expect(request.bodyUsed).toBe(false);
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
   });
@@ -141,7 +173,12 @@ describe("POST /api/reports", () => {
         "Content-Type": "application/json",
         "X-Forwarded-For": "203.0.113.10, 10.0.0.1",
       },
-      body: JSON.stringify({ profileId: "profile-1", reason: "harassment" }),
+      body: JSON.stringify({
+        profileId: "profile-1",
+        reason: "harassment",
+        targetType: "profile",
+        targetId: "profile-1",
+      }),
     });
 
     const response = await POST(request);
@@ -151,10 +188,11 @@ describe("POST /api/reports", () => {
     expect(response.headers.get("X-RateLimit-Limit")).toBe("3");
     await expect(response.json()).resolves.toEqual({
       error:
-        "同じプロフィールへの通報が続いています。しばらく待ってから再度お試しください。",
+        "同じ対象への通報が続いています。しばらく待ってから再度お試しください。",
     });
     expect(mocks.consumeReportTargetRateLimit).toHaveBeenCalledWith(
       "203.0.113.10",
+      "profile",
       "profile-1",
     );
     expect(mocks.profileFindUnique).not.toHaveBeenCalled();
@@ -172,6 +210,7 @@ describe("POST /api/reports", () => {
     );
     expect(mocks.consumeReportTargetRateLimit).toHaveBeenCalledWith(
       "unresolved-client",
+      "profile",
       "profile-1",
     );
   });
@@ -237,9 +276,69 @@ describe("POST /api/reports", () => {
     },
   );
 
+  it("プロフィールに属さないリンクを対象にした通報を404で拒否する", async () => {
+    const response = await POST(
+      reportRequest({
+        profileId: "profile-1",
+        reason: "unsafe_link",
+        targetType: "socialLink",
+        targetId: "link-from-another-profile",
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error: "通報対象が見つかりません。",
+    });
+    expect(mocks.contentReportCreate).not.toHaveBeenCalled();
+  });
+
+  it("音声の存在と公開状態をサーバー側で再検証してスナップショットを保存する", async () => {
+    mocks.profileFindUnique.mockResolvedValueOnce({
+      id: "profile-1",
+      status: "active",
+      displayName: "表示名",
+      bio: "自己紹介",
+      theme: "normal",
+      audioUrl: "",
+      audioKey: "audio-key-1",
+      audioTitle: "音声タイトル",
+      audioStatus: "active",
+      audioContentHash: "hash-1",
+      sns: [],
+    });
+
+    const response = await POST(
+      reportRequest({
+        profileId: "profile-1",
+        reason: "inappropriate_audio",
+        targetType: "audio",
+        targetId: "profile-1",
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.contentReportCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          targetType: "audio",
+          targetId: "profile-1",
+          targetSnapshot: {
+            audioTitle: "音声タイトル",
+            audioStatus: "active",
+            hasAudio: true,
+            audioContentHash: "hash-1",
+          },
+        }),
+      }),
+    );
+  });
+
   it("内部エラーの詳細をレスポンスへ公開しない", async () => {
     const internalError = new Error("database connection failed: secret-host");
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mocks.contentReportCreate.mockRejectedValueOnce(internalError);
 
     try {

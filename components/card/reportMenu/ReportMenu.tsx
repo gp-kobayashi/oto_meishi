@@ -3,8 +3,25 @@
 import { useEffect, useRef, useState } from "react";
 import styles from "./ReportMenu.module.css";
 import ReportDialog from "./ReportDialog";
+import type { ReportableSocialLink } from "./types";
 
-export default function ReportMenu({ profileId }: { profileId: string }) {
+type ReportMenuProps = {
+  profileId: string;
+  displayName?: string;
+  audioTitle?: string;
+  hasAudio?: boolean;
+  audioStatus?: "active" | "hidden" | "removed";
+  links?: ReportableSocialLink[];
+};
+
+export default function ReportMenu({
+  profileId,
+  displayName = "",
+  audioTitle = "",
+  hasAudio = false,
+  audioStatus = "active",
+  links = [],
+}: ReportMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -74,7 +91,15 @@ export default function ReportMenu({ profileId }: { profileId: string }) {
         </div>
       ) : null}
       {isDialogOpen ? (
-        <ReportDialog profileId={profileId} onClose={closeDialog} />
+        <ReportDialog
+          profileId={profileId}
+          displayName={displayName}
+          audioTitle={audioTitle}
+          hasAudio={hasAudio}
+          audioStatus={audioStatus}
+          links={links}
+          onClose={closeDialog}
+        />
       ) : null}
     </div>
   );

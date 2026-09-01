@@ -6,6 +6,7 @@ import SocialLink from "../card/socialLink/SocialLink";
 import ProfileShare from "./profileShare/ProfileShare";
 import type { ProfileData } from "@/lib/mock/profileData";
 import ReportMenu from "./reportMenu/ReportMenu";
+import type { ReportableSocialLink } from "./reportMenu/types";
 
 const Card = ({
   link,
@@ -39,7 +40,19 @@ const Card = ({
       data-display-mode={displayMode}
     >
       <Background theme={theme} />
-      {showReportMenu ? <ReportMenu profileId={link.id} /> : null}
+      {showReportMenu ? (
+        <ReportMenu
+          profileId={link.id}
+          displayName={displayName}
+          audioTitle={audioTitle}
+          hasAudio={Boolean(hasAudio || audioKey || audioUrl)}
+          audioStatus={link.audioStatus ?? "active"}
+          links={sns.filter(
+            (socialLink): socialLink is ReportableSocialLink =>
+              socialLink.status !== "hidden" && Boolean(socialLink.id),
+          )}
+        />
+      ) : null}
       <h2 id="profile-title" className={styles.title}>
         {displayName}
       </h2>

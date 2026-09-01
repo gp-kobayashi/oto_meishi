@@ -12,11 +12,12 @@ export const consumeReportIpRateLimit = (key: string) =>
   });
 export const consumeReportTargetRateLimit = (
   clientIp: string,
-  profileId: string,
+  targetType: "profile" | "audio" | "socialLink",
+  targetId: string,
 ) =>
   consumePersistentRateLimit({
     scope: "report:target",
-    key: `${clientIp}\u0000${profileId}`,
+    key: `${clientIp}\u0000${targetType}:${targetId}`,
     limit: REPORT_TARGET_LIMIT,
     windowMs: 60 * 60 * 1000,
   });

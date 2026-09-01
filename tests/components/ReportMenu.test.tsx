@@ -2,6 +2,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ReportMenu from "@/components/card/reportMenu/ReportMenu";
 
+const reportableLink = {
+  id: "link-1",
+  service: "x" as const,
+  label: "X",
+  url: "https://x.com/example",
+  status: "active" as const,
+};
+
 describe("ReportMenu", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -22,9 +30,7 @@ describe("ReportMenu", () => {
 
   it("Escapeキーでメニューを閉じる", () => {
     render(<ReportMenu profileId="profile-1" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "通報メニューを開く" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
 
     fireEvent.keyDown(document, { key: "Escape" });
 
@@ -33,9 +39,7 @@ describe("ReportMenu", () => {
 
   it("メニューの外側を押すと閉じる", () => {
     render(<ReportMenu profileId="profile-1" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "通報メニューを開く" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
 
     fireEvent.pointerDown(document.body);
 
@@ -44,9 +48,7 @@ describe("ReportMenu", () => {
 
   it("通報するを押すと通報項目をオーバーレイ表示する", () => {
     render(<ReportMenu profileId="profile-1" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "通報メニューを開く" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
 
     fireEvent.click(screen.getByRole("menuitem", { name: "通報する" }));
 
@@ -64,9 +66,7 @@ describe("ReportMenu", () => {
 
   it("通報項目を選択でき、キャンセルで閉じる", () => {
     render(<ReportMenu profileId="profile-1" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "通報メニューを開く" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "通報する" }));
     const reason = screen.getByRole("radio", { name: "なりすまし" });
 
@@ -77,11 +77,26 @@ describe("ReportMenu", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
+  it("省略時に存在しない音声やリンクを通報対象として表示しない", () => {
+    render(<ReportMenu profileId="profile-1" />);
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "通報する" }));
+
+    expect(
+      (screen.getByRole("radio", { name: "不適切な音声" }) as HTMLInputElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.click(
+      screen.getByRole("radio", { name: "危険または不正なリンク" }),
+    );
+    const linkSelect = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(linkSelect.disabled).toBe(true);
+    expect(linkSelect.options).toHaveLength(1);
+  });
+
   it("オーバーレイはEscapeキーで閉じる", () => {
     render(<ReportMenu profileId="profile-1" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "通報メニューを開く" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "通報する" }));
 
     fireEvent.keyDown(document, { key: "Escape" });
@@ -96,13 +111,13 @@ describe("ReportMenu", () => {
         headers: { "Content-Type": "application/json" },
       }),
     );
-    render(<ReportMenu profileId="profile-1" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "通報メニューを開く" }),
-    );
+    render(<ReportMenu profileId="profile-1" links={[reportableLink]} />);
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "通報する" }));
 
-    fireEvent.click(screen.getByRole("radio", { name: "危険または不正なリンク" }));
+    fireEvent.click(
+      screen.getByRole("radio", { name: "危険または不正なリンク" }),
+    );
     fireEvent.change(screen.getByRole("textbox", { name: "詳細（任意）" }), {
       target: { value: "外部サイトへ誘導されます" },
     });
@@ -117,6 +132,8 @@ describe("ReportMenu", () => {
         profileId: "profile-1",
         reason: "unsafe_link",
         details: "外部サイトへ誘導されます",
+        targetType: "socialLink",
+        targetId: "link-1",
       }),
     });
   });
@@ -129,9 +146,7 @@ describe("ReportMenu", () => {
       }),
     );
     render(<ReportMenu profileId="profile-1" />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "通報メニューを開く" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "通報メニューを開く" }));
     fireEvent.click(screen.getByRole("menuitem", { name: "通報する" }));
     fireEvent.click(screen.getByRole("radio", { name: "その他" }));
     fireEvent.click(screen.getByRole("button", { name: "送信する" }));

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import styles from "./ReportDialog.module.css";
+import type { ReportableSocialLink } from "./types";
 
 const reportReasons = [
   { value: "inappropriate_audio", label: "不適切な音声" },
@@ -14,6 +15,11 @@ const reportReasons = [
 
 type ReportDialogProps = {
   profileId: string;
+  displayName?: string;
+  audioTitle?: string;
+  hasAudio?: boolean;
+  audioStatus?: "active" | "hidden" | "removed";
+  links?: ReportableSocialLink[];
   onClose: () => void;
 };
 
@@ -23,9 +29,15 @@ type ReportResponse = {
 
 export default function ReportDialog({
   profileId,
+  displayName,
+  audioTitle = "",
+  hasAudio = false,
+  audioStatus = "active",
+  links = [],
   onClose,
 }: ReportDialogProps) {
   const [selectedReason, setSelectedReason] = useState("");
+  const [selectedLinkId, setSelectedLinkId] = useState("");
   const [details, setDetails] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -34,7 +46,13 @@ export default function ReportDialog({
 
   const submitReport = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedReason || isSubmitting) {
+    if (
+      !selectedReason ||
+      isSubmitting ||
+      (selectedReason === "inappropriate_audio" &&
+        (!hasAudio || audioStatus !== "active")) ||
+      (selectedReason === "unsafe_link" && !selectedLinkId)
+    ) {
       return;
     }
 
@@ -49,9 +67,19 @@ export default function ReportDialog({
           profileId,
           reason: selectedReason,
           details,
+          targetType:
+            selectedReason === "unsafe_link"
+              ? "socialLink"
+              : selectedReason === "inappropriate_audio"
+                ? "audio"
+                : "profile",
+          targetId:
+            selectedReason === "unsafe_link" ? selectedLinkId : profileId,
         }),
       });
-      const result = (await response.json().catch(() => ({}))) as ReportResponse;
+      const result = (await response
+        .json()
+        .catch(() => ({}))) as ReportResponse;
 
       if (!response.ok) {
         setErrorMessage(
@@ -127,7 +155,11 @@ export default function ReportDialog({
           <div className={styles.success} role="status">
             <p className={styles.successTitle}>通報を受け付けました</p>
             <p>送信された内容を運営が確認します。</p>
-            <button type="button" className={styles.submitButton} onClick={onClose}>
+            <button
+              type="button"
+              className={styles.submitButton}
+              onClick={onClose}
+            >
               閉じる
             </button>
           </div>
@@ -143,9 +175,7 @@ export default function ReportDialog({
                 <label
                   key={reason.value}
                   className={`${styles.reason} ${
-                    selectedReason === reason.value
-                      ? styles.selectedReason
-                      : ""
+                    selectedReason === reason.value ? styles.selectedReason : ""
                   }`}
                 >
                   <input
@@ -153,12 +183,55 @@ export default function ReportDialog({
                     name="reportReason"
                     value={reason.value}
                     checked={selectedReason === reason.value}
-                    onChange={() => setSelectedReason(reason.value)}
+                    disabled={
+                      isSubmitting ||
+                      (reason.value === "inappropriate_audio" &&
+                        (!hasAudio || audioStatus !== "active")) ||
+                      (reason.value === "unsafe_link" && !links.length)
+                    }
+                    onChange={() => {
+                      setSelectedReason(reason.value);
+                      if (reason.value !== "unsafe_link") setSelectedLinkId("");
+                      else if (links.length === 1)
+                        setSelectedLinkId(links[0].id);
+                    }}
                   />
                   <span>{reason.label}</span>
                 </label>
               ))}
             </fieldset>
+
+            {selectedReason === "unsafe_link" ? (
+              <div className={styles.detailsLabel}>
+                <label htmlFor="report-target-link">
+                  通報対象のリンク（必須）
+                </label>
+                <select
+                  id="report-target-link"
+                  value={selectedLinkId}
+                  onChange={(event) => setSelectedLinkId(event.target.value)}
+                  disabled={isSubmitting || !links.length}
+                >
+                  <option value="">リンクを選択してください</option>
+                  {links.map((link) => (
+                    <option key={link.id} value={link.id}>
+                      {link.label}（{link.service}）: {link.url}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {selectedReason ? (
+              <p className={styles.description}>
+                通報対象:{" "}
+                {selectedReason === "inappropriate_audio"
+                  ? `音声${audioTitle ? `「${audioTitle}」` : ""}`
+                  : selectedReason === "unsafe_link"
+                    ? (links.find((link) => link.id === selectedLinkId)
+                        ?.label ?? "リンク")
+                    : `プロフィール（${displayName}）`}
+              </p>
+            ) : null}
 
             <div className={styles.detailsLabel}>
               <label htmlFor="report-details">詳細（任意）</label>
@@ -193,7 +266,13 @@ export default function ReportDialog({
                 <button
                   type="submit"
                   className={styles.submitButton}
-                  disabled={!selectedReason || isSubmitting}
+                  disabled={
+                    !selectedReason ||
+                    isSubmitting ||
+                    (selectedReason === "inappropriate_audio" &&
+                      (!hasAudio || audioStatus !== "active")) ||
+                    (selectedReason === "unsafe_link" && !selectedLinkId)
+                  }
                 >
                   {isSubmitting ? "送信中..." : "送信する"}
                 </button>
