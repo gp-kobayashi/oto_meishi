@@ -17,6 +17,8 @@ describe("AdminIdentityVerificationPanel", () => {
   afterEach(() => vi.restoreAllMocks());
   it("本人確認申請と予定内容を表示しPATCHする", async () => {
     const d = createAdminModerationDetail();
+    d.profile.identityVerificationRequests[0].postingDeadlineAt =
+      "2999-01-01T00:00:00.000Z";
     const onReload = vi.fn().mockResolvedValue(undefined);
     const onActionMessage = vi.fn();
     const f = vi
@@ -183,5 +185,38 @@ describe("AdminIdentityVerificationPanel", () => {
     );
 
     expect(screen.getByText("音声")).toBeDefined();
+  });
+
+  it("期限切れのpending申請は審査操作を表示しない", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-02T00:00:00.000Z"));
+    const d = createAdminModerationDetail();
+    const request = {
+      ...d.profile.identityVerificationRequests[0],
+      status: "pending" as const,
+      postingDeadlineAt: "2026-09-01T23:59:00.000Z",
+    };
+
+    render(
+      <AdminIdentityVerificationPanel
+        requests={[request]}
+        moderationCases={d.profile.moderationCases}
+        profileLinks={d.profile.links}
+        onReload={vi.fn().mockResolvedValue(undefined)}
+        onActionMessage={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "投稿期限切れのため審査できません。期限処理後に再申請を待ちます。",
+      ),
+    ).toBeDefined();
+    expect(
+      screen.queryByLabelText("審査メモ・ユーザーへの説明（必須）"),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "本人と確認" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "確認できない" })).toBeNull();
+    vi.useRealTimers();
   });
 });

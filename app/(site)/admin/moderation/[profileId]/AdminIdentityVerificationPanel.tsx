@@ -40,6 +40,7 @@ export default function AdminIdentityVerificationPanel({
   const [verificationNotes, setVerificationNotes] = useState<
     Record<string, string>
   >({});
+  const [currentTime] = useState(() => Date.now());
   const [updatingVerificationId, setUpdatingVerificationId] = useState("");
   const [verificationError, setVerificationError] = useState("");
 
@@ -131,6 +132,11 @@ export default function AdminIdentityVerificationPanel({
                       link.id === verificationRequest.moderationCase.targetId,
                   )
                 : null;
+            const isExpired =
+              verificationRequest.status === "expired" ||
+              (verificationRequest.status === "pending" &&
+                new Date(verificationRequest.postingDeadlineAt).getTime() <=
+                  currentTime);
             return (
               <li key={verificationRequest.id}>
                 <div className={styles.reportHeader}>
@@ -259,7 +265,11 @@ export default function AdminIdentityVerificationPanel({
                     {verificationRequest.reviewerIdentifier ?? "記録なし"}
                   </p>
                 ) : null}
-                {verificationRequest.status === "pending" ? (
+                {isExpired ? (
+                  <p className={styles.restoreBlocked}>
+                    投稿期限切れのため審査できません。期限処理後に再申請を待ちます。
+                  </p>
+                ) : verificationRequest.status === "pending" ? (
                   <div className={styles.requestResolution}>
                     <label
                       htmlFor={`verification-note-${verificationRequest.id}`}
