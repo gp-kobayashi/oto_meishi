@@ -60,6 +60,7 @@ const pendingCase = {
   snapshots: [
     {
       id: "snapshot-latest",
+      kind: "corrected",
       content: {
         service: "youtube",
         url: "https://example.com/new",
@@ -188,6 +189,7 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
       snapshots: [
         {
           id: "snapshot-profile",
+          kind: "corrected",
           content: {
             displayName: "表示名",
             bio: "自己紹介",
@@ -236,6 +238,7 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
       snapshots: [
         {
           id: "snapshot-profile",
+          kind: "corrected",
           content: {
             displayName: "表示名",
             bio: "自己紹介",
@@ -476,6 +479,7 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
       snapshots: [
         {
           id: "snapshot-audio",
+          kind: "corrected",
           content: { audioKey: "audio/current.m4a" },
           contentHash: "a".repeat(64),
         },
@@ -637,6 +641,7 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
       snapshots: [
         {
           id: "snapshot-deleted",
+          kind: "corrected",
           content: { deleted: true },
           contentHash: null,
         },
@@ -716,6 +721,32 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 
+  it("correctedスナップショットがないケースは承認しない", async () => {
+    mocks.caseFindUnique.mockResolvedValueOnce({
+      ...pendingCase,
+      snapshots: [
+        {
+          ...pendingCase.snapshots[0],
+          id: "snapshot-reported",
+          kind: "reported",
+        },
+      ],
+    });
+
+    const response = await PATCH(
+      request({
+        decision: "approve",
+        reason: "修正を確認しました。",
+        reviewedSnapshotId: "snapshot-reported",
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(409);
+    expect(mocks.caseUpdate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).not.toHaveBeenCalled();
+  });
+
   it("最新スナップショットと現在のリンクが違う場合は承認を拒否する", async () => {
     mocks.linkFindUnique.mockResolvedValueOnce({
       service: "youtube",
@@ -745,6 +776,7 @@ describe("PATCH /api/admin/moderation/cases/[caseId]", () => {
       snapshots: [
         {
           id: "snapshot-audio",
+          kind: "corrected",
           content: { audioKey: "audio/reviewed.m4a" },
           contentHash: "b".repeat(64),
         },

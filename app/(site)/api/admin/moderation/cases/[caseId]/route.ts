@@ -179,10 +179,9 @@ export async function PATCH(
       }
 
       const now = new Date();
-      const latestCorrectedSnapshot =
-        moderationCase.snapshots.find(
-          (snapshot) => snapshot.kind === "corrected",
-        ) ?? moderationCase.snapshots[0];
+      const latestCorrectedSnapshot = moderationCase.snapshots.find(
+        (snapshot) => snapshot.kind === "corrected",
+      );
       const reportedSnapshot = moderationCase.snapshots.find(
         (snapshot) => snapshot.kind === "reported",
       );
@@ -196,9 +195,11 @@ export async function PATCH(
       if (decision === "approve") {
         const latestSnapshot = latestCorrectedSnapshot;
         if (
+          !latestSnapshot ||
+          reviewedSnapshotId !== latestSnapshot.id ||
           compareModerationSnapshotVersions(
             reviewedSnapshotId,
-            latestSnapshot?.id,
+            latestSnapshot.id,
           ) !== "current" ||
           !(await doesCurrentTargetMatchSnapshot(
             tx,
