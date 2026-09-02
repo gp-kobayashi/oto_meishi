@@ -16,6 +16,29 @@ export const unresolvedReportStatuses: ReportStatus[] = [
   ReportStatus.reviewed,
 ];
 
+export function mergeUnresolvedWithRecentHistory<
+  T extends { id: string; status: string; createdAt: Date },
+>(items: T[], unresolvedStatuses: readonly string[], historyLimit = 50): T[] {
+  const unresolved = items.filter((item) =>
+    unresolvedStatuses.includes(item.status),
+  );
+  const completed = items
+    .filter((item) => !unresolvedStatuses.includes(item.status))
+    .sort(
+      (left, right) =>
+        right.createdAt.getTime() - left.createdAt.getTime() ||
+        right.id.localeCompare(left.id),
+    )
+    .slice(0, historyLimit);
+  const merged = [...unresolved, ...completed];
+  const unique = [...new Map(merged.map((item) => [item.id, item])).values()];
+  return unique.sort(
+    (left, right) =>
+      right.createdAt.getTime() - left.createdAt.getTime() ||
+      right.id.localeCompare(left.id),
+  );
+}
+
 export type AdminReportTargetValues = Record<string, string>;
 
 export type AdminReportTarget = {

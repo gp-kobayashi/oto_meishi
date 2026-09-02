@@ -2,6 +2,10 @@ import { authorizeAdminRequest } from "@/lib/adminAuth";
 import { prisma } from "@/lib/prisma";
 import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { getActiveViolationEvents } from "@/lib/moderationViolation";
+import {
+  mergeUnresolvedWithRecentHistory,
+  unresolvedReportStatuses,
+} from "@/lib/adminModeration";
 
 export async function GET(
   request: Request,
@@ -208,6 +212,164 @@ export async function GET(
       );
     }
 
+    const [
+      unresolvedReports,
+      unresolvedRequests,
+      unresolvedVerifications,
+      unresolvedCases,
+    ] = await Promise.all([
+      prisma.contentReport.findMany({
+        where: { profileId, status: { in: unresolvedReportStatuses } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+          id: true,
+          targetType: true,
+          targetId: true,
+          targetSnapshot: true,
+          moderationCase: {
+            select: { id: true, status: true, reasonCode: true },
+          },
+          moderationAction: {
+            select: { id: true, action: true, createdAt: true },
+          },
+          reason: true,
+          details: true,
+          status: true,
+          reviewNote: true,
+          reviewedAt: true,
+          reviewedByAdminUser: { select: { authId: true, role: true } },
+          statusEvents: {
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            take: 50,
+            select: {
+              id: true,
+              previousStatus: true,
+              newStatus: true,
+              note: true,
+              isBackfilled: true,
+              adminAuthId: true,
+              adminRole: true,
+              createdAt: true,
+            },
+          },
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.moderationRequest.findMany({
+        where: { profileId, status: "pending" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+          id: true,
+          kind: true,
+          status: true,
+          message: true,
+          responseMessage: true,
+          resolvedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.identityVerificationRequest.findMany({
+        where: { profileId, status: "pending" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+          id: true,
+          moderationCaseId: true,
+          socialLinkId: true,
+          moderationCase: {
+            select: {
+              id: true,
+              targetType: true,
+              targetId: true,
+              reasonCode: true,
+              status: true,
+              reviewMode: true,
+              userMessage: true,
+              resolvedAt: true,
+            },
+          },
+          socialLink: {
+            select: {
+              id: true,
+              service: true,
+              label: true,
+              url: true,
+              status: true,
+            },
+          },
+          socialUrl: true,
+          plannedContent: true,
+          status: true,
+          postingDeadlineAt: true,
+          reviewNote: true,
+          reviewedAt: true,
+          reviewedByAdminUser: { select: { authId: true, role: true } },
+          createdAt: true,
+          updatedAt: true,
+        },
+      }),
+      prisma.moderationCase.findMany({
+        where: {
+          profileId,
+          status: {
+            in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+          },
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: {
+          id: true,
+          targetType: true,
+          targetId: true,
+          reasonCode: true,
+          status: true,
+          reviewMode: true,
+          userMessage: true,
+          reviewDueAt: true,
+          retentionExpiresAt: true,
+          resolvedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          snapshots: {
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: {
+              id: true,
+              kind: true,
+              content: true,
+              contentHash: true,
+              storageObjectKey: true,
+              expiresAt: true,
+              createdAt: true,
+            },
+          },
+          events: {
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: {
+              id: true,
+              eventType: true,
+              actorType: true,
+              actorId: true,
+              previousStatus: true,
+              newStatus: true,
+              details: true,
+              createdAt: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const reports = [...profile.reports, ...unresolvedReports];
+    const moderationRequests = [
+      ...profile.moderationRequests,
+      ...unresolvedRequests,
+    ];
+    const identityVerificationRequests = [
+      ...profile.identityVerificationRequests,
+      ...unresolvedVerifications,
+    ];
+    const moderationCases = [...profile.moderationCases, ...unresolvedCases];
+
     const history = await prisma.moderationAction.findMany({
       where: { profileId },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -296,7 +458,10 @@ export async function GET(
           createdAt: profile.createdAt.toISOString(),
           updatedAt: profile.updatedAt.toISOString(),
           links: profile.sns,
-          reports: profile.reports.map((report) => ({
+          reports: mergeUnresolvedWithRecentHistory(
+            reports,
+            unresolvedReportStatuses,
+          ).map((report) => ({
             id: report.id,
             targetType: report.targetType,
             targetId: report.targetId,
@@ -345,42 +510,48 @@ export async function GET(
               createdAt: event.createdAt.toISOString(),
             })),
           })),
-          moderationRequests: profile.moderationRequests.map(
-            (moderationRequest) => ({
-              ...moderationRequest,
-              resolvedAt: moderationRequest.resolvedAt?.toISOString() ?? null,
-              createdAt: moderationRequest.createdAt.toISOString(),
-              updatedAt: moderationRequest.updatedAt.toISOString(),
-            }),
-          ),
-          identityVerificationRequests:
-            profile.identityVerificationRequests.map((verificationRequest) => ({
-              id: verificationRequest.id,
-              moderationCaseId: verificationRequest.moderationCaseId,
-              socialLinkId: verificationRequest.socialLinkId,
-              moderationCase: {
-                ...verificationRequest.moderationCase,
-                resolvedAt:
-                  verificationRequest.moderationCase.resolvedAt?.toISOString() ??
-                  null,
-              },
-              socialLink: verificationRequest.socialLink,
-              socialUrl: verificationRequest.socialUrl,
-              plannedContent: verificationRequest.plannedContent,
-              status: verificationRequest.status,
-              postingDeadlineAt:
-                verificationRequest.postingDeadlineAt.toISOString(),
-              reviewNote: verificationRequest.reviewNote,
-              reviewerIdentifier:
-                verificationRequest.reviewedByAdminUser?.authId.slice(0, 8) ??
+          moderationRequests: mergeUnresolvedWithRecentHistory(
+            moderationRequests,
+            ["pending"],
+          ).map((moderationRequest) => ({
+            ...moderationRequest,
+            resolvedAt: moderationRequest.resolvedAt?.toISOString() ?? null,
+            createdAt: moderationRequest.createdAt.toISOString(),
+            updatedAt: moderationRequest.updatedAt.toISOString(),
+          })),
+          identityVerificationRequests: mergeUnresolvedWithRecentHistory(
+            identityVerificationRequests,
+            ["pending"],
+          ).map((verificationRequest) => ({
+            id: verificationRequest.id,
+            moderationCaseId: verificationRequest.moderationCaseId,
+            socialLinkId: verificationRequest.socialLinkId,
+            moderationCase: {
+              ...verificationRequest.moderationCase,
+              resolvedAt:
+                verificationRequest.moderationCase.resolvedAt?.toISOString() ??
                 null,
-              reviewerRole:
-                verificationRequest.reviewedByAdminUser?.role ?? null,
-              reviewedAt: verificationRequest.reviewedAt?.toISOString() ?? null,
-              createdAt: verificationRequest.createdAt.toISOString(),
-              updatedAt: verificationRequest.updatedAt.toISOString(),
-            })),
-          moderationCases: profile.moderationCases.map((moderationCase) => ({
+            },
+            socialLink: verificationRequest.socialLink,
+            socialUrl: verificationRequest.socialUrl,
+            plannedContent: verificationRequest.plannedContent,
+            status: verificationRequest.status,
+            postingDeadlineAt:
+              verificationRequest.postingDeadlineAt.toISOString(),
+            reviewNote: verificationRequest.reviewNote,
+            reviewerIdentifier:
+              verificationRequest.reviewedByAdminUser?.authId.slice(0, 8) ??
+              null,
+            reviewerRole: verificationRequest.reviewedByAdminUser?.role ?? null,
+            reviewedAt: verificationRequest.reviewedAt?.toISOString() ?? null,
+            createdAt: verificationRequest.createdAt.toISOString(),
+            updatedAt: verificationRequest.updatedAt.toISOString(),
+          })),
+          moderationCases: mergeUnresolvedWithRecentHistory(moderationCases, [
+            "correctionRequired",
+            "postReviewPending",
+            "preReviewPending",
+          ]).map((moderationCase) => ({
             id: moderationCase.id,
             targetType: moderationCase.targetType,
             targetId: moderationCase.targetId,

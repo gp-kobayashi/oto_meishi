@@ -4,6 +4,10 @@ const { mocks } = vi.hoisted(() => ({
   mocks: {
     authorizeAdminRequest: vi.fn(),
     findUnique: vi.fn(),
+    reportsFindMany: vi.fn(),
+    moderationRequestsFindMany: vi.fn(),
+    identityVerificationRequestsFindMany: vi.fn(),
+    moderationCasesFindMany: vi.fn(),
     historyFindMany: vi.fn(),
     reportGroupBy: vi.fn(),
   },
@@ -16,8 +20,16 @@ vi.mock("@/lib/adminAuth", () => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     profile: { findUnique: mocks.findUnique },
+    contentReport: {
+      findMany: mocks.reportsFindMany,
+      groupBy: mocks.reportGroupBy,
+    },
+    moderationRequest: { findMany: mocks.moderationRequestsFindMany },
+    identityVerificationRequest: {
+      findMany: mocks.identityVerificationRequestsFindMany,
+    },
+    moderationCase: { findMany: mocks.moderationCasesFindMany },
     moderationAction: { findMany: mocks.historyFindMany },
-    contentReport: { groupBy: mocks.reportGroupBy },
   },
 }));
 
@@ -39,6 +51,10 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       ok: true,
       admin: { id: "admin-1", authId: "auth-1", role: "admin" },
     });
+    mocks.reportsFindMany.mockResolvedValue([]);
+    mocks.moderationRequestsFindMany.mockResolvedValue([]);
+    mocks.identityVerificationRequestsFindMany.mockResolvedValue([]);
+    mocks.moderationCasesFindMany.mockResolvedValue([]);
     mocks.findUnique.mockResolvedValue({
       id: "profile-1",
       userId: "sample-user",
@@ -430,6 +446,34 @@ describe("GET /api/admin/moderation/[profileId]", () => {
       ],
     });
     expect(result.profile.audioUrl).toBeUndefined();
+    expect(mocks.reportsFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          profileId: "profile-1",
+          status: { in: ["pending", "reviewed"] },
+        },
+      }),
+    );
+    expect(mocks.moderationRequestsFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { profileId: "profile-1", status: "pending" },
+      }),
+    );
+    expect(mocks.identityVerificationRequestsFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { profileId: "profile-1", status: "pending" },
+      }),
+    );
+    expect(mocks.moderationCasesFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          profileId: "profile-1",
+          status: {
+            in: ["correctionRequired", "postReviewPending", "preReviewPending"],
+          },
+        },
+      }),
+    );
   });
 
   it("プロフィールが存在しない場合は404を返す", async () => {
