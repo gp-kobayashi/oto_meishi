@@ -92,6 +92,7 @@ export async function processModerationDeadlines(
         postingDeadlineAt: { lte: now },
       },
       select: { profileId: true, moderationCaseId: true },
+      take: batchSize,
     });
   const expiredByProfile = new Map<string, Set<string>>();
   for (const request of expiredVerificationRequests) {

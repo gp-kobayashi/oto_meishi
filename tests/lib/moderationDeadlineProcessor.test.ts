@@ -83,6 +83,9 @@ describe("processModerationDeadlines", () => {
         take: 100,
       }),
     );
+    expect(mocks.verificationFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 100 }),
+    );
   });
 
   it("修正されないまま期限を過ぎたプロフィールを利用停止する", async () => {
