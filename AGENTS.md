@@ -6,7 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Agent workflow
 
-- The primary agent is the planner and reviewer. Use GPT-5.6 Sol for the primary session.
+- The primary agent is the planner and reviewer. Use GPT-5.6 Terra for the primary session.
 - The primary agent owns requirement clarification, repository investigation, implementation planning, scope decisions, final review, full verification, and commits.
 - After the plan is settled, delegate application-code and test-code changes to the project custom agent named `implementer`.
 - The `implementer` agent must follow the approved plan, make only scoped changes, and run the directly related tests. It must not commit, push, merge, or expand the scope.
