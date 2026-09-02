@@ -12,6 +12,7 @@ const { mocks } = vi.hoisted(() => ({
     userRateLimit: vi.fn(),
     ipRateLimit: vi.fn(),
     getClientIp: vi.fn(),
+    lockModerationProfile: vi.fn(),
   },
 }));
 
@@ -35,6 +36,9 @@ vi.mock("@/lib/moderationRequestRateLimit", () => ({
   consumeModerationRequestIpRateLimit: mocks.ipRateLimit,
 }));
 vi.mock("@/lib/clientIp", () => ({ getClientIp: mocks.getClientIp }));
+vi.mock("@/lib/moderationTransactionLock", () => ({
+  lockModerationProfile: mocks.lockModerationProfile,
+}));
 
 import {
   GET,
@@ -71,6 +75,7 @@ describe("/api/moderation/identity-verification", () => {
       retryAfterSeconds: 86_400,
     });
     mocks.getClientIp.mockReturnValue(null);
+    mocks.lockModerationProfile.mockResolvedValue(undefined);
     mocks.caseFindFirst.mockResolvedValue({ id: caseId });
     mocks.socialLinkFindFirst.mockResolvedValue({
       id: socialLinkId,
@@ -93,19 +98,20 @@ describe("/api/moderation/identity-verification", () => {
           updatedAt: new Date(),
         }),
     );
-    mocks.transaction.mockImplementation(
-      async (operation: unknown) => {
-        if (typeof operation === "function") {
-          return operation({
-            identityVerificationRequest: {
-              updateMany: mocks.verificationUpdateMany,
-              create: mocks.verificationCreate,
-            },
-          });
-        }
-        return Promise.all(operation as Promise<unknown>[]);
-      },
-    );
+    mocks.transaction.mockImplementation(async (operation: unknown) => {
+      if (typeof operation === "function") {
+        return operation({
+          identityVerificationRequest: {
+            updateMany: mocks.verificationUpdateMany,
+            create: mocks.verificationCreate,
+          },
+          moderationCase: {
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+          },
+        });
+      }
+      return Promise.all(operation as Promise<unknown>[]);
+    });
   });
 
   it("なりすましケースと登録SNSと申請履歴を返す", async () => {
@@ -165,6 +171,9 @@ describe("/api/moderation/identity-verification", () => {
       },
       data: { status: "expired" },
     });
+    expect(
+      mocks.lockModerationProfile.mock.invocationCallOrder[0],
+    ).toBeLessThan(mocks.verificationUpdateMany.mock.invocationCallOrder[0]);
     expect(mocks.verificationCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

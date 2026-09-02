@@ -9,6 +9,8 @@ import { prisma } from "@/lib/prisma";
 import { authorizeProfileOwnerRequest } from "@/lib/profileOwnerAuth";
 import { readJsonBody } from "@/lib/requestJson";
 import { hasJsonContentType } from "@/lib/requestContentType";
+import { expireIdentityVerificationRequest } from "@/lib/identityVerificationDeadline";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 const MAX_REQUEST_BODY_BYTES = 8 * 1024;
 const POSTING_WINDOW_MS = 10 * 60 * 1000;
@@ -252,14 +254,12 @@ export async function POST(request: Request) {
     const now = new Date();
     const postingDeadlineAt = new Date(now.getTime() + POSTING_WINDOW_MS);
     const created = await prisma.$transaction(async (transaction) => {
-      await transaction.identityVerificationRequest.updateMany({
-        where: {
-          moderationCaseId,
-          status: "pending",
-          postingDeadlineAt: { lte: now },
-        },
-        data: { status: "expired" },
-      });
+      await lockModerationProfile(transaction, authorization.profileId);
+      await expireIdentityVerificationRequest(
+        transaction,
+        moderationCaseId,
+        now,
+      );
       return transaction.identityVerificationRequest.create({
         data: {
           profileId: authorization.profileId,
