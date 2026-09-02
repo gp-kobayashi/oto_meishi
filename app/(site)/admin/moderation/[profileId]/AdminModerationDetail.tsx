@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import type { ModerationDetailResponse } from "@/lib/adminModeration";
 import styles from "./page.module.css";
@@ -13,19 +13,26 @@ import AdminModerationCasesPanel from "./AdminModerationCasesPanel";
 import AdminModeratedContentPanel from "./AdminModeratedContentPanel";
 import AdminModerationHistoryPanels from "./AdminModerationHistoryPanels";
 import AdminModerationAttentionSummary from "./AdminModerationAttentionSummary";
-import {
-  profileStatusLabels,
-} from "./moderationPresentation";
+import { profileStatusLabels } from "./moderationPresentation";
 
-
-export default function AdminModerationDetail({ profileId }: { profileId: string }) {
+export default function AdminModerationDetail({
+  profileId,
+}: {
+  profileId: string;
+}) {
   const router = useRouter();
   const [data, setData] = useState<ModerationDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const loadDetail = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setLoading(true);
     setError("");
 
@@ -43,27 +50,39 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
 
       const response = await fetch(
         `/api/admin/moderation/${encodeURIComponent(profileId)}`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } },
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+          signal: controller.signal,
+        },
       );
       if (response.status === 403) {
-        router.replace("/profile");
+        if (requestId === requestIdRef.current) router.replace("/profile");
         return;
       }
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result.error || "管理対象の詳細を取得できませんでした。");
+        throw new Error(
+          result.error || "管理対象の詳細を取得できませんでした。",
+        );
       }
 
-      setData(result as ModerationDetailResponse);
+      if (requestId === requestIdRef.current) {
+        setData(result as ModerationDetailResponse);
+      }
     } catch (loadError) {
-      setData(null);
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "管理対象の詳細を取得できませんでした。",
-      );
+      if (
+        requestId === requestIdRef.current &&
+        !(loadError instanceof Error && loadError.name === "AbortError")
+      ) {
+        setData(null);
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "管理対象の詳細を取得できませんでした。",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [profileId, router]);
 
@@ -71,6 +90,14 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
     const timeoutId = window.setTimeout(() => void loadDetail(), 0);
     return () => window.clearTimeout(timeoutId);
   }, [loadDetail]);
+
+  useEffect(
+    () => () => {
+      requestIdRef.current += 1;
+      abortControllerRef.current?.abort();
+    },
+    [],
+  );
 
   return (
     <section className={styles.page}>
@@ -100,7 +127,9 @@ export default function AdminModerationDetail({ profileId }: { profileId: string
                 <p className={styles.userId}>@{data.profile.userId}</p>
                 <h1>{data.profile.displayName}</h1>
               </div>
-              <span className={`${styles.badge} ${styles[data.profile.status]}`}>
+              <span
+                className={`${styles.badge} ${styles[data.profile.status]}`}
+              >
                 {profileStatusLabels[data.profile.status]}
               </span>
             </header>

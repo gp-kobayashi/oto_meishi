@@ -142,4 +142,51 @@ describe("AdminPage", () => {
     });
     expect(screen.queryByText("管理者権限がありません。")).toBeNull();
   });
+
+  it("遅れて返った古い一覧結果で最新表示を上書きしない", async () => {
+    let resolveFirst!: (response: Response) => void;
+    let resolveSecond!: (response: Response) => void;
+    const first = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const second = new Promise<Response>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const fetchMock = vi.spyOn(global, "fetch");
+    fetchMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    render(<AdminPage />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "要対応" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    resolveSecond(
+      Response.json({
+        items: [
+          {
+            id: "new-profile",
+            userId: "new-user",
+            displayName: "新しい結果",
+            status: "active",
+            hasAudio: false,
+            audioTitle: "",
+            audioStatus: "active",
+            linkCount: 0,
+            hiddenLinkCount: 0,
+            pendingReportCount: 1,
+            pendingReviewCount: 0,
+            updatedAt: "2026-09-02T00:00:00.000Z",
+          },
+        ],
+        attentionTotal: 1,
+        pagination: { page: 1, pageSize: 20, total: 1, totalPages: 1 },
+      }),
+    );
+    await screen.findByRole("heading", { name: "新しい結果" });
+    resolveFirst(
+      Response.json({ error: "古いリクエストのエラー" }, { status: 500 }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { name: "新しい結果" })).toBeDefined(),
+    );
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
 });

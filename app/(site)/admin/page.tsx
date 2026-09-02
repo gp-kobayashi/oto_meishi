@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
@@ -46,8 +46,14 @@ export default function AdminPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const requestIdRef = useRef(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const loadItems = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setLoading(true);
     setError("");
 
@@ -71,9 +77,10 @@ export default function AdminPage() {
 
       const response = await fetch(`/api/admin/moderation?${params}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        signal: controller.signal,
       });
       if (response.status === 403) {
-        router.replace("/profile");
+        if (requestId === requestIdRef.current) router.replace("/profile");
         return;
       }
       const result = await response.json().catch(() => ({}));
@@ -83,16 +90,23 @@ export default function AdminPage() {
         );
       }
 
-      setData(result as ModerationListResponse);
+      if (requestId === requestIdRef.current) {
+        setData(result as ModerationListResponse);
+      }
     } catch (loadError) {
-      setData(null);
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "管理対象の一覧を取得できませんでした。",
-      );
+      if (
+        requestId === requestIdRef.current &&
+        !(loadError instanceof Error && loadError.name === "AbortError")
+      ) {
+        setData(null);
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "管理対象の一覧を取得できませんでした。",
+        );
+      }
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }, [filter, page, query, router]);
 
@@ -100,6 +114,14 @@ export default function AdminPage() {
     const timeoutId = window.setTimeout(() => void loadItems(), 0);
     return () => window.clearTimeout(timeoutId);
   }, [loadItems]);
+
+  useEffect(
+    () => () => {
+      requestIdRef.current += 1;
+      abortControllerRef.current?.abort();
+    },
+    [],
+  );
 
   const submitSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

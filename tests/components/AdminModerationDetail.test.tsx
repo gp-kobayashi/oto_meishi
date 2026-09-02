@@ -107,4 +107,27 @@ describe("AdminModerationDetail", () => {
       "action-required",
     );
   });
+
+  it("profileId変更後に古い詳細結果を表示しない", async () => {
+    let resolveFirst!: (response: Response) => void;
+    let resolveSecond!: (response: Response) => void;
+    const first = new Promise<Response>((resolve) => {
+      resolveFirst = resolve;
+    });
+    const second = new Promise<Response>((resolve) => {
+      resolveSecond = resolve;
+    });
+    const fetchMock = vi.spyOn(global, "fetch");
+    fetchMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    const view = render(<AdminModerationDetail profileId="profile-1" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    view.rerender(<AdminModerationDetail profileId="profile-2" />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    resolveSecond(createAdminModerationDetailResponse());
+    await screen.findByRole("heading", { name: "サンプル" });
+    resolveFirst(
+      new Response(JSON.stringify({ error: "古い結果" }), { status: 200 }),
+    );
+    await waitFor(() => expect(screen.queryByText("古い結果")).toBeNull());
+  });
 });
