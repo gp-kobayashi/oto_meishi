@@ -1,4 +1,5 @@
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { ReportStatus } from "@/lib/generated/prisma/enums";
 
 export const moderationFilters = [
   "all",
@@ -10,6 +11,10 @@ export const moderationFilters = [
 
 export type ModerationFilter = (typeof moderationFilters)[number];
 export type ModerationTargetType = "profile" | "audio" | "socialLink";
+export const unresolvedReportStatuses: ReportStatus[] = [
+  ReportStatus.pending,
+  ReportStatus.reviewed,
+];
 
 export type AdminReportTargetValues = Record<string, string>;
 
@@ -39,7 +44,7 @@ export function getModerationFilterWhere(
           { status: { not: "active" } },
           { audioStatus: { not: "active" } },
           { sns: { some: { status: "hidden" } } },
-          { reports: { some: { status: "pending" } } },
+          { reports: { some: { status: { in: unresolvedReportStatuses } } } },
           {
             moderationCases: {
               some: {

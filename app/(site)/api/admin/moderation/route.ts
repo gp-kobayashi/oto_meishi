@@ -2,6 +2,7 @@ import { authorizeAdminRequest } from "@/lib/adminAuth";
 import {
   getModerationFilterWhere,
   isModerationFilter,
+  unresolvedReportStatuses,
 } from "@/lib/adminModeration";
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -22,7 +23,10 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const requestedFilter = url.searchParams.get("filter") ?? "all";
     if (!isModerationFilter(requestedFilter)) {
-      return Response.json({ error: "絞り込み条件が不正です。" }, { status: 400 });
+      return Response.json(
+        { error: "絞り込み条件が不正です。" },
+        { status: 400 },
+      );
     }
 
     const page = parsePositiveInteger(url.searchParams.get("page"));
@@ -60,7 +64,7 @@ export async function GET(request: Request) {
           sns: { select: { status: true } },
           _count: {
             select: {
-              reports: { where: { status: "pending" } },
+              reports: { where: { status: { in: unresolvedReportStatuses } } },
               moderationCases: {
                 where: {
                   status: { in: ["postReviewPending", "preReviewPending"] },

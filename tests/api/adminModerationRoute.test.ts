@@ -49,7 +49,7 @@ describe("GET /api/admin/moderation", () => {
           audioStatus: "active",
           updatedAt: new Date("2026-07-17T00:00:00.000Z"),
           sns: [{ status: "active" }, { status: "hidden" }],
-        _count: { reports: 2, moderationCases: 1 },
+          _count: { reports: 2, moderationCases: 1 },
         },
       ],
       1,
@@ -89,7 +89,7 @@ describe("GET /api/admin/moderation", () => {
           { status: { not: "active" } },
           { audioStatus: { not: "active" } },
           { sns: { some: { status: "hidden" } } },
-          { reports: { some: { status: "pending" } } },
+          { reports: { some: { status: { in: ["pending", "reviewed"] } } } },
           {
             moderationCases: {
               some: {
@@ -106,7 +106,11 @@ describe("GET /api/admin/moderation", () => {
           AND: expect.arrayContaining([
             expect.objectContaining({
               OR: expect.arrayContaining([
-                { reports: { some: { status: "pending" } } },
+                {
+                  reports: {
+                    some: { status: { in: ["pending", "reviewed"] } },
+                  },
+                },
               ]),
             }),
           ]),
@@ -116,7 +120,10 @@ describe("GET /api/admin/moderation", () => {
   });
 
   it("権限がない場合はDBへ問い合わせない", async () => {
-    const deniedResponse = Response.json({ error: "権限なし" }, { status: 403 });
+    const deniedResponse = Response.json(
+      { error: "権限なし" },
+      { status: 403 },
+    );
     mocks.authorizeAdminRequest.mockResolvedValue({
       ok: false,
       response: deniedResponse,
