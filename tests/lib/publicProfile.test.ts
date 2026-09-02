@@ -28,6 +28,7 @@ const baseProfile = {
   accountModerationStatus: "active" as const,
   sns: [
     {
+      id: "link-1",
       service: "youtube" as const,
       url: "https://youtube.com/example",
       label: "YouTube",
@@ -79,9 +80,11 @@ describe("getPublicProfile", () => {
       audioTitle: "自己紹介",
       sns: [
         {
+          id: "link-1",
           service: "youtube",
           url: "https://youtube.com/example",
           label: "YouTube",
+          status: "active",
         },
       ],
     });

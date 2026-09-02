@@ -8,6 +8,8 @@ import {
   consumeReportIpRateLimit,
   consumeReportTargetRateLimit,
 } from "@/lib/reportRateLimit";
+import { verifyPublicReportToken } from "@/lib/publicReportToken";
+import { lockModerationProfile } from "@/lib/moderationTransactionLock";
 
 const MAX_REPORT_BODY_BYTES = 8 * 1024;
 const MAX_PROFILE_ID_LENGTH = 100;
@@ -29,6 +31,7 @@ type ReportRequestBody = {
   details?: unknown;
   targetType?: unknown;
   targetId?: unknown;
+  reportToken?: unknown;
 };
 
 function isReportReason(value: unknown): value is ReportReason {
@@ -100,6 +103,7 @@ export async function POST(request: Request) {
         : "";
     const targetId =
       typeof body.targetId === "string" ? body.targetId.trim() : "";
+    const reportToken = body.reportToken;
 
     if (!profileId || profileId.length > MAX_PROFILE_ID_LENGTH) {
       return NextResponse.json(
@@ -139,6 +143,15 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "通報の詳細は500文字までです。" },
         { status: 400, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
+    if (
+      reportToken !== undefined &&
+      !verifyPublicReportToken(reportToken, profileId)
+    ) {
+      return NextResponse.json(
+        { error: "通報対象が見つかりません。" },
+        { status: 404, headers: PRIVATE_NO_STORE_HEADERS },
       );
     }
 
@@ -245,17 +258,88 @@ export async function POST(request: Request) {
               url: targetLink!.url,
               status: targetLink!.status,
             };
-    await prisma.contentReport.create({
-      data: {
-        profileId: profile.id,
-        targetType,
-        targetId,
-        targetSnapshot,
-        reason,
-        details,
-      },
-      select: { id: true },
-    });
+    const createReport = async (tx: typeof prisma) => {
+      return tx.contentReport.create({
+        data: {
+          profileId: profile.id,
+          targetType,
+          targetId,
+          targetSnapshot,
+          reason,
+          details,
+        },
+        select: { id: true },
+      });
+    };
+    const created =
+      typeof prisma.$transaction !== "function"
+        ? await createReport(prisma)
+        : await prisma.$transaction(async (tx) => {
+            await lockModerationProfile(tx, profile.id);
+            const current = await tx.profile.findUnique({
+              where: { id: profile.id },
+              select: {
+                status: true,
+                audioStatus: true,
+                audioKey: true,
+                audioUrl: true,
+                sns: { select: { id: true, status: true } },
+              },
+            });
+            const currentLink = current?.sns.find(
+              (link) => link.id === targetId,
+            );
+            const stillPublic =
+              current?.status === "active" &&
+              (targetType !== "audio" ||
+                (current.audioStatus === "active" &&
+                  Boolean(current.audioKey || current.audioUrl))) &&
+              (targetType !== "socialLink" || currentLink?.status === "active");
+            if (!stillPublic) return null;
+
+            const moderationCase = await tx.moderationCase.findFirst({
+              where: {
+                profileId: profile.id,
+                targetType,
+                targetId,
+                status: {
+                  in: [
+                    "correctionRequired",
+                    "postReviewPending",
+                    "preReviewPending",
+                  ],
+                },
+              },
+              orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+              select: { id: true },
+            });
+            const moderationAction = moderationCase
+              ? await tx.moderationAction.findFirst({
+                  where: { profileId: profile.id, targetType, targetId },
+                  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                  select: { id: true },
+                })
+              : null;
+            return tx.contentReport.create({
+              data: {
+                profileId: profile.id,
+                targetType,
+                targetId,
+                targetSnapshot,
+                reason,
+                details,
+                moderationCaseId: moderationCase?.id,
+                moderationActionId: moderationAction?.id,
+              },
+              select: { id: true },
+            });
+          });
+    if (!created) {
+      return NextResponse.json(
+        { error: "通報対象が見つかりません。" },
+        { status: 404, headers: PRIVATE_NO_STORE_HEADERS },
+      );
+    }
 
     return NextResponse.json(
       { success: true },

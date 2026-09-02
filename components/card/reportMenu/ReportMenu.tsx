@@ -12,6 +12,7 @@ type ReportMenuProps = {
   hasAudio?: boolean;
   audioStatus?: "active" | "hidden" | "removed";
   links?: ReportableSocialLink[];
+  reportToken?: string;
 };
 
 export default function ReportMenu({
@@ -21,6 +22,7 @@ export default function ReportMenu({
   hasAudio = false,
   audioStatus = "active",
   links = [],
+  reportToken,
 }: ReportMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -98,6 +100,7 @@ export default function ReportMenu({
           hasAudio={hasAudio}
           audioStatus={audioStatus}
           links={links}
+          reportToken={reportToken}
           onClose={closeDialog}
         />
       ) : null}

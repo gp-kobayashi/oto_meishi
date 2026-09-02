@@ -13,11 +13,13 @@ const Card = ({
   showReportMenu = false,
   previewAudioUrl = "",
   displayMode = "responsive",
+  reportToken,
 }: {
   link: ProfileData;
   showReportMenu?: boolean;
   previewAudioUrl?: string;
   displayMode?: "responsive" | "mobile";
+  reportToken?: string;
 }) => {
   const {
     userId,
@@ -51,6 +53,7 @@ const Card = ({
             (socialLink): socialLink is ReportableSocialLink =>
               socialLink.status !== "hidden" && Boolean(socialLink.id),
           )}
+          reportToken={reportToken}
         />
       ) : null}
       <h2 id="profile-title" className={styles.title}>

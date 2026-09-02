@@ -21,6 +21,7 @@ type ReportDialogProps = {
   audioStatus?: "active" | "hidden" | "removed";
   links?: ReportableSocialLink[];
   onClose: () => void;
+  reportToken?: string;
 };
 
 type ReportResponse = {
@@ -35,6 +36,7 @@ export default function ReportDialog({
   audioStatus = "active",
   links = [],
   onClose,
+  reportToken,
 }: ReportDialogProps) {
   const [selectedReason, setSelectedReason] = useState("");
   const [selectedLinkId, setSelectedLinkId] = useState("");
@@ -75,6 +77,7 @@ export default function ReportDialog({
                 : "profile",
           targetId:
             selectedReason === "unsafe_link" ? selectedLinkId : profileId,
+          reportToken,
         }),
       });
       const result = (await response

@@ -38,7 +38,13 @@ export const getPublicProfile = cache(
       audioTitle: hasAudio ? profile.audioTitle : "",
       sns: profile.sns
         .filter((link) => link.status === "active")
-        .map(({ service, url, label }) => ({ service, url, label })),
+        .map(({ id, service, url, label }) => ({
+          id,
+          service,
+          url,
+          label,
+          status: "active" as const,
+        })),
     };
   },
 );
