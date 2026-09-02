@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   compareModeratedContentHashes,
+  compareModeratedProfileContent,
   compareModeratedUrls,
   compareModerationSnapshotVersions,
   createModerationContentHash,
@@ -82,6 +83,69 @@ describe("プロフィール本体の変更判定", () => {
         theme: "colorful",
       }),
     ).toEqual(["displayName", "bio", "theme"]);
+  });
+});
+
+describe("プロフィール審査対象の最新内容判定", () => {
+  const current = {
+    displayName: "表示名",
+    bio: "自己紹介",
+    theme: "normal",
+    audioKey: "audio/current.m4a",
+    audioUrl: "",
+    audioTitle: "音声",
+    audioStatus: "active",
+    audioContentHash: "a".repeat(64),
+    socialLinks: [
+      {
+        id: "link-a",
+        service: "youtube",
+        label: "動画",
+        url: "https://youtube.com/a",
+        status: "active",
+        sortOrder: 0,
+      },
+    ],
+  };
+
+  const snapshot = {
+    displayName: "表示名",
+    bio: "自己紹介",
+    theme: "normal",
+    audio: {
+      storageKey: "audio/current.m4a",
+      contentHash: "a".repeat(64),
+      title: "音声",
+      status: "active",
+      hasAudio: true,
+    },
+    socialLinks: current.socialLinks,
+  };
+
+  it("音声とSNSが同じなら一致と判定する", () => {
+    expect(compareModeratedProfileContent(snapshot, current)).toBe(true);
+  });
+
+  it.each([
+    ["音声のタイトル", { audio: { ...snapshot.audio, title: "変更後" } }],
+    [
+      "SNSの追加",
+      {
+        socialLinks: [
+          ...current.socialLinks,
+          { ...current.socialLinks[0], id: "link-b", sortOrder: 1 },
+        ],
+      },
+    ],
+    ["SNSの削除", { socialLinks: [] }],
+    [
+      "SNSの並び順変更",
+      { socialLinks: [{ ...current.socialLinks[0], sortOrder: 1 }] },
+    ],
+  ])("%sは不一致と判定する", (_, changed) => {
+    expect(
+      compareModeratedProfileContent({ ...snapshot, ...changed }, current),
+    ).toBe(false);
   });
 });
 

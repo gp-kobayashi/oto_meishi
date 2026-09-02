@@ -158,3 +158,123 @@ export function compareModerationSnapshotVersions(
 
   return reviewedSnapshotId === latestSnapshotId ? "current" : "stale";
 }
+
+export function compareModeratedProfileContent(
+  snapshot: unknown,
+  current: {
+    displayName: string;
+    bio: string;
+    theme: string;
+    audioKey: string;
+    audioUrl: string;
+    audioTitle: string;
+    audioStatus: string;
+    audioContentHash: string | null;
+    socialLinks: Array<{
+      id: string;
+      service: string;
+      label: string;
+      url: string;
+      status: string;
+      sortOrder: number;
+    }>;
+  },
+): boolean {
+  if (!snapshot || typeof snapshot !== "object" || Array.isArray(snapshot)) {
+    return false;
+  }
+  const value = snapshot as Record<string, unknown>;
+  if (
+    value.displayName !== current.displayName ||
+    value.bio !== current.bio ||
+    value.theme !== current.theme
+  ) {
+    return false;
+  }
+  const audio = value.audio;
+  const audioValue =
+    audio && typeof audio === "object" && !Array.isArray(audio)
+      ? (audio as Record<string, unknown>)
+      : value;
+  const snapshotHash = audioValue.contentHash ?? audioValue.audioContentHash;
+  const hasSnapshotHash = typeof snapshotHash === "string";
+  if (hasSnapshotHash) {
+    if (
+      !current.audioContentHash ||
+      compareModeratedContentHashes(snapshotHash, current.audioContentHash) ===
+        "changed"
+    ) {
+      return false;
+    }
+  }
+  const hasAudioSnapshot =
+    audio && typeof audio === "object" && !Array.isArray(audio);
+  if (hasAudioSnapshot) {
+    const snapshotAudioKey = audioValue.audioKey ?? audioValue.storageKey;
+    const snapshotAudioTitle = audioValue.audioTitle ?? audioValue.title;
+    const snapshotAudioStatus = audioValue.audioStatus ?? audioValue.status;
+    if (
+      !hasSnapshotHash &&
+      typeof snapshotAudioKey === "string" &&
+      snapshotAudioKey !== current.audioKey
+    ) {
+      return false;
+    }
+    if (
+      typeof snapshotAudioTitle === "string" &&
+      snapshotAudioTitle !== current.audioTitle
+    ) {
+      return false;
+    }
+    if (
+      typeof snapshotAudioStatus === "string" &&
+      snapshotAudioStatus !== current.audioStatus
+    ) {
+      return false;
+    }
+    if (
+      typeof audioValue.hasAudio === "boolean" &&
+      audioValue.hasAudio !== Boolean(current.audioKey || current.audioUrl)
+    ) {
+      return false;
+    }
+  }
+  if (!Array.isArray(value.socialLinks)) return true;
+  const normalizedLinks = value.socialLinks.map((link) => {
+    if (!link || typeof link !== "object" || Array.isArray(link)) return null;
+    const item = link as Record<string, unknown>;
+    return {
+      id: typeof item.id === "string" ? item.id : "",
+      service: typeof item.service === "string" ? item.service : "",
+      label: typeof item.label === "string" ? item.label : "",
+      url: normalizeModeratedUrl(typeof item.url === "string" ? item.url : ""),
+      status: typeof item.status === "string" ? item.status : "active",
+      sortOrder: typeof item.sortOrder === "number" ? item.sortOrder : 0,
+    };
+  });
+  const validLinks = normalizedLinks.filter(
+    (link): link is NonNullable<typeof link> => link !== null,
+  );
+  if (validLinks.length !== current.socialLinks.length) {
+    return false;
+  }
+  const sortLinks = <T extends { sortOrder: unknown; id: unknown }>(
+    items: T[],
+  ) =>
+    [...items].sort(
+      (left, right) =>
+        Number(left.sortOrder) - Number(right.sortOrder) ||
+        String(left.id).localeCompare(String(right.id)),
+    );
+  return (
+    JSON.stringify(sortLinks(validLinks)) ===
+    JSON.stringify(
+      sortLinks(
+        current.socialLinks.map((link) => ({
+          ...link,
+          url: normalizeModeratedUrl(link.url),
+        })),
+      ),
+    )
+  );
+}

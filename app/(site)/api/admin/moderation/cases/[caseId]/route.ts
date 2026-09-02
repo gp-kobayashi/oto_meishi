@@ -9,6 +9,7 @@ import { PRIVATE_NO_STORE_HEADERS } from "@/lib/httpCache";
 import { getIncompleteImpersonationRemediationFields } from "@/lib/impersonationRemediation";
 import {
   compareModeratedContentHashes,
+  compareModeratedProfileContent,
   compareModeratedUrls,
   compareModerationSnapshotVersions,
 } from "@/lib/moderationRemediation";
@@ -133,12 +134,13 @@ export async function PATCH(
           profile: {
             select: {
               status: true,
-              audioStatus: true,
               displayName: true,
               bio: true,
               theme: true,
               audioKey: true,
               audioUrl: true,
+              audioTitle: true,
+              audioStatus: true,
               audioContentHash: true,
               accountModerationStatus: true,
               sns: {
@@ -147,6 +149,8 @@ export async function PATCH(
                   service: true,
                   url: true,
                   label: true,
+                  status: true,
+                  sortOrder: true,
                 },
               },
             },
@@ -375,12 +379,16 @@ async function doesCurrentTargetMatchSnapshot(
       theme: string;
       audioKey: string;
       audioUrl: string;
+      audioTitle: string;
+      audioStatus: string;
       audioContentHash: string | null;
       sns?: {
         id: string;
         service: string;
         url: string;
         label: string;
+        status: string;
+        sortOrder: number;
       }[];
     };
   },
@@ -405,11 +413,17 @@ async function doesCurrentTargetMatchSnapshot(
   }
 
   if (moderationCase.targetType === "profile") {
-    return (
-      snapshot.content.displayName === moderationCase.profile.displayName &&
-      snapshot.content.bio === moderationCase.profile.bio &&
-      snapshot.content.theme === moderationCase.profile.theme
-    );
+    return compareModeratedProfileContent(snapshot.content, {
+      displayName: moderationCase.profile.displayName,
+      bio: moderationCase.profile.bio,
+      theme: moderationCase.profile.theme,
+      audioKey: moderationCase.profile.audioKey,
+      audioUrl: moderationCase.profile.audioUrl,
+      audioTitle: moderationCase.profile.audioTitle,
+      audioStatus: moderationCase.profile.audioStatus,
+      audioContentHash: moderationCase.profile.audioContentHash,
+      socialLinks: moderationCase.profile.sns ?? [],
+    });
   }
 
   if (moderationCase.targetType === "audio") {
