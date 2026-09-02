@@ -8,6 +8,7 @@ import {
   deleteModeratedAccount,
 } from "@/lib/moderatedAccountDeletion";
 import { lockModerationProfile } from "@/lib/moderationTransactionLock";
+import { expireIdentityVerificationRequest } from "@/lib/identityVerificationDeadline";
 
 const DEFAULT_BATCH_SIZE = 100;
 const MAX_BATCH_SIZE = 500;
@@ -69,11 +70,7 @@ export async function processModerationDeadlines(
       moderationCases: {
         where: {
           status: {
-            in: [
-              "correctionRequired",
-              "postReviewPending",
-              "preReviewPending",
-            ],
+            in: ["correctionRequired", "postReviewPending", "preReviewPending"],
           },
         },
         select: { id: true, status: true, reviewDueAt: true },
@@ -87,6 +84,30 @@ export async function processModerationDeadlines(
     orderBy: { id: "asc" },
     take: batchSize,
   });
+
+  const expiredVerificationRequests =
+    await prisma.identityVerificationRequest.findMany({
+      where: {
+        status: "pending",
+        postingDeadlineAt: { lte: now },
+      },
+      select: { profileId: true, moderationCaseId: true },
+    });
+  const expiredByProfile = new Map<string, Set<string>>();
+  for (const request of expiredVerificationRequests) {
+    const caseIds =
+      expiredByProfile.get(request.profileId) ?? new Set<string>();
+    caseIds.add(request.moderationCaseId);
+    expiredByProfile.set(request.profileId, caseIds);
+  }
+  for (const [profileId, caseIds] of expiredByProfile) {
+    await prisma.$transaction(async (tx) => {
+      await lockModerationProfile(tx, profileId);
+      for (const moderationCaseId of caseIds) {
+        await expireIdentityVerificationRequest(tx, moderationCaseId, now);
+      }
+    });
+  }
 
   const result: ModerationDeadlineProcessResult = {
     examined: profiles.length,
@@ -105,10 +126,11 @@ export async function processModerationDeadlines(
         moderationCase.status === "correctionRequired" &&
         moderationCase.reviewDueAt.getTime() <= now.getTime(),
     );
-    const pendingReviewCases = profile.moderationCases.filter((moderationCase) =>
-      PENDING_ADMIN_REVIEW_STATUSES.includes(
-        moderationCase.status as (typeof PENDING_ADMIN_REVIEW_STATUSES)[number],
-      ),
+    const pendingReviewCases = profile.moderationCases.filter(
+      (moderationCase) =>
+        PENDING_ADMIN_REVIEW_STATUSES.includes(
+          moderationCase.status as (typeof PENDING_ADMIN_REVIEW_STATUSES)[number],
+        ),
     );
     const decision = decideModerationDeadlineAction(
       {

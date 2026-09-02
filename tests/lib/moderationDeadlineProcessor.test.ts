@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { mocks } = vi.hoisted(() => ({
   mocks: {
     findMany: vi.fn(),
+    verificationFindMany: vi.fn(),
     transaction: vi.fn(),
     updateMany: vi.fn(),
     actionCreate: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock("@/lib/moderatedAccountDeletion", () => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     profile: { findMany: mocks.findMany },
+    identityVerificationRequest: { findMany: mocks.verificationFindMany },
     $transaction: mocks.transaction,
   },
 }));
@@ -40,6 +42,7 @@ const transactionClient = {
 describe("processModerationDeadlines", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.verificationFindMany.mockResolvedValue([]);
     mocks.transaction.mockImplementation(
       (callback: (tx: typeof transactionClient) => unknown) =>
         callback(transactionClient),
@@ -60,6 +63,7 @@ describe("processModerationDeadlines", () => {
 
   it("管理者確認・解除申請待ちをバッチ取得前に除外する", async () => {
     mocks.findMany.mockResolvedValue([]);
+    mocks.verificationFindMany.mockResolvedValue([]);
 
     await processModerationDeadlines(now, 100);
 
@@ -267,10 +271,7 @@ describe("processModerationDeadlines", () => {
 
     expect(result.deletionCandidates).toBe(1);
     expect(result.deleted).toBe(1);
-    expect(mocks.deleteModeratedAccount).toHaveBeenCalledWith(
-      "profile-5",
-      now,
-    );
+    expect(mocks.deleteModeratedAccount).toHaveBeenCalledWith("profile-5", now);
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
 });

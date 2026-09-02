@@ -14,6 +14,7 @@ import {
 } from "@/lib/moderationViolation";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { lockModerationProfile } from "@/lib/moderationTransactionLock";
+import { expireIdentityVerificationRequest } from "@/lib/identityVerificationDeadline";
 
 const MAX_REVIEW_BODY_BYTES = 4 * 1024;
 const openCaseStatuses = [
@@ -252,10 +253,11 @@ export async function PATCH(
       const verificationRequest = lockedVerificationRequest;
       const reviewedAt = new Date();
       if (verificationRequest.postingDeadlineAt <= reviewedAt) {
-        await transaction.identityVerificationRequest.update({
-          where: { id: verificationRequest.id },
-          data: { status: "expired" },
-        });
+        await expireIdentityVerificationRequest(
+          transaction,
+          verificationRequest.moderationCase.id,
+          reviewedAt,
+        );
         return {
           error: "投稿期限を過ぎているため、この本人確認申請は審査できません。",
           httpStatus: 409,

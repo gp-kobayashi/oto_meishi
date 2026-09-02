@@ -10,10 +10,13 @@ const { mocks } = vi.hoisted(() => ({
     executeRaw: vi.fn(),
     requestFindUnique: vi.fn(),
     requestUpdate: vi.fn(),
+    requestUpdateMany: vi.fn(),
+    requestFindFirst: vi.fn(),
     appealUpdateMany: vi.fn(),
     caseCount: vi.fn(),
     caseFindMany: vi.fn(),
     caseUpdate: vi.fn(),
+    caseUpdateMany: vi.fn(),
     caseEventCreate: vi.fn(),
     profileUpdate: vi.fn(),
     socialLinkFindFirst: vi.fn(),
@@ -96,10 +99,13 @@ describe("管理者の本人確認審査API", () => {
       moderationCase,
     });
     mocks.requestUpdate.mockResolvedValue({ id: requestId });
+    mocks.requestUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.requestFindFirst.mockResolvedValue(null);
     mocks.appealUpdateMany.mockResolvedValue({ count: 1 });
     mocks.caseCount.mockResolvedValue(0);
     mocks.caseFindMany.mockResolvedValue([]);
     mocks.caseUpdate.mockResolvedValue({ id: "case-1" });
+    mocks.caseUpdateMany.mockResolvedValue({ count: 0 });
     mocks.caseEventCreate.mockResolvedValue({ id: "event-1" });
     mocks.profileUpdate.mockResolvedValue({ id: "profile-1" });
     mocks.violationFindFirst.mockResolvedValue({
@@ -132,12 +138,15 @@ describe("管理者の本人確認審査API", () => {
           identityVerificationRequest: {
             findUnique: mocks.requestFindUnique,
             update: mocks.requestUpdate,
+            updateMany: mocks.requestUpdateMany,
+            findFirst: mocks.requestFindFirst,
           },
           moderationRequest: { updateMany: mocks.appealUpdateMany },
           moderationCase: {
             count: mocks.caseCount,
             findMany: mocks.caseFindMany,
             update: mocks.caseUpdate,
+            updateMany: mocks.caseUpdateMany,
           },
           moderationCaseEvent: { create: mocks.caseEventCreate },
           profile: { update: mocks.profileUpdate },
@@ -220,10 +229,7 @@ describe("管理者の本人確認審査API", () => {
     });
     expect(mocks.executeRaw.mock.calls.slice(0, 2)).toEqual([
       [
-        [
-          "select pg_advisory_xact_lock(hashtextextended(",
-          ", 0))",
-        ],
+        ["select pg_advisory_xact_lock(hashtextextended(", ", 0))"],
         "profile:profile-1",
       ],
       [
@@ -657,8 +663,12 @@ describe("管理者の本人確認審査API", () => {
     await expect(response.json()).resolves.toEqual({
       error: "投稿期限を過ぎているため、この本人確認申請は審査できません。",
     });
-    expect(mocks.requestUpdate).toHaveBeenCalledWith({
-      where: { id: requestId },
+    expect(mocks.requestUpdateMany).toHaveBeenCalledWith({
+      where: {
+        moderationCaseId: "case-1",
+        status: "pending",
+        postingDeadlineAt: { lte: expect.any(Date) },
+      },
       data: { status: "expired" },
     });
     expect(mocks.profileUpdate).not.toHaveBeenCalled();

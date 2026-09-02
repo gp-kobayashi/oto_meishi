@@ -13,6 +13,7 @@ const { mocks } = vi.hoisted(() => ({
     ipRateLimit: vi.fn(),
     getClientIp: vi.fn(),
     lockModerationProfile: vi.fn(),
+    caseUpdateMany: vi.fn(),
   },
 }));
 
@@ -76,6 +77,7 @@ describe("/api/moderation/identity-verification", () => {
     });
     mocks.getClientIp.mockReturnValue(null);
     mocks.lockModerationProfile.mockResolvedValue(undefined);
+    mocks.caseUpdateMany.mockResolvedValue({ count: 1 });
     mocks.caseFindFirst.mockResolvedValue({ id: caseId });
     mocks.socialLinkFindFirst.mockResolvedValue({
       id: socialLinkId,
@@ -105,9 +107,7 @@ describe("/api/moderation/identity-verification", () => {
             updateMany: mocks.verificationUpdateMany,
             create: mocks.verificationCreate,
           },
-          moderationCase: {
-            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-          },
+          moderationCase: { updateMany: mocks.caseUpdateMany },
         });
       }
       return Promise.all(operation as Promise<unknown>[]);
@@ -174,6 +174,16 @@ describe("/api/moderation/identity-verification", () => {
     expect(
       mocks.lockModerationProfile.mock.invocationCallOrder[0],
     ).toBeLessThan(mocks.verificationUpdateMany.mock.invocationCallOrder[0]);
+    expect(mocks.caseUpdateMany).toHaveBeenCalledWith({
+      where: { id: caseId, status: "correctionRequired" },
+      data: { status: "preReviewPending" },
+    });
+    expect(mocks.caseUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.verificationCreate.mock.invocationCallOrder[0],
+    );
+    expect(mocks.verificationCreate.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.verificationUpdateMany.mock.invocationCallOrder[0],
+    );
     expect(mocks.verificationCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({

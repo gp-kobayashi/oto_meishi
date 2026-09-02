@@ -255,12 +255,11 @@ export async function POST(request: Request) {
     const postingDeadlineAt = new Date(now.getTime() + POSTING_WINDOW_MS);
     const created = await prisma.$transaction(async (transaction) => {
       await lockModerationProfile(transaction, authorization.profileId);
-      await expireIdentityVerificationRequest(
-        transaction,
-        moderationCaseId,
-        now,
-      );
-      return transaction.identityVerificationRequest.create({
+      await transaction.moderationCase.updateMany({
+        where: { id: moderationCaseId, status: "correctionRequired" },
+        data: { status: "preReviewPending" },
+      });
+      const request = await transaction.identityVerificationRequest.create({
         data: {
           profileId: authorization.profileId,
           moderationCaseId,
@@ -271,6 +270,12 @@ export async function POST(request: Request) {
         },
         select: requestSelection,
       });
+      await expireIdentityVerificationRequest(
+        transaction,
+        moderationCaseId,
+        now,
+      );
+      return request;
     });
 
     return Response.json(serializeRequest(created), {
