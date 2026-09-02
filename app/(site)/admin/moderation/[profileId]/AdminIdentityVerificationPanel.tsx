@@ -108,7 +108,7 @@ export default function AdminIdentityVerificationPanel({
     >
       <div className={styles.sectionHeading}>
         <h2 id="identity-verification-heading">本人確認申請</h2>
-        <span>最新{requests.length}件</span>
+        <span>{requests.length}件（未処理は全件・履歴は最新50件）</span>
       </div>
       {verificationError ? (
         <p className={styles.actionError} role="alert">

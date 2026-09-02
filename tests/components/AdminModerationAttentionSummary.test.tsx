@@ -12,8 +12,9 @@ describe("AdminModerationAttentionSummary", () => {
     );
 
     expect(screen.getByText("要対応 4項目")).toBeDefined();
-    expect(screen.getByRole("link", { name: "通報1件" }).getAttribute("href"))
-      .toBe("#reports-heading");
+    expect(
+      screen.getByRole("link", { name: "通報1件" }).getAttribute("href"),
+    ).toBe("#reports-heading");
     expect(
       screen
         .getByRole("link", { name: "修正内容と審査状況1件" })
@@ -51,5 +52,17 @@ describe("AdminModerationAttentionSummary", () => {
     expect(screen.queryByRole("link", { name: /件$/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: "対応対象" })).toBeNull();
     expect(screen.queryByRole("list")).toBeNull();
+  });
+
+  it("確認済み通報も要対応の通報件数に含める", () => {
+    const profile = createAdminModerationDetail().profile;
+    profile.reports = profile.reports.map((report) => ({
+      ...report,
+      status: "reviewed" as const,
+    }));
+
+    render(<AdminModerationAttentionSummary profile={profile} />);
+
+    expect(screen.getByRole("link", { name: "通報1件" })).toBeDefined();
   });
 });

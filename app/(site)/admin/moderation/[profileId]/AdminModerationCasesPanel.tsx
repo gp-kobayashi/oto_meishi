@@ -142,7 +142,7 @@ export default function AdminModerationCasesPanel({
     <section className={styles.panel} aria-labelledby="cases-heading">
       <div className={styles.sectionHeading}>
         <h2 id="cases-heading">修正内容と審査状況</h2>
-        <span>最新{cases.length}件</span>
+        <span>{cases.length}件（未処理は全件・履歴は最新50件）</span>
       </div>
       {caseError ? (
         <p className={styles.actionError} role="alert">

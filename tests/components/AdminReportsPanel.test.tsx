@@ -80,6 +80,26 @@ describe("AdminReportsPanel", () => {
     expect(screen.getByText("外部サイトへ誘導されます")).toBeDefined();
   });
 
+  it("未処理は全件、履歴は最新50件であることを案内する", () => {
+    const d = createAdminModerationDetail();
+    render(
+      <AdminReportsPanel
+        reports={d.profile.reports}
+        onReload={vi.fn()}
+        onActionMessage={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "未処理項目は全件、完了済み履歴は最新50件を表示しています。",
+      ),
+    ).toBeDefined();
+    expect(
+      screen.getByText("1件（未処理は全件・履歴は最新50件）"),
+    ).toBeDefined();
+  });
+
   it("未関連の通報は対応済みにできないことを案内する", () => {
     const d = createAdminModerationDetail();
     d.profile.reports = [

@@ -101,7 +101,7 @@ export default function AdminReportsPanel({
       <section className={styles.panel} aria-labelledby="reports-heading">
         <div className={styles.sectionHeading}>
           <h2 id="reports-heading">通報</h2>
-          <span>最新{reports.length}件</span>
+          <span>{reports.length}件（未処理は全件・履歴は最新50件）</span>
         </div>
         {reports.length ? (
           <ol className={styles.reportList}>
@@ -308,9 +308,9 @@ export default function AdminReportsPanel({
         ) : (
           <p className={styles.emptyHistory}>通報はありません。</p>
         )}
-        {reports.length === 50 ? (
-          <p className={styles.historyNote}>最新50件を表示しています。</p>
-        ) : null}
+        <p className={styles.historyNote}>
+          未処理項目は全件、完了済み履歴は最新50件を表示しています。
+        </p>
         {reportError ? (
           <p className={styles.actionError} role="alert">
             {reportError}

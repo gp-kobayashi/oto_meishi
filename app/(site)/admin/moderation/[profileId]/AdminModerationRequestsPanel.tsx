@@ -90,7 +90,9 @@ export default function AdminModerationRequestsPanel({
     <section className={styles.panel} aria-labelledby="requests-heading">
       <div className={styles.sectionHeading}>
         <h2 id="requests-heading">問い合わせ・解除申請</h2>
-        <span>最新{requestList.length}件</span>
+        <span>
+          {requestList.length}件（未処理は全件・履歴は最新50件）
+        </span>
       </div>
       {requestError ? (
         <p className={styles.actionError} role="alert">

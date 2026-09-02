@@ -16,7 +16,7 @@ export default function AdminModerationAttentionSummary({
   profile: Profile;
 }) {
   const pendingReports = profile.reports.filter(
-    (report) => report.status === "pending",
+    (report) => report.status === "pending" || report.status === "reviewed",
   ).length;
   const reviewWaitingCases = profile.moderationCases.filter((moderationCase) =>
     reviewWaitingStatuses.has(moderationCase.status),
