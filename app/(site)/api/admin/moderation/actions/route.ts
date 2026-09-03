@@ -418,6 +418,7 @@ export async function PATCH(request: Request) {
           where: { id: targetId },
           data: {
             status: effectiveNextStatus as "active" | "hidden" | "suspended",
+            moderatedAt: new Date(),
             ...(effectiveAction === "suspend"
               ? {
                   accountModerationStatus: "suspended" as const,
@@ -429,12 +430,19 @@ export async function PATCH(request: Request) {
       } else if (targetType === "audio") {
         await tx.profile.update({
           where: { id: targetId },
-          data: { audioStatus: nextStatus as "active" | "hidden" },
+          data: {
+            audioStatus: nextStatus as "active" | "hidden",
+            moderatedAt: new Date(),
+          },
         });
       } else {
         await tx.socialLink.update({
           where: { id: targetId },
           data: { status: nextStatus as "active" | "hidden" },
+        });
+        await tx.profile.update({
+          where: { id: profileId },
+          data: { moderatedAt: new Date() },
         });
       }
 
@@ -451,6 +459,7 @@ export async function PATCH(request: Request) {
             status: "suspended",
             accountModerationStatus: "suspended",
             suspensionAppealDueAt,
+            moderatedAt: new Date(),
           },
         });
         const suspensionAction = await tx.moderationAction.create({

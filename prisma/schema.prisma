@@ -390,12 +390,14 @@ model Profile {
   identityVerificationRequests IdentityVerificationRequest[]
   createdAt                    DateTime                      @default(now())
   updatedAt                    DateTime                      @updatedAt
+  moderatedAt                  DateTime                      @default(now())
 
   @@index([status])
   @@index([audioStatus])
   @@index([accountModerationStatus, suspensionAppealDueAt])
   @@index([deletionScheduledAt])
   @@index([accountModerationStatus, deletionProcessingStartedAt])
+  @@index([moderatedAt(sort: Desc), id(sort: Desc)], map: "Profile_moderatedAt_id_idx")
 }
 
 model AccountDeletionRecord {

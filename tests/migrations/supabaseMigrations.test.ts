@@ -407,4 +407,20 @@ describe("Supabase migrations", () => {
       'create index "ContentReport_moderationActionId_idx"',
     );
   });
+  it("プロフィールの管理日時を既存更新日時から初期化する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_add_profile_moderated_at.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+    expect(sql).toContain('add column "moderatedAt" timestamptz(3)');
+    expect(sql).toMatch(
+      /set\s+"moderatedAt"\s*=\s*"updatedAt"[\s\S]*where\s+"moderatedAt"\s+is\s+null/i,
+    );
+    expect(sql).toMatch(/alter column "moderatedAt" set not null/i);
+    expect(sql).toContain('create index "Profile_moderatedAt_id_idx"');
+  });
 });

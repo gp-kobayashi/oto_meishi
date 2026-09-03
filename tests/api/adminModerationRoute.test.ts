@@ -47,6 +47,7 @@ describe("GET /api/admin/moderation", () => {
           audioUrl: "https://example.com/audio.m4a",
           audioTitle: "自己紹介",
           audioStatus: "active",
+          moderatedAt: new Date("2026-07-18T00:00:00.000Z"),
           updatedAt: new Date("2026-07-17T00:00:00.000Z"),
           sns: [{ status: "active" }, { status: "hidden" }],
           _count: { reports: 2, moderationCases: 1 },
@@ -70,7 +71,7 @@ describe("GET /api/admin/moderation", () => {
       hiddenLinkCount: 1,
       pendingReportCount: 2,
       pendingReviewCount: 1,
-      updatedAt: "2026-07-17T00:00:00.000Z",
+      updatedAt: "2026-07-18T00:00:00.000Z",
     });
     expect(result.items[0].audioUrl).toBeUndefined();
     expect(result.attentionTotal).toBe(10);
@@ -81,7 +82,11 @@ describe("GET /api/admin/moderation", () => {
       totalPages: 1,
     });
     expect(mocks.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 20, take: 20 }),
+      expect.objectContaining({
+        skip: 20,
+        take: 20,
+        orderBy: [{ moderatedAt: "desc" }, { id: "desc" }],
+      }),
     );
     expect(mocks.count).toHaveBeenNthCalledWith(2, {
       where: {

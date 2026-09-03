@@ -170,7 +170,10 @@ describe("PATCH /api/admin/moderation/actions", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(mocks.profileUpdate).toHaveBeenCalledWith({
       where: { id: "profile-1" },
-      data: { status: "hidden" },
+      data: expect.objectContaining({
+        status: "hidden",
+        moderatedAt: expect.any(Date),
+      }),
     });
     expect(mocks.actionCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -262,6 +265,42 @@ describe("PATCH /api/admin/moderation/actions", () => {
         actorType: "admin",
         newStatus: "correctionRequired",
       }),
+    });
+  });
+
+  it("ケースがないリンクの復旧でも管理日時を更新する", async () => {
+    mocks.socialLinkFindUnique.mockResolvedValueOnce({
+      id: "link-1",
+      profileId: "profile-1",
+      service: "youtube",
+      label: "YouTube",
+      url: "https://youtube.com/hidden",
+      status: "hidden",
+      profile: {
+        status: "active",
+        accountModerationStatus: "active",
+        deletionProcessingStartedAt: null,
+      },
+    });
+
+    const response = await PATCH(
+      request({
+        targetType: "socialLink",
+        targetId: "link-1",
+        action: "restore",
+        reason: "リンクを再公開します",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.moderationCaseFindFirst).toHaveBeenCalled();
+    expect(mocks.socialLinkUpdate).toHaveBeenCalledWith({
+      where: { id: "link-1" },
+      data: { status: "active" },
+    });
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { moderatedAt: expect.any(Date) },
     });
   });
 
@@ -362,7 +401,10 @@ describe("PATCH /api/admin/moderation/actions", () => {
     );
     expect(mocks.profileUpdate).toHaveBeenNthCalledWith(1, {
       where: { id: "profile-1" },
-      data: { audioStatus: "hidden" },
+      data: expect.objectContaining({
+        audioStatus: "hidden",
+        moderatedAt: expect.any(Date),
+      }),
     });
     expect(mocks.profileUpdate).toHaveBeenNthCalledWith(2, {
       where: { id: "profile-1" },
@@ -447,6 +489,13 @@ describe("PATCH /api/admin/moderation/actions", () => {
         contentHash: expect.stringMatching(/^[a-f0-9]{64}$/),
       }),
     });
+    expect(mocks.profileUpdate).toHaveBeenCalledWith({
+      where: { id: "profile-1" },
+      data: { moderatedAt: expect.any(Date) },
+    });
+    expect(mocks.socialLinkUpdate.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.profileUpdate.mock.invocationCallOrder[0],
+    );
   });
 
   it("リンクが別プロフィールへ移動していた場合は更新せず409を返す", async () => {

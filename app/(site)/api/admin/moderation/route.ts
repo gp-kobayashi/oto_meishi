@@ -48,7 +48,7 @@ export async function GET(request: Request) {
     const [profiles, total, attentionTotal] = await prisma.$transaction([
       prisma.profile.findMany({
         where,
-        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        orderBy: [{ moderatedAt: "desc" }, { id: "desc" }],
         skip: (page - 1) * PAGE_SIZE,
         take: PAGE_SIZE,
         select: {
@@ -60,6 +60,7 @@ export async function GET(request: Request) {
           audioUrl: true,
           audioTitle: true,
           audioStatus: true,
+          moderatedAt: true,
           updatedAt: true,
           sns: { select: { status: true } },
           _count: {
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
           ).length,
           pendingReportCount: profile._count.reports,
           pendingReviewCount: profile._count.moderationCases,
-          updatedAt: profile.updatedAt.toISOString(),
+          updatedAt: (profile.moderatedAt ?? profile.updatedAt).toISOString(),
         })),
         pagination: {
           page,
