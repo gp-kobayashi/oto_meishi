@@ -423,4 +423,17 @@ describe("Supabase migrations", () => {
     expect(sql).toMatch(/alter column "moderatedAt" set not null/i);
     expect(sql).toContain('create index "Profile_moderatedAt_id_idx"');
   });
+  it("回答用の管理操作種別を追加する", () => {
+    const migrationFile = migrationFiles.find((fileName) =>
+      fileName.endsWith("_add_respond_moderation_action.sql"),
+    );
+    expect(migrationFile).toBeDefined();
+    const sql = fs.readFileSync(
+      path.join(migrationsDirectory, migrationFile!),
+      "utf8",
+    );
+    expect(sql).toMatch(
+      /alter\s+type\s+public\."ModerationActionType"\s+add\s+value\s+'respond'/i,
+    );
+  });
 });

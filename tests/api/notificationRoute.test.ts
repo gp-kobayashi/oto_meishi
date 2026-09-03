@@ -179,6 +179,43 @@ describe("GET /api/notifications", () => {
     });
   });
 
+  it("respond通知は回答内容と問い合わせ導線を返す", async () => {
+    mocks.transaction.mockResolvedValueOnce([
+      [
+        {
+          id: "notification-response",
+          title: "お問い合わせへの回答",
+          message: "ご質問への回答です。",
+          readAt: null,
+          createdAt: new Date("2026-07-21T06:00:00.000Z"),
+          profile: { displayName: "テスト", audioTitle: "" },
+          moderationAction: {
+            targetType: "profile",
+            targetId: "profile-1",
+            action: "respond",
+            reason: "ご質問への回答です。",
+            createdAt: new Date("2026-07-21T05:55:00.000Z"),
+          },
+        },
+      ],
+      1,
+    ]);
+
+    const response = await GET(request());
+    const result = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(result.notifications[0]).toEqual(
+      expect.objectContaining({
+        actionLabel: "回答",
+        message: "ご質問への回答です。",
+        reason: "ご質問への回答です。",
+        actionUrl: "/support",
+        actionLinkLabel: "回答を確認",
+      }),
+    );
+  });
+
   it("未認証の場合はDBへ問い合わせない", async () => {
     mocks.authorizeProfileOwnerRequest.mockResolvedValue({
       ok: false,

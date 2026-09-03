@@ -219,9 +219,10 @@ export async function PATCH(
             status: "active",
             accountModerationStatus: "active",
             suspensionAppealDueAt: null,
+            moderatedAt: new Date(),
           },
         });
-        await tx.moderationAction.create({
+        const restoreAction = await tx.moderationAction.create({
           data: {
             adminUserId: authorization.admin.id,
             profileId: moderationRequest.profileId,
@@ -231,6 +232,40 @@ export async function PATCH(
             previousStatus: lockedModerationRequest.profile.status,
             newStatus: "active",
             reason: responseMessage,
+          },
+          select: { id: true },
+        });
+        await tx.userNotification.create({
+          data: {
+            profileId: moderationRequest.profileId,
+            moderationActionId: restoreAction.id,
+            title: "利用停止解除申請の結果",
+            message: `解除申請が承認され、プロフィールを再公開しました。\n${responseMessage}`,
+          },
+        });
+      } else {
+        const responseAction = await tx.moderationAction.create({
+          data: {
+            adminUserId: authorization.admin.id,
+            profileId: moderationRequest.profileId,
+            targetType: "profile",
+            targetId: moderationRequest.profileId,
+            action: "respond",
+            previousStatus: lockedModerationRequest.profile.status,
+            newStatus: lockedModerationRequest.profile.status,
+            reason: responseMessage,
+          },
+          select: { id: true },
+        });
+        await tx.userNotification.create({
+          data: {
+            profileId: moderationRequest.profileId,
+            moderationActionId: responseAction.id,
+            title:
+              lockedModerationRequest.kind === "accountAppeal"
+                ? "利用停止解除申請の結果"
+                : "お問い合わせへの回答",
+            message: responseMessage,
           },
         });
       }

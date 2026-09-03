@@ -1,5 +1,5 @@
 export type NotificationTargetType = "profile" | "audio" | "socialLink";
-export type NotificationAction = "hide" | "restore" | "suspend";
+export type NotificationAction = "hide" | "restore" | "suspend" | "respond";
 export type NotificationReviewMode = "postReview" | "preReview" | null;
 
 const targetLabels: Record<NotificationTargetType, string> = {
@@ -24,8 +24,7 @@ export function getModerationNotification(
   if (action === "suspend") {
     return {
       title: "プロフィールの利用停止について",
-      message:
-        "規約違反が確認されたため、プロフィールを利用停止にしました。",
+      message: "規約違反が確認されたため、プロフィールを利用停止にしました。",
     };
   }
 
@@ -39,6 +38,7 @@ const actionLabels: Record<NotificationAction, string> = {
   hide: "非公開",
   restore: "再公開",
   suspend: "利用停止",
+  respond: "回答",
 };
 
 export function getModerationNotificationGuidance(
@@ -47,6 +47,14 @@ export function getModerationNotificationGuidance(
   reviewMode: NotificationReviewMode,
 ) {
   void reviewMode;
+  if (action === "respond") {
+    return {
+      actionLabel: actionLabels[action],
+      guidance: "管理者からの回答を確認できます。",
+      actionUrl: "/support",
+      actionLinkLabel: "回答を確認",
+    };
+  }
   if (action === "restore") {
     return {
       actionLabel: actionLabels[action],

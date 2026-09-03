@@ -65,6 +65,7 @@ enum ModerationActionType {
   hide
   restore
   suspend
+  respond
   scheduleDeletion
   remove
 }

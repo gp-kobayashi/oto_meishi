@@ -12,6 +12,7 @@ const { mocks } = vi.hoisted(() => ({
     profileUpdate: vi.fn(),
     profileFindUnique: vi.fn(),
     actionCreate: vi.fn(),
+    notificationCreate: vi.fn(),
     userRateLimit: vi.fn(),
     ipRateLimit: vi.fn(),
     getClientIp: vi.fn(),
@@ -73,6 +74,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
           update: mocks.profileUpdate,
         },
         moderationAction: { create: mocks.actionCreate },
+        userNotification: { create: mocks.notificationCreate },
       }),
     );
     mocks.requestFindUnique.mockResolvedValue({
@@ -93,7 +95,8 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
       status: "suspended",
       accountModerationStatus: "suspended",
     });
-    mocks.actionCreate.mockResolvedValue({});
+    mocks.actionCreate.mockResolvedValue({ id: "action-1" });
+    mocks.notificationCreate.mockResolvedValue({ id: "notification-1" });
   });
 
   it("解除申請を承認するとアカウントを復旧する", async () => {
@@ -120,6 +123,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
         status: "active",
         accountModerationStatus: "active",
         suspensionAppealDueAt: null,
+        moderatedAt: expect.any(Date),
       },
     });
     expect(mocks.actionCreate).toHaveBeenCalledWith({
@@ -129,7 +133,18 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
         previousStatus: "suspended",
         newStatus: "active",
       }),
+      select: { id: true },
     });
+    expect(mocks.notificationCreate).toHaveBeenCalledWith({
+      data: {
+        profileId: "profile-1",
+        moderationActionId: "action-1",
+        title: "利用停止解除申請の結果",
+        message:
+          expect.stringContaining("修正内容を確認したため解除しました。"),
+      },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
     expect(mocks.executeRaw.mock.calls).toEqual([
       [
         "select pg_advisory_xact_lock(hashtextextended($1, 0))",
@@ -158,7 +173,23 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
-    expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.actionCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "respond",
+        reason: "問題箇所の修正を確認できませんでした。",
+      }),
+      select: { id: true },
+    });
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
+    expect(mocks.notificationCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        moderationActionId: "action-1",
+        title: "利用停止解除申請の結果",
+        message: expect.stringContaining(
+          "問題箇所の修正を確認できませんでした。",
+        ),
+      }),
+    });
   });
 
   it("未完了ケースがある解除申請の承認を拒否する", async () => {
@@ -187,6 +218,7 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
     expect(mocks.requestUpdate).not.toHaveBeenCalled();
     expect(mocks.profileUpdate).not.toHaveBeenCalled();
     expect(mocks.actionCreate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
   });
 
   it("有効ななりすまし違反が残る解除申請の承認を拒否する", async () => {
@@ -247,5 +279,50 @@ describe("PATCH /api/admin/moderation/requests/[requestId]", () => {
 
     expect(response.status).toBe(409);
     expect(mocks.requestUpdate).not.toHaveBeenCalled();
+    expect(mocks.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it.each(["resolved", "rejected"])(
+    "問い合わせの%sでrespond操作と回答通知を保存する",
+    async (status) => {
+      mocks.requestFindUnique.mockResolvedValue({
+        id: "request-1",
+        profileId: "profile-1",
+        kind: "inquiry",
+        status: "pending",
+        profile: { status: "active", accountModerationStatus: "active" },
+      });
+      const response = await PATCH(
+        request({ status, responseMessage: "お問い合わせへの回答です。" }),
+        { params: Promise.resolve({ requestId: "request-1" }) },
+      );
+      expect(response.status).toBe(200);
+      expect(mocks.actionCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({ action: "respond" }),
+        select: { id: true },
+      });
+      expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
+      expect(mocks.notificationCreate).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          moderationActionId: "action-1",
+          title: "お問い合わせへの回答",
+          message: "お問い合わせへの回答です。",
+        }),
+      });
+    },
+  );
+
+  it("通知作成に失敗した場合は500を返す", async () => {
+    mocks.notificationCreate.mockRejectedValueOnce(
+      new Error("notification failed"),
+    );
+    const response = await PATCH(
+      request({ status: "rejected", responseMessage: "対応できません。" }),
+      { params: Promise.resolve({ requestId: "request-1" }) },
+    );
+    expect(response.status).toBe(500);
+    expect(mocks.requestUpdate).toHaveBeenCalled();
+    expect(mocks.actionCreate).toHaveBeenCalled();
+    expect(mocks.notificationCreate).toHaveBeenCalledTimes(1);
   });
 });
