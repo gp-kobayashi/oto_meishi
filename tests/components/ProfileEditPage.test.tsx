@@ -338,6 +338,24 @@ describe("ProfileEditPage", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("ラベルを入力した新規リンクのURLを必須にして保存を止める", async () => {
+    const fetchMock = await renderLoadedPage();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "+ リンクを追加" }),
+    );
+    const labelInputs = screen.getAllByLabelText<HTMLInputElement>("ラベル");
+    fireEvent.change(labelInputs.at(-1)!, {
+      target: { value: "Website" },
+    });
+
+    expect(screen.getByText("URLを入力してください。")).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+    expect(await screen.findByText("入力内容を確認してください。")).toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("対象ごとの違反理由と確認中の公開状態を表示する", async () => {
     await renderLoadedPage({
       ...baseProfile,

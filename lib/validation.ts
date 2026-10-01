@@ -74,9 +74,15 @@ export function validateSocialLabel(
  * SNS URLのHTTPS形式チェック
  * 空欄のリンク行は保存時に除外されるため、入力がある場合だけ検証する
  */
-export function validateSocialUrl(value: string): string | undefined {
+export function validateSocialUrl(
+  value: string,
+  required = false,
+): string | undefined {
   const trimmedValue = value.trim();
   if (!trimmedValue) {
+    if (required) {
+      return "URLを入力してください。";
+    }
     return undefined;
   }
 
@@ -119,7 +125,10 @@ export function validateProfile(data: ProfileData): ValidationError {
       link.label,
       Boolean(link.url.trim()),
     );
-    const urlError = validateSocialUrl(link.url);
+    const urlError = validateSocialUrl(
+      link.url,
+      Boolean(link.label.trim()),
+    );
     if (labelError || urlError) {
       snsErrors[index] = {
         label: labelError,

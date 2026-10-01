@@ -135,12 +135,13 @@ export function normalizeTheme(theme: string): ProfileTheme {
  * URLフォーマットのバリデーション
  */
 export function validateUrlFormat(url: string): ApiValidationError | null {
-  if (!url) {
+  const trimmedUrl = url.trim();
+  if (!trimmedUrl) {
     return { field: "sns", message: "URLは必須です。" };
   }
 
   try {
-    const parsedUrl = new URL(url);
+    const parsedUrl = new URL(trimmedUrl);
     if (parsedUrl.protocol !== "https:") {
       return {
         field: "sns",
@@ -274,12 +275,33 @@ export function sanitizeProfileData(
     return Boolean(url) && !label;
   });
 
+  const hasLabelWithoutUrl = socialLinkInputs.some((link) => {
+    if (typeof link !== "object" || link === null) {
+      return false;
+    }
+    const candidate = link as Record<string, unknown>;
+    const url = typeof candidate.url === "string" ? candidate.url.trim() : "";
+    const label =
+      typeof candidate.label === "string" ? candidate.label.trim() : "";
+    return Boolean(label) && !url;
+  });
+
   if (hasUrlWithoutLabel) {
     return {
       data: null,
       error: {
         field: "sns",
         message: "SNSラベルを入力してください。",
+      },
+    };
+  }
+
+  if (hasLabelWithoutUrl) {
+    return {
+      data: null,
+      error: {
+        field: "sns",
+        message: "SNS URLを入力してください。",
       },
     };
   }

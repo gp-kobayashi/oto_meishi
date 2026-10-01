@@ -325,6 +325,19 @@ describe('APIバリデーション関数', () => {
       });
     });
 
+    it('ラベルがあるSNSリンクのURLが空の場合はエラーを返す', () => {
+      const result = sanitizeProfileData({
+        userId: 'testuser',
+        sns: [{ service: 'x', url: '  ', label: 'X' }],
+      });
+
+      expect(result.data).toBeNull();
+      expect(result.error).toEqual({
+        field: 'sns',
+        message: 'SNS URLを入力してください。',
+      });
+    });
+
     it('URLとラベルが空の追加行は無視する', () => {
       const result = sanitizeProfileData({
         userId: 'testuser',
@@ -436,7 +449,7 @@ describe('APIバリデーション関数', () => {
       expect(result.data).toBeNull();
     });
 
-    it('空のURLはフィルタリングされる', () => {
+    it('URLが空でラベルがあるSNSリンクはエラーを返す', () => {
       const input = {
         userId: 'testuser',
         displayName: 'テストユーザー',
@@ -445,8 +458,11 @@ describe('APIバリデーション関数', () => {
         ],
       };
       const result = sanitizeProfileData(input);
-      expect(result.error).toBeNull();
-      expect(result.data?.sns).toEqual([]);
+      expect(result.error).toEqual({
+        field: 'sns',
+        message: 'SNS URLを入力してください。',
+      });
+      expect(result.data).toBeNull();
     });
 
     it('displayNameが空の場合はuserIdを使用する', () => {
