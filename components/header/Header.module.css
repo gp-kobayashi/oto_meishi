@@ -11,6 +11,10 @@
   border-bottom: 1px solid rgba(31, 41, 51, 0.1);
 }
 
+.header:has([aria-controls="notification-panel"][aria-expanded="true"]) {
+  z-index: 30;
+}
+
 .logoContainer {
   display: flex;
   align-items: center;
