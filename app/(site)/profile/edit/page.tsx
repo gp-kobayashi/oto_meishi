@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent, type DragEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from "react";
 import type {
   ModerationCase,
   ProfileData,
@@ -214,6 +220,7 @@ export default function ProfileEditPage() {
   const [error, setError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [saveMessage, setSaveMessage] = useState<string>("");
+  const editRevisionRef = useRef(0);
   const [audioUploadMessages, setAudioUploadMessages] = useState<string[]>([]);
   const [audioFileError, setAudioFileError] = useState<string>("");
   const [deletingAudio, setDeletingAudio] = useState(false);
@@ -227,6 +234,14 @@ export default function ProfileEditPage() {
     audioTitle?: string;
     socialLinks?: Record<number, { label?: string; url?: string }>;
   }>({});
+
+  const markProfileEdited = () => {
+    editRevisionRef.current += 1;
+    setSaveState((current) =>
+      current === "success" || current === "error" ? "idle" : current,
+    );
+    setSaveMessage("");
+  };
 
   useEffect(() => {
     const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
@@ -299,6 +314,7 @@ export default function ProfileEditPage() {
   }, [previewOpen]);
 
   const updateField = (field: keyof ProfileData, value: string) => {
+    markProfileEdited();
     setProfile((current) =>
       current ? { ...current, [field]: value } : current,
     );
@@ -333,6 +349,7 @@ export default function ProfileEditPage() {
     field: keyof SocialLink,
     value: string,
   ) => {
+    markProfileEdited();
     setProfile((current) => {
       if (!current) return current;
       const next = [...current.sns];
@@ -394,6 +411,7 @@ export default function ProfileEditPage() {
     }
 
     setAudioFileError("");
+    markProfileEdited();
     setAudioFile(file);
     setAudioPreviewUrl((previousUrl) => {
       if (previousUrl) URL.revokeObjectURL(previousUrl);
@@ -437,6 +455,8 @@ export default function ProfileEditPage() {
     ) {
       return;
     }
+
+    markProfileEdited();
 
     if (!supabase) {
       setAudioFileError("認証クライアントが初期化されていません。");
@@ -485,6 +505,7 @@ export default function ProfileEditPage() {
   };
 
   const addSocialLink = () => {
+    markProfileEdited();
     setProfile((current) => {
       if (!current || current.sns.length >= 4) return current;
       return {
@@ -495,6 +516,7 @@ export default function ProfileEditPage() {
   };
 
   const removeSocialLink = (index: number) => {
+    markProfileEdited();
     setProfile((current) =>
       current
         ? { ...current, sns: current.sns.filter((_, i) => i !== index) }
@@ -517,6 +539,8 @@ export default function ProfileEditPage() {
       setSaveMessage("入力内容を確認してください。");
       return;
     }
+
+    const saveRevision = editRevisionRef.current;
 
     const savedUserId = window.localStorage.getItem(OTO_MEISHI_USER_ID_KEY);
     if (!savedUserId) {
@@ -599,6 +623,12 @@ export default function ProfileEditPage() {
 
       if (!response.ok) {
         throw new Error(savedProfileResponse.error || "保存に失敗しました。");
+      }
+
+      if (editRevisionRef.current !== saveRevision) {
+        setSaveState("idle");
+        setSaveMessage("");
+        return;
       }
 
       setProfile(savedProfileResponse as ProfileData);

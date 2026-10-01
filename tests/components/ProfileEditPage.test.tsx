@@ -172,6 +172,58 @@ describe("ProfileEditPage", () => {
     );
   });
 
+  it("保存成功メッセージは保存対象を編集すると消え、再保存で再表示する", async () => {
+    const fetchMock = await renderLoadedPage();
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ ...baseProfile, displayName: "変更後の表示名" }),
+    );
+
+    fireEvent.change(screen.getByLabelText("表示名"), {
+      target: { value: "変更後の表示名" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+    expect(await screen.findByText("プロフィールを保存しました。"))
+      .toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("自己紹介"), {
+      target: { value: "編集後の自己紹介" },
+    });
+    expect(screen.queryByText("プロフィールを保存しました。")).toBeNull();
+
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ ...baseProfile, bio: "編集後の自己紹介" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+    expect(await screen.findByText("プロフィールを保存しました。"))
+      .toBeDefined();
+  });
+
+  it("保存中に編集した場合は古い保存結果で成功表示や入力値を上書きしない", async () => {
+    const fetchMock = await renderLoadedPage();
+    let resolveSave!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveSave = resolve;
+        }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "変更を保存" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    fireEvent.change(screen.getByLabelText("表示名"), {
+      target: { value: "保存中に編集した表示名" },
+    });
+
+    resolveSave(Response.json({ ...baseProfile }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("プロフィールを保存しました。")).toBeNull();
+      expect(screen.getByLabelText<HTMLInputElement>("表示名").value).toBe(
+        "保存中に編集した表示名",
+      );
+    });
+  });
+
   it("音声ファイルの制限と対応形式を表示する", async () => {
     await renderLoadedPage();
 
