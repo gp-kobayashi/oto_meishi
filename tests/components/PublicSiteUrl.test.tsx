@@ -37,6 +37,23 @@ describe("公開URLを使用する画面", () => {
     expect(screen.getByText("https://oto-meishi.com/")).toBeDefined();
   });
 
+  it("入力中のユーザーIDを使った公開プロフィールURLと注意書きを表示する", () => {
+    render(<UserIdInputPage />);
+
+    expect(screen.getByText("https://oto-meishi.com/your-user-id")).toBeDefined();
+    expect(
+      screen.getByText(
+        "ユーザーIDは登録後に変更できません。内容をよく確認してから登録してください。",
+      ),
+    ).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText("ユーザーID"), {
+      target: { value: "sample-user" },
+    });
+
+    expect(screen.getByText("https://oto-meishi.com/sample-user")).toBeDefined();
+  });
+
   it("予約済みユーザーIDを送信せずにエラー表示する", () => {
     const fetchMock = vi.fn();
     const originalFetch = globalThis.fetch;

@@ -22,6 +22,7 @@ export default function UserIdInputPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const profileUrlPreview = `${profileUrlPrefix}${userId.trim() || "your-user-id"}`;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -108,6 +109,9 @@ export default function UserIdInputPage() {
           あなたの oto_meishi
           ページの公開パスとなるユーザーIDを入力してください。
         </p>
+        <p className={styles.warning} role="note">
+          ユーザーIDは登録後に変更できません。内容をよく確認してから登録してください。
+        </p>
         <form className={styles.form} onSubmit={handleSubmit}>
           <label className={styles.label} htmlFor="userId">
             ユーザーID
@@ -122,6 +126,15 @@ export default function UserIdInputPage() {
               placeholder="your-user-id"
               aria-describedby="userIdHelp"
             />
+          </div>
+          <div
+            id="userIdPreview"
+            className={styles.preview}
+            aria-live="polite"
+            aria-atomic="true"
+          >
+            <span className={styles.previewLabel}>公開プロフィールURL</span>
+            <code className={styles.previewUrl}>{profileUrlPreview}</code>
           </div>
           <p id="userIdHelp" className={styles.hint}>
             英数字、ハイフン、アンダースコアが使えます。一部のシステム予約済みIDは使用できません。
