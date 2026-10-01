@@ -104,6 +104,11 @@
   opacity: 1;
 }
 
+.progressBar:focus-visible {
+  outline: 2px solid var(--player-bar-fill);
+  outline-offset: 4px;
+}
+
 .time {
   flex-shrink: 0;
   margin: 0;

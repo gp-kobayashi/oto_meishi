@@ -1,5 +1,6 @@
 import {
   act,
+  createEvent,
   fireEvent,
   render,
   screen,
@@ -161,5 +162,108 @@ describe("AudioPlayer", () => {
       "Audio not found.",
     );
     expect(HTMLMediaElement.prototype.play).not.toHaveBeenCalled();
+  });
+
+  it("シークバーの矢印キーで5秒単位に再生位置を変更する", () => {
+    setMediaPreferences(false);
+    const { container } = render(
+      <AudioPlayer userId="sample-user" audioTitle="自己紹介" />,
+    );
+    const audio = container.querySelector("audio");
+    const progressBar = screen.getByRole("slider", { name: "再生位置" });
+    if (!audio) throw new Error("Audio element was not rendered");
+
+    Object.defineProperty(audio, "duration", {
+      configurable: true,
+      value: 30,
+    });
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 10,
+    });
+    fireEvent.loadedMetadata(audio);
+
+    const event = createEvent.keyDown(progressBar, { key: "ArrowRight" });
+    fireEvent(progressBar, event);
+
+    expect(audio.currentTime).toBe(15);
+    expect(event.defaultPrevented).toBe(true);
+    expect(progressBar.getAttribute("aria-valuenow")).toBe("50");
+    expect(container.querySelector('[class*="time"]')?.textContent).toContain(
+      "0:15",
+    );
+  });
+
+  it.each([
+    ["ArrowLeft", 0],
+    ["ArrowRight", 30],
+  ])("シーク位置を範囲内にクランプする (%s)", (key, expectedTime) => {
+    setMediaPreferences(false);
+    const { container } = render(
+      <AudioPlayer userId="sample-user" audioTitle="自己紹介" />,
+    );
+    const audio = container.querySelector("audio");
+    const progressBar = screen.getByRole("slider", { name: "再生位置" });
+    if (!audio) throw new Error("Audio element was not rendered");
+
+    Object.defineProperty(audio, "duration", {
+      configurable: true,
+      value: 30,
+    });
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: key === "ArrowLeft" ? 2 : 28,
+    });
+    fireEvent.loadedMetadata(audio);
+    fireEvent.keyDown(progressBar, { key });
+
+    expect(audio.currentTime).toBe(expectedTime);
+  });
+
+  it("再生時間が利用できない場合は矢印キーを無視する", () => {
+    setMediaPreferences(false);
+    const { container } = render(
+      <AudioPlayer userId="sample-user" audioTitle="自己紹介" />,
+    );
+    const audio = container.querySelector("audio");
+    const progressBar = screen.getByRole("slider", { name: "再生位置" });
+    if (!audio) throw new Error("Audio element was not rendered");
+
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 10,
+    });
+    const event = createEvent.keyDown(progressBar, { key: "ArrowRight" });
+    fireEvent(progressBar, event);
+
+    expect(audio.currentTime).toBe(10);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("矢印キー以外はシークしない", () => {
+    setMediaPreferences(false);
+    const { container } = render(
+      <AudioPlayer userId="sample-user" audioTitle="自己紹介" />,
+    );
+    const audio = container.querySelector("audio");
+    const progressBar = screen.getByRole("slider", { name: "再生位置" });
+    if (!audio) throw new Error("Audio element was not rendered");
+
+    Object.defineProperty(audio, "duration", {
+      configurable: true,
+      value: 30,
+    });
+    Object.defineProperty(audio, "currentTime", {
+      configurable: true,
+      writable: true,
+      value: 10,
+    });
+    fireEvent.loadedMetadata(audio);
+    fireEvent.keyDown(progressBar, { key: "Home" });
+
+    expect(audio.currentTime).toBe(10);
   });
 });

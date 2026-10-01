@@ -162,6 +162,30 @@ const AudioPlayer = ({
     [duration],
   );
 
+  const handleSeekKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (!Number.isFinite(duration) || duration <= 0) return;
+
+      const audio = audioRef.current;
+      if (!audio) return;
+
+      e.preventDefault();
+      const currentPosition = Number.isFinite(audio.currentTime)
+        ? audio.currentTime
+        : currentTime;
+      const delta = e.key === "ArrowRight" ? 5 : -5;
+      const nextPosition = Math.max(
+        0,
+        Math.min(duration, currentPosition + delta),
+      );
+
+      audio.currentTime = nextPosition;
+      setCurrentTime(nextPosition);
+    },
+    [currentTime, duration],
+  );
+
   const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
   return (
@@ -209,6 +233,7 @@ const AudioPlayer = ({
           className={styles.progressBar}
           ref={progressRef}
           onClick={handleSeek}
+          onKeyDown={handleSeekKeyDown}
           role="slider"
           aria-label="再生位置"
           aria-valuenow={Math.round(progress)}
